@@ -56,7 +56,7 @@ tasks.register("generateTypeScript") {
     description = "Generate TypeScript enums from Java enums"
 
     doLast {
-        val sharedDir = file("../shared")
+        val sharedDir = file("../@shared")
         sharedDir.mkdirs()
 
         val outputFile = File(sharedDir, "enums.ts")
