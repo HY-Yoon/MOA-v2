@@ -50,3 +50,69 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+tasks.register("generateTypeScript") {
+    group = "generate"
+    description = "Generate TypeScript enums from Java enums"
+
+    doLast {
+        val sharedDir = file("../shared")
+        sharedDir.mkdirs()
+
+        val outputFile = File(sharedDir, "enums.ts")
+        val typescript = StringBuilder()
+
+        typescript.append("// Auto-generated from Java enums - DO NOT EDIT\n\n")
+
+        fileTree("src/main/java/com/moa2/global/model") {
+            include("*.java")
+        }.forEach { javaFile ->
+            val content = javaFile.readText()
+
+            if (content.contains("public enum")) {
+                val enumName = javaFile.nameWithoutExtension
+
+                // 주석 제거 후 enum 추출
+                val cleanedContent = content
+                    .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "") // 블록 주석 제거
+                    .replace(Regex("//.*"), "") // 라인 주석 제거
+
+                val enumPattern = Regex("""enum\s+$enumName\s*\{([^}]+)\}""", RegexOption.DOT_MATCHES_ALL)
+                val match = enumPattern.find(cleanedContent)
+
+                if (match != null) {
+                    val enumBody = match.groupValues[1]
+
+                    val values = enumBody
+                        .split(",")
+                        .map {
+                            it.trim()
+                                .split(Regex("\\s+"))[0] // 첫 번째 단어만 (공백 전까지)
+                                .replace(Regex("\\(.*?\\)"), "")
+                                .replace(";", "")
+                                .trim()
+                        }
+                        .filter {
+                            it.isNotEmpty() &&
+                                    it.matches(Regex("[A-Z][A-Z0-9_]*"))
+                        }
+
+                    if (values.isNotEmpty()) {
+                        val tsValues = values.joinToString(" | ") { "\"$it\"" }
+                        typescript.append("export type $enumName = $tsValues;\n\n")
+
+                        println("$enumName: ${values.joinToString(", ")}")
+                    }
+                }
+            }
+        }
+
+        outputFile.writeText(typescript.toString())
+        println("Generated file: ${outputFile.absolutePath}")
+        println("Total types: ${typescript.lines().count { it.startsWith("export type") }}")
+    }
+}
+
+tasks.named("compileJava") {
+    dependsOn("generateTypeScript")
+}
