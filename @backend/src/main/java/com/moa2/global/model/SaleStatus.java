@@ -8,3 +8,4 @@ public enum SaleStatus {
     SUSPENDED  // 판매 중단
 }
 
+

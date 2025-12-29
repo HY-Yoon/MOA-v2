@@ -34,3 +34,4 @@ public class Seat {
     private LocalDateTime updatedAt;
 }
 
+

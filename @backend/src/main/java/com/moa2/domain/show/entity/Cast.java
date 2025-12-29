@@ -24,3 +24,4 @@ public class Cast {
     private LocalDateTime updatedAt;
 }
 
+

@@ -9,3 +9,4 @@ public enum UserStatus {
     SUSPENDED  // 정지됨
 }
 
+

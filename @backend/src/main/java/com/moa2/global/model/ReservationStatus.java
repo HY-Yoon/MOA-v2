@@ -9,3 +9,4 @@ public enum ReservationStatus {
     CANCELLED  // 예매 취소
 }
 
+

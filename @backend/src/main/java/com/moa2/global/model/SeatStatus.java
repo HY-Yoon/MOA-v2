@@ -10,3 +10,4 @@ public enum SeatStatus {
     SOLD       // 판매됨
 }
 
+

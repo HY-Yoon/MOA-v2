@@ -26,7 +26,7 @@ public class Show {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "venue_id", nullable = false)
+    @JoinColumn(name = "venue_id")
     private Venue venue;
 
     private String title;
@@ -36,6 +36,9 @@ public class Show {
     
     private Integer runningTime;
     private String posterUrl;
+    
+    @Column(name = "\"cast\"")
+    private String cast; // 출연진 정보 (단순 문자열)
     
     // PostgreSQL Array 타입 처리 필요 (혹은 별도 테이블 분리 가능하나 단순화를 위해 문자열 가정)
     // @Type(ListArrayType.class) 
@@ -51,8 +54,6 @@ public class Show {
 
     @Enumerated(EnumType.STRING)
     private SaleStatus saleStatus;
-
-    private String seatMapId; // 좌석배치도 ID (예: "SM001")
     
     private LocalDateTime saleStartDate; // 판매 시작일시
     private LocalDateTime saleEndDate; // 판매 종료일시

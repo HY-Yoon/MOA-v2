@@ -11,3 +11,4 @@ public enum Genre {
     DANCE     // 무용
 }
 
+
