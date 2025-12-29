@@ -5,13 +5,20 @@ import com.moa2.global.model.ShowStatus;
 import com.moa2.global.model.SaleStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
+@Setter
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Table(name = "shows")
 public class Show {
     
@@ -45,6 +52,25 @@ public class Show {
     @Enumerated(EnumType.STRING)
     private SaleStatus saleStatus;
 
+    private String seatMapId; // 좌석배치도 ID (예: "SM001")
+    
+    private LocalDateTime saleStartDate; // 판매 시작일시
+    private LocalDateTime saleEndDate; // 판매 종료일시
+    
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
     private Long viewCount;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
 
