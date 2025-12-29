@@ -10,3 +10,4 @@ public enum ScheduleStatus {
     CANCELLED    // 취소
 }
 
+

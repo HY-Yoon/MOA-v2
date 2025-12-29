@@ -5,7 +5,6 @@ import com.moa2.domain.show.entity.*;
 import com.moa2.domain.show.repository.*;
 import com.moa2.domain.reservation.repository.ReservationRepository;
 import com.moa2.global.model.*;
-import com.moa2.global.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -27,12 +26,10 @@ public class AdminShowService {
 
     private final ShowRepository showRepository;
     private final ShowScheduleRepository showScheduleRepository;
-    private final ShowCastRepository showCastRepository;
-    private final ShowCastScheduleRepository showCastScheduleRepository;
     private final ShowSeatGradeRepository showSeatGradeRepository;
-    private final CastRepository castRepository;
-    private final SeatLayoutRepository seatLayoutRepository;
+    private final VenueRepository venueRepository;
     private final VenueSeatSectionRepository venueSeatSectionRepository;
+    private final SeatLayoutRepository seatLayoutRepository;
     private final ReservationRepository reservationRepository;
     private final SeatRepository seatRepository;
 
@@ -88,7 +85,6 @@ public class AdminShowService {
         }
 
         List<ShowSchedule> schedules = showScheduleRepository.findByShowIdOrderByDateAndTime(id);
-        List<ShowCast> casts = showCastRepository.findByShowId(id);
         List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(id);
 
         // 스케줄 정보 구성
@@ -112,24 +108,6 @@ public class AdminShowService {
             })
             .collect(Collectors.toList());
 
-        // 출연진 정보 구성
-        List<ShowDetailResponse.CastInfo> castInfos = casts.stream()
-            .map(showCast -> {
-                List<ShowCastSchedule> castSchedules = showCastScheduleRepository
-                    .findByShowCastId(showCast.getId());
-                List<Long> scheduleIds = castSchedules.stream()
-                    .map(scs -> scs.getSchedule().getId())
-                    .collect(Collectors.toList());
-
-                return ShowDetailResponse.CastInfo.builder()
-                    .castId(showCast.getCast().getId())
-                    .name(showCast.getCast().getName())
-                    .role(showCast.getRoleName())
-                    .scheduleIds(scheduleIds)
-                    .build();
-            })
-            .collect(Collectors.toList());
-
         // 좌석 가격 정보 구성
         List<ShowDetailResponse.SeatPriceInfo> seatPriceInfos = seatGrades.stream()
             .map(grade -> ShowDetailResponse.SeatPriceInfo.builder()
@@ -139,26 +117,19 @@ public class AdminShowService {
                 .build())
             .collect(Collectors.toList());
 
-        // Hall 정보 찾기 (SeatLayout을 통해)
+        // Venue에서 정보 가져오기
+        String venueName = null;
         String hallName = null;
-        if (show.getSeatMapId() != null) {
-            try {
-                Long seatMapIdLong = Long.parseLong(show.getSeatMapId());
-                SeatLayout seatLayout = seatLayoutRepository.findById(seatMapIdLong).orElse(null);
-                if (seatLayout != null && seatLayout.getHall() != null) {
-                    hallName = seatLayout.getHall().getName();
-                }
-            } catch (NumberFormatException e) {
-                // seatMapId가 숫자가 아닌 경우 무시
-            }
+        if (show.getVenue() != null) {
+            venueName = show.getVenue().getName();
+            hallName = show.getVenue().getHallName();
         }
 
         return ShowDetailResponse.builder()
             .id(show.getId())
             .title(show.getTitle())
             .genre(show.getGenre() != null ? show.getGenre().name() : null)
-            .seatMapId(show.getSeatMapId())
-            .venueName(show.getVenue() != null ? show.getVenue().getName() : null)
+            .venueName(venueName)
             .hallName(hallName)
             .region(show.getVenue() != null && show.getVenue().getRegion() != null 
                 ? show.getVenue().getRegion().name() : null)
@@ -169,8 +140,8 @@ public class AdminShowService {
             .saleStatus(show.getSaleStatus() != null ? show.getSaleStatus().name() : null)
             .saleStartDate(show.getSaleStartDate())
             .saleEndDate(show.getSaleEndDate())
+            .cast(show.getCast())
             .schedules(scheduleInfos)
-            .casts(castInfos)
             .seatPrices(seatPriceInfos)
             .createdAt(show.getCreatedAt())
             .updatedAt(show.getUpdatedAt())
@@ -179,22 +150,9 @@ public class AdminShowService {
 
     @Transactional
     public ShowCreateResponse createShow(ShowCreateRequest request) {
-        // seatMapId 검증 (String 형식이므로 Long으로 파싱 시도)
-        SeatLayout seatLayout = null;
-        try {
-            Long seatMapIdLong = Long.parseLong(request.getSeatMapId());
-            seatLayout = seatLayoutRepository.findById(seatMapIdLong)
-                .orElseThrow(() -> new RuntimeException("좌석배치도를 찾을 수 없습니다"));
-        } catch (NumberFormatException e) {
-            throw new RuntimeException("좌석배치도 ID 형식이 올바르지 않습니다");
-        }
-
-        // Venue는 SeatLayout을 통해 Hall을 통해 찾아야 함
-        // 일단 SeatLayout의 Hall을 통해 Venue를 찾음
-        Venue venue = seatLayout.getHall() != null ? seatLayout.getHall().getVenue() : null;
-        if (venue == null) {
-            throw new RuntimeException("공연장 정보를 찾을 수 없습니다");
-        }
+        // Venue 조회
+        Venue venue = venueRepository.findById(request.getVenueId())
+            .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + request.getVenueId()));
 
         // 마지막 공연일 계산
         LocalDate lastShowDate = request.getSchedules().stream()
@@ -214,9 +172,9 @@ public class AdminShowService {
             .runningTime(request.getRunningTime())
             .posterUrl(request.getPosterUrl())
             .detailImageUrls(request.getDetailImageUrls())
+            .cast(request.getCast())
             .status(ShowStatus.WAITING)
             .saleStatus(SaleStatus.ALLOWED)
-            .seatMapId(request.getSeatMapId())
             .saleStartDate(request.getSaleStartDate())
             .saleEndDate(LocalDateTime.of(lastShowDate, LocalTime.of(23, 59, 59)))
             .startDate(firstShowDate)
@@ -244,46 +202,24 @@ public class AdminShowService {
             savedSchedules.add(showScheduleRepository.save(schedule));
         }
 
-        // ShowCast 및 ShowCastSchedule 생성
-        if (request.getCasts() != null) {
-            for (ShowCreateRequest.CastRequest castReq : request.getCasts()) {
-                Cast cast = castRepository.findById(castReq.getCastId())
-                    .orElseThrow(() -> new RuntimeException("출연진을 찾을 수 없습니다: " + castReq.getCastId()));
-
-                ShowCast showCast = ShowCast.builder()
-                    .show(show)
-                    .cast(cast)
-                    .roleName(castReq.getRole())
-                    .build();
-                showCast = showCastRepository.save(showCast);
-
-                // ShowCastSchedule 생성
-                if (castReq.getScheduleIds() != null) {
-                    for (Long scheduleId : castReq.getScheduleIds()) {
-                        ShowSchedule schedule = savedSchedules.stream()
-                            .filter(s -> s.getId().equals(scheduleId))
-                            .findFirst()
-                            .orElse(null);
-                        
-                        if (schedule != null) {
-                            ShowCastSchedule castSchedule = new ShowCastSchedule(showCast, schedule);
-                            showCastScheduleRepository.save(castSchedule);
-                        }
-                    }
-                }
-            }
-        }
-
-        // ShowSeatGrade 생성 (createdAt, updatedAt은 @PrePersist/@PreUpdate로 자동 설정)
-        if (request.getSeatPrices() != null) {
-            for (ShowCreateRequest.SeatPriceRequest priceReq : request.getSeatPrices()) {
-                VenueSeatSection section = venueSeatSectionRepository.findById(Long.parseLong(priceReq.getSectionId()))
-                    .orElseThrow(() -> new RuntimeException("좌석 구역을 찾을 수 없습니다: " + priceReq.getSectionId()));
-
+        // ShowSeatGrade 생성 - SeatLayout에서 가격 정보 자동 가져오기
+        // 1. Venue에 연결된 SeatLayout 조회 (가장 최근 것)
+        SeatLayout seatLayout = seatLayoutRepository.findFirstByVenueIdOrderByIdDesc(venue.getId())
+            .orElse(null);
+        
+        // 2. Venue의 모든 구역 조회
+        List<VenueSeatSection> sections = venueSeatSectionRepository.findByVenueId(venue.getId());
+        
+        // 3. 각 구역의 기본 가격을 사용하여 ShowSeatGrade 생성
+        for (VenueSeatSection section : sections) {
+            // SeatLayout이 있고 해당 section의 가격이 있으면 사용, 없으면 VenueSeatSection의 defaultPrice 사용
+            Integer price = section.getDefaultPrice();
+            
+            if (price != null && price > 0) {
                 ShowSeatGrade grade = ShowSeatGrade.builder()
                     .show(show)
                     .section(section)
-                    .price(priceReq.getPrice())
+                    .price(price)
                     .build();
                 showSeatGradeRepository.save(grade);
             }
@@ -307,7 +243,7 @@ public class AdminShowService {
         }
 
         // WAITING 상태: 전체 수정 가능
-        // ON_SALE 이후: 장르, seatMapId, 예매 시작일 수정 불가
+        // ON_SALE 이후: 장르, 장소, 예매 시작일 수정 불가
         if (show.getStatus() != ShowStatus.WAITING) {
             // ON_SALE 이후에는 제한된 필드만 수정 가능
         }
@@ -324,44 +260,12 @@ public class AdminShowService {
         if (request.getDetailImageUrls() != null) {
             show.setDetailImageUrls(request.getDetailImageUrls());
         }
+        if (request.getCast() != null) {
+            show.setCast(request.getCast());
+        }
 
         // updatedAt은 @PreUpdate로 자동 설정됨
         showRepository.save(show);
-
-        // 출연진 업데이트
-        if (request.getCasts() != null) {
-            // 기존 출연진 삭제
-            showCastScheduleRepository.deleteByShowCastShowId(id);
-            showCastRepository.deleteByShowId(id);
-
-            // 새 출연진 추가
-            List<ShowSchedule> schedules = showScheduleRepository.findByShowId(id);
-            for (ShowUpdateRequest.CastRequest castReq : request.getCasts()) {
-                Cast cast = castRepository.findById(castReq.getCastId())
-                    .orElseThrow(() -> new RuntimeException("출연진을 찾을 수 없습니다: " + castReq.getCastId()));
-
-                ShowCast showCast = ShowCast.builder()
-                    .show(show)
-                    .cast(cast)
-                    .roleName(castReq.getRole())
-                    .build();
-                showCast = showCastRepository.save(showCast);
-
-                if (castReq.getScheduleIds() != null) {
-                    for (Long scheduleId : castReq.getScheduleIds()) {
-                        ShowSchedule schedule = schedules.stream()
-                            .filter(s -> s.getId().equals(scheduleId))
-                            .findFirst()
-                            .orElse(null);
-                        
-                        if (schedule != null) {
-                            ShowCastSchedule castSchedule = new ShowCastSchedule(showCast, schedule);
-                            showCastScheduleRepository.save(castSchedule);
-                        }
-                    }
-                }
-            }
-        }
 
         return ShowUpdateResponse.builder()
             .showId(show.getId())

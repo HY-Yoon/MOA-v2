@@ -21,8 +21,10 @@ public class VenueSeatSection {
     
     private String name; // 구역명 (A구역, VIP구역 등)
     private Integer displayOrder; // 화면 노출 순서
+    private Integer defaultPrice; // 기본 가격 (SeatLayout에서 사용)
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+
 

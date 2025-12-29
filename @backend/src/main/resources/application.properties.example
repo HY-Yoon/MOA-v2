@@ -1,13 +1,16 @@
 spring.application.name=moa2
 
-spring.datasource.url=jdbc:postgresql://ep-late-cell-a10ivmok-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-spring.datasource.username=neondb_owner
-spring.datasource.password=npg_j1IHRaMuyBJ5
+# 데이터베이스 설정 (개인정보 - 실제 값으로 변경 필요)
+spring.datasource.url=jdbc:postgresql://localhost:5432/neondb?sslmode=require
+spring.datasource.username=your_username
+spring.datasource.password=your_password
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
 
 spring.jpa.hibernate.ddl-auto=update
+spring.sql.init.mode=always
+spring.jpa.defer-datasource-initialization=true
 
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
