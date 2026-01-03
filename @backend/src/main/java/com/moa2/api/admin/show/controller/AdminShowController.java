@@ -212,9 +212,9 @@ public class AdminShowController {
                             "- `cast`: 출연진 정보\n" +
                             "- `genre`: 장르 (WAITING 상태에서만 수정 가능)\n" +
                             "- `location`: 장소 정보 (WAITING 상태에서만 수정 가능)\n" +
-                            "  - `region`: 지역 (예: \"경기\")\n" +
-                            "  - `venue`: 공연장명 (예: \"예술의전당\")\n" +
-                            "  - `hall`: 홀명 (예: \"A홀\")\n" +
+                            "  - `region`: 지역 (예: \"서울\")\n" +
+                            "  - `venueName`: 공연장명 (예: \"올림픽공원\")\n" +
+                            "  - `hallName`: 홀명 (예: \"KSPO DOME\")\n" +
                             "- `saleStartDate`: 예매 시작일시 (WAITING 상태에서만 수정 가능)\n" +
                             "- `schedules`: 일정 목록 (추가/수정 모두 포함)\n" +
                             "- `deletedScheduleIds`: 삭제할 일정 ID 목록\n\n" +
@@ -257,7 +257,7 @@ public class AdminShowController {
                     ),
                     @ExampleObject(
                         name = "WAITING 상태 - 전체 수정",
-                        value = "{\"title\":\"레미제라블\",\"genre\":\"MUSICAL\",\"location\":{\"region\":\"경기\",\"venue\":\"예술의전당\",\"hall\":\"A홀\"},\"saleStartDate\":\"2024-01-01T00:00:00\"}"
+                        value = "{\"title\":\"레미제라블\",\"genre\":\"MUSICAL\",\"location\":{\"region\":\"서울\",\"venueName\":\"올림픽공원\",\"hallName\":\"KSPO DOME\"},\"saleStartDate\":\"2024-01-01T00:00:00\"}"
                     ),
                     @ExampleObject(
                         name = "일정 추가/수정/삭제",

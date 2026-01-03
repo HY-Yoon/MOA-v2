@@ -33,7 +33,6 @@ public class Venue {
     private Double latitude;
     private Double longitude;
     private Integer totalSeats;
-    private String seatLayoutImageUrl;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

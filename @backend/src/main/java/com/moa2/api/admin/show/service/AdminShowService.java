@@ -31,7 +31,6 @@ public class AdminShowService {
     private final ShowRepository showRepository;
     private final ShowScheduleRepository showScheduleRepository;
     private final ShowSeatGradeRepository showSeatGradeRepository;
-    private final SeatLayoutRepository seatLayoutRepository;
     private final VenueSeatSectionRepository venueSeatSectionRepository;
     private final VenueRepository venueRepository;
     private final ReservationRepository reservationRepository;
@@ -178,8 +177,8 @@ public class AdminShowService {
         Region region = convertRegionFromKorean(request.getLocation().getRegion());
         
         // location 정보로 Venue 조회, 없으면 자동 생성
-        String venueName = request.getLocation().getVenue();
-        String hallName = request.getLocation().getHall();
+        String venueName = request.getLocation().getVenueName();
+        String hallName = request.getLocation().getHallName();
         
         log.debug("Venue 조회 시도: name={}, hallName={}, region={}", venueName, hallName, region);
         
@@ -313,8 +312,8 @@ public class AdminShowService {
                 Region region = convertRegionFromKorean(request.getLocation().getRegion());
                 
                 // location 정보로 Venue 조회, 없으면 자동 생성
-                String venueName = request.getLocation().getVenue();
-                String hallName = request.getLocation().getHall();
+                String venueName = request.getLocation().getVenueName();
+                String hallName = request.getLocation().getHallName();
                 
                 log.debug("Venue 조회 시도: name={}, hallName={}, region={}", venueName, hallName, region);
                 

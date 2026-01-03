@@ -46,14 +46,14 @@ public class ShowUpdateRequest {
     @Setter
     @Schema(description = "장소 정보")
     public static class LocationRequest {
-        @Schema(description = "지역", example = "경기", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "지역", example = "서울")
         private String region;
 
-        @Schema(description = "공연장명", example = "예술의전당", requiredMode = Schema.RequiredMode.REQUIRED)
-        private String venue;
+        @Schema(description = "공연장명", example = "올림픽공원")
+        private String venueName;
 
-        @Schema(description = "홀명", example = "A홀", requiredMode = Schema.RequiredMode.REQUIRED)
-        private String hall;
+        @Schema(description = "홀명", example = "KSPO DOME")
+        private String hallName;
     }
 
     @Getter
