@@ -22,7 +22,7 @@ public class Venue {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    private String name; // 공연장명 (ex. 예술의 전당 오페라극장)
+    private String name; // 공연장명 (ex. 예술의전당)
     private String address;
     
     @Enumerated(EnumType.STRING)
@@ -38,5 +38,3 @@ public class Venue {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-
-

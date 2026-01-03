@@ -17,20 +17,19 @@ public interface ShowRepository extends JpaRepository<Show, Long> {
     @Query("SELECT s FROM Show s " +
            "WHERE (:showStatus IS NULL OR s.status = :showStatus) " +
            "AND (:saleStatus IS NULL OR s.saleStatus = :saleStatus) " +
-           "AND (:keyword IS NULL OR s.title LIKE CONCAT('%', :keyword, '%')) " +
-           "AND (:startDate IS NULL OR s.startDate >= :startDate) " +
-           "AND (:endDate IS NULL OR s.endDate <= :endDate) " +
-           "AND s.status != 'SUSPENDED'")
+           "AND (:keywordPattern IS NULL OR s.title LIKE :keywordPattern) " +
+           "AND (CAST(:startDate AS date) IS NULL OR s.startDate >= :startDate) " +
+           "AND (CAST(:endDate AS date) IS NULL OR s.endDate <= :endDate)")
     Page<Show> findShowsWithFilters(
         @Param("showStatus") ShowStatus showStatus,
         @Param("saleStatus") SaleStatus saleStatus,
-        @Param("keyword") String keyword,
+        @Param("keywordPattern") String keywordPattern,
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate,
         Pageable pageable
     );
     
-    @Query("SELECT s FROM Show s WHERE s.id = :id AND s.status != 'SUSPENDED'")
+    @Query("SELECT s FROM Show s WHERE s.id = :id")
     Show findByIdAndNotDeleted(@Param("id") Long id);
 }
 

@@ -40,9 +40,7 @@ public class Show {
     @Column(name = "\"cast\"")
     private String cast; // 출연진 정보 (단순 문자열)
     
-    // PostgreSQL Array 타입 처리 필요 (혹은 별도 테이블 분리 가능하나 단순화를 위해 문자열 가정)
-    // @Type(ListArrayType.class) 
-    // private List<String> detailImageUrls;
+    // PostgreSQL Array 타입 처리
     @Column(columnDefinition = "TEXT[]")
     private String[] detailImageUrls;
 
@@ -74,4 +72,3 @@ public class Show {
         updatedAt = LocalDateTime.now();
     }
 }
-

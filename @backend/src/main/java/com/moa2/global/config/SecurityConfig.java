@@ -14,19 +14,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // CSRF 비활성화 (API 서버이므로)
             .csrf(AbstractHttpConfigurer::disable)
+            // 모든 요청 허용 (테스트 용도 - 추후 인증 추가 예정)
             .authorizeHttpRequests(auth -> auth
-                // Swagger UI 및 API 문서 경로 허용
-                .requestMatchers(
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**",
-                    "/api-docs/**"
-                ).permitAll()
-                // Admin API 경로 허용 (기존 설정 유지)
-                .requestMatchers("/api/v1/admin/**").permitAll()
-                // 기타 모든 요청은 인증 필요
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             );
         
         return http.build();

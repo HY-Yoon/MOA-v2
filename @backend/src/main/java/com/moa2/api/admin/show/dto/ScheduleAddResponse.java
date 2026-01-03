@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShowUpdateResponse {
-    private Long showId;
+public class ScheduleAddResponse {
+    private Long scheduleId;
     private String message;
 }
 
