@@ -5,7 +5,8 @@ package com.moa2.global.model;
  */
 public enum SaleStatus {
     ALLOWED,   // 판매 허용
-    SUSPENDED  // 판매 중단
+    SUSPENDED; // 판매 중단
 }
+
 
 

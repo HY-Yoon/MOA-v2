@@ -36,4 +36,10 @@ out/
 ### VS Code ###
 .vscode/
 
-application.properties
+
+SHOW_API_TABLES.md
+SWAGGER_TEST_GUIDE.md
+TEST_DATA_GUIDE.md
+SHOW_DELETE_TABLES.md
+
+
