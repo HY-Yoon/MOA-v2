@@ -47,17 +47,17 @@ public class ShowCreateRequest {
     @Setter
     @Schema(description = "장소 정보")
     public static class LocationRequest {
-        @Schema(description = "지역", example = "경기", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "지역", example = "서울", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "지역은 필수입니다")
         private String region;
 
-        @Schema(description = "공연장명", example = "예술의전당", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "공연장명", example = "올림픽공원", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "공연장명은 필수입니다")
-        private String venue;
+        private String venueName;
 
-        @Schema(description = "홀명", example = "A홀", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "홀명", example = "KSPO DOME", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "홀명은 필수입니다")
-        private String hall;
+        private String hallName;
     }
 
     @Getter

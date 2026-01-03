@@ -3,6 +3,10 @@ package com.moa2.api.admin.seatmap.service;
 import com.moa2.api.admin.seatmap.dto.*;
 import com.moa2.domain.seatmap.entity.SeatMap;
 import com.moa2.domain.seatmap.repository.SeatMapRepository;
+import com.moa2.domain.show.entity.Venue;
+import com.moa2.domain.show.entity.VenueSeatSection;
+import com.moa2.domain.show.repository.VenueRepository;
+import com.moa2.domain.show.repository.VenueSeatSectionRepository;
 import com.moa2.global.model.Region;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +28,8 @@ import java.util.stream.Collectors;
 public class AdminSeatMapService {
     
     private final SeatMapRepository seatMapRepository;
+    private final VenueRepository venueRepository;
+    private final VenueSeatSectionRepository venueSeatSectionRepository;
     
     /**
      * 좌석배치도 목록 조회 (필터링 및 페이징)
@@ -132,6 +138,61 @@ public class AdminSeatMapService {
                 return seatMap;
             })
             .collect(Collectors.toList());
+        
+        // Venue 찾기 또는 생성
+        Venue venue = venueRepository.findByNameAndHallNameAndRegion(
+            request.getVenueName(),
+            request.getHallName(),
+            region
+        ).orElseGet(() -> {
+            log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", 
+                request.getVenueName(), request.getHallName(), region);
+            Venue newVenue = Venue.builder()
+                .name(request.getVenueName())
+                .hallName(request.getHallName())
+                .region(region)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+            return venueRepository.save(newVenue);
+        });
+        
+        // VenueSeatSection 생성 (sections 정보를 VenueSeatSection으로 변환)
+        // 좌석배치도에 등록된 구역 정보를 VenueSeatSection으로 저장하여 공연 등록 시 사용
+        int displayOrder = 0;
+        for (SeatMapCreateRequest.SectionRequest sectionReq : request.getSections()) {
+            // 이미 존재하는 구역인지 확인 (venue_id + name으로)
+            List<VenueSeatSection> existingSections = venueSeatSectionRepository.findByVenueId(venue.getId());
+            VenueSeatSection existingSection = existingSections.stream()
+                .filter(section -> section.getName().equals(sectionReq.getName()))
+                .findFirst()
+                .orElse(null);
+            
+            if (existingSection == null) {
+                // 새 구역 생성
+                VenueSeatSection venueSection = VenueSeatSection.builder()
+                    .venue(venue)
+                    .name(sectionReq.getName())
+                    .displayOrder(displayOrder++)
+                    .defaultPrice(sectionReq.getPrice())
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+                venueSeatSectionRepository.save(venueSection);
+                log.info("VenueSeatSection 생성: venueId={}, name={}, price={}", 
+                    venue.getId(), sectionReq.getName(), sectionReq.getPrice());
+            } else {
+                // 이미 존재하면 가격만 업데이트
+                if (existingSection.getDefaultPrice() == null || 
+                    !existingSection.getDefaultPrice().equals(sectionReq.getPrice())) {
+                    existingSection.setDefaultPrice(sectionReq.getPrice());
+                    existingSection.setUpdatedAt(LocalDateTime.now());
+                    venueSeatSectionRepository.save(existingSection);
+                    log.info("VenueSeatSection 가격 업데이트: venueId={}, name={}, price={}", 
+                        venue.getId(), sectionReq.getName(), sectionReq.getPrice());
+                }
+            }
+        }
         
         // SeatMap 엔티티 생성
         SeatMap seatMap = SeatMap.builder()
