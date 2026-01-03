@@ -47,6 +47,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserStatus status; // ACTIVE, DELETED, SUSPENDED
 
+    private String suspensionReason;
+    private LocalDateTime suspendedAt;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
@@ -78,6 +81,22 @@ public class User {
     public void withdraw() {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 계정 정지
+    public void suspend(String reason) {
+        this.status = UserStatus.SUSPENDED;
+        this.suspensionReason = reason;
+        this.suspendedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 계정 활성화
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+        this.suspensionReason = null;
+        this.suspendedAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 }
