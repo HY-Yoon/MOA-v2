@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Noto_Sans_KR } from "next/font/google";
+import { Inter, Noto_Sans_KR, Sansation } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -12,6 +12,12 @@ const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-kr",
 })
 
+const sansation = Sansation({
+  subsets: ["latin"],
+  weight: "700",          
+  variable: "--font-sansation",
+})
+
 export default function RootLayout({
   children,
 }: {
@@ -20,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body
-        className={`${inter.variable} ${notoSansKr.variable} font-sans`}
+        className={`${inter.variable} ${notoSansKr.variable} ${sansation.variable} font-sans`}
       >
         {children}
       </body>
