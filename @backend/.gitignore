@@ -37,7 +37,17 @@ out/
 .vscode/
 
 SAMPLE_DATA.md
-seats_info.md
+SEATS_INFO.md
+SOCIAL_LOGIN.md
+GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
+OAUTH2_ERROR_HANDLING_TEST_GUIDE.md
+ENCRYPTION_AND_MASKING_GUIDE.md
 
 
+app
+
+### Application Properties ###
+src/main/resources/application.properties
+
+.env
 

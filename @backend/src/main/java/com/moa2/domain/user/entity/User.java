@@ -32,6 +32,8 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    private String picture; // 프로필 이미지 URL (Google OAuth2)
+
     private String phone;
 
     @Enumerated(EnumType.STRING)
@@ -55,15 +57,34 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    public User(String email, SocialProvider socialProvider, String providerId, String name) {
+    public User(String email, SocialProvider socialProvider, String providerId, String name, String picture, String phone) {
         this.email = email;
         this.socialProvider = socialProvider;
         this.providerId = providerId;
         this.name = name;
+        this.picture = picture;
+        this.phone = phone;
         this.role = UserRole.USER;
         this.status = UserStatus.ACTIVE;
         this.isVerified = false;
         this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // OAuth2 로그인 시 프로필 정보 업데이트
+    public void updateOAuth2Info(String name, String picture) {
+        this.name = name;
+        this.picture = picture;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // OAuth2 로그인 시 프로필 정보 업데이트 (전화번호 포함)
+    public void updateOAuth2Info(String name, String picture, String phone) {
+        this.name = name;
+        this.picture = picture;
+        if (phone != null && !phone.trim().isEmpty()) {
+            this.phone = phone;
+        }
         this.updatedAt = LocalDateTime.now();
     }
 
