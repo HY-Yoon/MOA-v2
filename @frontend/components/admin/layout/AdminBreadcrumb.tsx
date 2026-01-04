@@ -12,35 +12,34 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
-const routeMap: Record<string, string> = {
-  "/admin": "대시보드",
-  "/admin/show": "공연 관리",
-  "/admin/user": "회원 관리",
-  "/admin/seat": "좌석 관리",
-};
+import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from "@/constants/adminRoutes";
 
 export function AdminBreadcrumb() {
   const pathname = usePathname();
-  const pathSegments = pathname.split("/").filter(Boolean);
+  const paths = pathname.split("/").filter(Boolean);
+  const currentPath = "/" + paths.join("/");
 
-  const breadcrumbItems = pathSegments.map((segment, index) => {
-    const path = "/" + pathSegments.slice(0, index + 1).join("/");
-    const label = routeMap[path] || segment;
-    const isLast = index === pathSegments.length - 1;
+  // 첫 번째에 '관리자' 고정 (링크는 /admin으로)
+  const adminItem = {
+    path: ADMIN_ROUTES.DASHBOARD,
+    label: "관리자",
+    isLast: false,
+  };
 
-    return {
-      path,
-      label,
-      isLast,
-    };
-  });
+  // 현재 경로에 대한 항목 추가
+  const currentItem = {
+    path: currentPath,
+    label: ADMIN_ROUTE_LABELS[currentPath] || paths[paths.length - 1],
+    isLast: true,
+  };
+
+  const breadcrumbItems = [adminItem, currentItem];
 
   return (
     <Breadcrumb>
       <BreadcrumbList>
         {breadcrumbItems.map((item, index) => (
-          <React.Fragment key={item.path}>
+          <React.Fragment key={`${item.path}-${index}`}>
             <BreadcrumbItem>
               {item.isLast ? (
                 <BreadcrumbPage>{item.label}</BreadcrumbPage>

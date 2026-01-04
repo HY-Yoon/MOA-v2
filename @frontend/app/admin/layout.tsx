@@ -1,6 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AdminSidebar } from "@/components/admin/admin-sidebar/AdminSidebarComponent";
-import { AdminBreadcrumb } from "@/components/admin/AdminBreadcrumb";
+import { AdminSidebar } from "@/components/admin/layout/AdminSidebar";
+import { AdminBreadcrumb } from "@/components/admin/layout/AdminBreadcrumb";
 
 export default function AdminLayout({
   children,
