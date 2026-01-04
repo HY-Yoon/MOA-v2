@@ -12,5 +12,9 @@ Thumbs.db
 @shared/
 uploads/
 
+
 package-lock.json
+
+.env
+
 
