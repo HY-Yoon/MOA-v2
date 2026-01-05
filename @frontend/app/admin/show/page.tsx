@@ -1,6 +1,4 @@
-// /admin/show - 공연관리 페이지 
-
-export default function ShowPage() {
+export default function ShowList() {
   return (
     "공연 관리 페이지"
   )
