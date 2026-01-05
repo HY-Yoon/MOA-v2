@@ -4,6 +4,7 @@ import com.moa2.api.auth.dto.TokenResponse;
 import com.moa2.domain.auth.entity.RefreshToken;
 import com.moa2.domain.auth.repository.RefreshTokenRepository;
 import com.moa2.global.exception.RefreshTokenException;
+import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.util.LogMaskingUtil;
 import lombok.RequiredArgsConstructor;
@@ -27,17 +28,18 @@ public class RefreshTokenService {
 
     /**
      * Refresh Token을 DB에 저장
-     * 기존 Refresh Token이 있으면 삭제하고 새로 저장 (One Token Per User)
+     * 기존 Refresh Token이 있으면 삭제하고 새로 저장 (One Token Per User Per Provider)
      * @param email 사용자 이메일
      * @param refreshToken Refresh Token 문자열
+     * @param socialProvider 소셜 제공자
      * @return 저장된 RefreshToken 엔티티
      */
     @Transactional
-    public RefreshToken createRefreshToken(String email, String refreshToken) {
-        // 기존 Refresh Token이 있으면 삭제
-        if (refreshTokenRepository.existsByUserEmail(email)) {
-            refreshTokenRepository.deleteByUserEmail(email);
-            log.debug("기존 Refresh Token 삭제: {}", LogMaskingUtil.maskEmail(email));
+    public RefreshToken createRefreshToken(String email, String refreshToken, SocialProvider socialProvider) {
+        // 기존 Refresh Token이 있으면 삭제 (같은 이메일 + 같은 제공자)
+        if (refreshTokenRepository.existsByUserEmailAndSocialProvider(email, socialProvider)) {
+            refreshTokenRepository.deleteByUserEmailAndSocialProvider(email, socialProvider);
+            log.debug("기존 Refresh Token 삭제: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
         }
 
         // 만료 시간 계산 (7일)
@@ -48,11 +50,12 @@ public class RefreshTokenService {
         RefreshToken token = RefreshToken.builder()
                 .token(refreshToken)
                 .userEmail(email)
+                .socialProvider(socialProvider)
                 .expiryDate(expiryDate)
                 .build();
 
         RefreshToken savedToken = refreshTokenRepository.save(token);
-        log.info("Refresh Token 저장 완료: {}", LogMaskingUtil.maskEmail(email));
+        log.info("Refresh Token 저장 완료: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
         return savedToken;
     }
 
@@ -92,6 +95,17 @@ public class RefreshTokenService {
     public void deleteByUserEmail(String email) {
         refreshTokenRepository.deleteByUserEmail(email);
         log.info("Refresh Token 삭제 완료: {}", LogMaskingUtil.maskEmail(email));
+    }
+
+    /**
+     * 사용자 이메일과 소셜 제공자로 Refresh Token 삭제 (로그아웃 시)
+     * @param email 사용자 이메일
+     * @param socialProvider 소셜 제공자
+     */
+    @Transactional
+    public void deleteByUserEmailAndSocialProvider(String email, SocialProvider socialProvider) {
+        refreshTokenRepository.deleteByUserEmailAndSocialProvider(email, socialProvider);
+        log.info("Refresh Token 삭제 완료: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
     }
 
     /**

@@ -1,10 +1,12 @@
 package com.moa2.global.dto;
 
 import com.moa2.domain.user.entity.User;
+import com.moa2.global.model.Gender;
 import com.moa2.global.model.SocialProvider;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 /**
@@ -17,6 +19,9 @@ public class OAuthAttributes {
     private String email;
     private String picture;
     private String phone;
+    private Gender gender;
+    private LocalDate birthDate;
+    private String ageRange;
     private String providerId;
     private SocialProvider provider;
 
@@ -74,6 +79,10 @@ public class OAuthAttributes {
         String name = (String) response.get("name");
         String profileImage = (String) response.get("profile_image");
         String mobile = (String) response.get("mobile"); // 네이버는 mobile 필드로 전화번호 제공
+        String genderStr = (String) response.get("gender"); // "M" 또는 "F"
+        String birthday = (String) response.get("birthday"); // "MM-DD" 형식
+        String birthyear = (String) response.get("birthyear"); // "YYYY" 형식
+        String age = (String) response.get("age"); // 연령대 (예: "20-29")
 
         // email이 null이면 기본값 설정
         if (email == null || email.trim().isEmpty()) {
@@ -85,11 +94,42 @@ public class OAuthAttributes {
             name = "네이버 사용자";
         }
 
+        // 성별 변환: "M" -> MALE, "F" -> FEMALE, 그 외 -> null
+        Gender gender = null;
+        if (genderStr != null) {
+            if ("M".equals(genderStr) || "m".equals(genderStr)) {
+                gender = Gender.MALE;
+            } else if ("F".equals(genderStr) || "f".equals(genderStr)) {
+                gender = Gender.FEMALE;
+            }
+        }
+
+        // 생년월일 변환: birthyear + birthday -> LocalDate
+        LocalDate birthDate = null;
+        if (birthyear != null && !birthyear.trim().isEmpty() && 
+            birthday != null && !birthday.trim().isEmpty()) {
+            try {
+                // birthday는 "MM-DD" 형식, birthyear는 "YYYY" 형식
+                String[] dateParts = birthday.split("-");
+                if (dateParts.length == 2) {
+                    int month = Integer.parseInt(dateParts[0]);
+                    int day = Integer.parseInt(dateParts[1]);
+                    int year = Integer.parseInt(birthyear);
+                    birthDate = LocalDate.of(year, month, day);
+                }
+            } catch (Exception e) {
+                // 파싱 실패 시 무시
+            }
+        }
+
         return OAuthAttributes.builder()
                 .name(name)
                 .email(email)
                 .picture(profileImage)
-                .phone(mobile) // 전화번호 추가
+                .phone(mobile)
+                .gender(gender)
+                .birthDate(birthDate)
+                .ageRange(age) // 연령대 저장
                 .providerId(id)
                 .provider(SocialProvider.NAVER)
                 .build();
@@ -105,6 +145,9 @@ public class OAuthAttributes {
                 .name(name)
                 .picture(picture)
                 .phone(phone)
+                .gender(gender)
+                .birthDate(birthDate)
+                .ageRange(ageRange)
                 .providerId(providerId)
                 .socialProvider(provider)
                 .build();

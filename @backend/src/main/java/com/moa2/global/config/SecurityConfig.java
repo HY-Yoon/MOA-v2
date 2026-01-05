@@ -52,6 +52,7 @@ public class SecurityConfig {
                     "/error",
                     "/oauth2/**",
                     "/login/**",
+                    "/auth/login",
                     "/api/auth/verify",
                     "/api/auth/success",
                     "/api/auth/refresh",

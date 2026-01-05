@@ -66,3 +66,8 @@ spring.security.oauth2.client.provider.naver.user-name-attribute=response
 # JWT
 jwt.secret=${JWT_SECRET}
 jwt.expiration=${JWT_EXPIRATION:86400000}
+
+jwt.refresh.secret=${JWT_REFRESH_SECRET}
+jwt.refresh.expiration=${JWT_REFRESH_EXPIRATION:604800000}
+
+encryption.key=${ENCRYPTION_KEY}

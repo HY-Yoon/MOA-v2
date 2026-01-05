@@ -1,6 +1,7 @@
 package com.moa2.domain.auth.entity;
 
 import com.moa2.domain.auth.converter.RefreshTokenConverter;
+import com.moa2.global.model.SocialProvider;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -19,7 +20,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "refresh_tokens", indexes = {
     @Index(name = "idx_refresh_token_user_email", columnList = "user_email"),
-    @Index(name = "idx_refresh_token_token", columnList = "token")
+    @Index(name = "idx_refresh_token_token", columnList = "token"),
+    @Index(name = "idx_refresh_token_email_provider", columnList = "user_email,social_provider")
 })
 public class RefreshToken {
 
@@ -34,6 +36,10 @@ public class RefreshToken {
     @Column(name = "user_email", nullable = false)
     private String userEmail;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "social_provider", nullable = false)
+    private SocialProvider socialProvider;
+
     @Column(name = "expiry_date", nullable = false)
     private LocalDateTime expiryDate;
 
@@ -41,9 +47,10 @@ public class RefreshToken {
     private LocalDateTime createdAt;
 
     @Builder
-    public RefreshToken(String token, String userEmail, LocalDateTime expiryDate) {
+    public RefreshToken(String token, String userEmail, SocialProvider socialProvider, LocalDateTime expiryDate) {
         this.token = token;
         this.userEmail = userEmail;
+        this.socialProvider = socialProvider;
         this.expiryDate = expiryDate;
         this.createdAt = LocalDateTime.now();
     }
