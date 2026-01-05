@@ -41,6 +41,8 @@ public class User {
 
     private LocalDate birthDate;
 
+    private String ageRange; // 연령대 (예: "20-29")
+
     @Enumerated(EnumType.STRING)
     private UserRole role; // USER, ADMIN
 
@@ -57,13 +59,16 @@ public class User {
     private LocalDateTime deletedAt;
 
     @Builder
-    public User(String email, SocialProvider socialProvider, String providerId, String name, String picture, String phone) {
+    public User(String email, SocialProvider socialProvider, String providerId, String name, String picture, String phone, Gender gender, LocalDate birthDate, String ageRange) {
         this.email = email;
         this.socialProvider = socialProvider;
         this.providerId = providerId;
         this.name = name;
         this.picture = picture;
         this.phone = phone;
+        this.gender = gender;
+        this.birthDate = birthDate;
+        this.ageRange = ageRange;
         this.role = UserRole.USER;
         this.status = UserStatus.ACTIVE;
         this.isVerified = false;
@@ -84,6 +89,25 @@ public class User {
         this.picture = picture;
         if (phone != null && !phone.trim().isEmpty()) {
             this.phone = phone;
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // OAuth2 로그인 시 프로필 정보 업데이트 (전화번호, 성별, 생년월일, 연령대 포함)
+    public void updateOAuth2Info(String name, String picture, String phone, Gender gender, LocalDate birthDate, String ageRange) {
+        this.name = name;
+        this.picture = picture;
+        if (phone != null && !phone.trim().isEmpty()) {
+            this.phone = phone;
+        }
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+        if (ageRange != null && !ageRange.trim().isEmpty()) {
+            this.ageRange = ageRange;
         }
         this.updatedAt = LocalDateTime.now();
     }

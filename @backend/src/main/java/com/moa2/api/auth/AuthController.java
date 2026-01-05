@@ -5,6 +5,7 @@ import com.moa2.api.auth.dto.TokenResponse;
 import com.moa2.api.auth.dto.UserInfoResponse;
 import com.moa2.domain.user.entity.User;
 import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.service.RefreshTokenService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -181,18 +182,49 @@ public class AuthController {
             @RequestParam(required = false) String accessToken) {
         
         String userEmail = extractEmail(session, request, email, accessToken);
-        String socialProvider = "GOOGLE"; // 기본값
+        SocialProvider socialProvider = null;
+        
+        // 세션에서 social_provider 가져오기 (가장 정확함)
+        String socialProviderName = (String) session.getAttribute("social_provider");
+        if (socialProviderName != null) {
+            try {
+                socialProvider = SocialProvider.valueOf(socialProviderName.toUpperCase());
+            } catch (Exception e) {
+                log.warn("세션의 social_provider 파싱 실패: {}", socialProviderName);
+            }
+        }
         
         // DB에서 사용자 정보 조회하여 소셜 제공자 확인
         if (userEmail != null && !userEmail.isEmpty()) {
             try {
-                refreshTokenService.deleteByUserEmail(userEmail);
-                log.info("Refresh Token 삭제 완료: {}", userEmail);
+                User user = null;
+                
+                // social_provider가 있으면 정확하게 조회
+                if (socialProvider != null) {
+                    // 같은 이메일이 여러 개 있을 수 있으므로 providerId로 조회해야 함
+                    // 하지만 providerId를 모르므로, email + socialProvider 조합으로 찾기
+                    // User 엔티티에 unique constraint가 email + social_provider이므로
+                    // 이메일로만 조회하면 첫 번째 것만 반환됨
+                    // 따라서 세션의 social_provider를 우선 사용
+                }
                 
                 // 소셜 제공자 확인
-                User user = userRepository.findByEmail(userEmail).orElse(null);
-                if (user != null) {
-                    socialProvider = user.getSocialProvider().name();
+                if (socialProvider != null) {
+                    // 세션의 social_provider 사용
+                    refreshTokenService.deleteByUserEmailAndSocialProvider(userEmail, socialProvider);
+                    log.info("Refresh Token 삭제 완료: {} ({})", userEmail, socialProvider);
+                } else {
+                    // 세션에 없으면 DB에서 조회
+                    user = userRepository.findByEmail(userEmail).orElse(null);
+                    if (user != null) {
+                        socialProvider = user.getSocialProvider();
+                        refreshTokenService.deleteByUserEmailAndSocialProvider(userEmail, socialProvider);
+                        log.info("Refresh Token 삭제 완료: {} ({})", userEmail, socialProvider);
+                    } else {
+                        // 사용자를 찾을 수 없으면 이메일로만 삭제 (하위 호환성)
+                        refreshTokenService.deleteByUserEmail(userEmail);
+                        log.info("Refresh Token 삭제 완료: {} (사용자 정보 없음)", userEmail);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Refresh Token 삭제 실패: {}", e.getMessage());
@@ -202,23 +234,8 @@ public class AuthController {
         session.invalidate();
         log.info("사용자 로그아웃: {} ({})", userEmail, socialProvider);
         
-        // 소셜 제공자별 로그아웃 URL
-        String logoutUrl;
-        switch (socialProvider) {
-            case "GOOGLE":
-                logoutUrl = "https://accounts.google.com/logout?continue=http://localhost:8081/api/auth/logout/complete?provider=google";
-                break;
-            case "NAVER":
-                logoutUrl = "https://nid.naver.com/nidlogin.logout?returl=http://localhost:8081/api/auth/logout/complete?provider=naver";
-                break;
-            case "KAKAO":
-                logoutUrl = "https://kauth.kakao.com/oauth/logout?client_id=YOUR_KAKAO_CLIENT_ID&logout_redirect_uri=http://localhost:8081/api/auth/logout/complete?provider=kakao";
-                break;
-            default:
-                logoutUrl = "http://localhost:8081/api/auth/logout/complete?provider=unknown";
-        }
-        
-        return "redirect:" + logoutUrl;
+        // 로그인 페이지로 리다이렉트
+        return generateLoginHtml();
     }
     
     /**
@@ -271,6 +288,15 @@ public class AuthController {
         return null;
     }
 
+
+    /**
+     * 로그인 페이지
+     * @return 로그인 HTML
+     */
+    @GetMapping("/login")
+    public String login() {
+        return generateLoginHtml();
+    }
 
     /**
      * 로그아웃 완료 페이지
@@ -625,6 +651,113 @@ public class AuthController {
         } else {
             return seconds + "초";
         }
+    }
+
+    /**
+     * 로그인 HTML 생성
+     * @return 로그인 페이지 HTML
+     */
+    private String generateLoginHtml() {
+        return """
+            <!DOCTYPE html>
+            <html lang="ko">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+                <meta http-equiv="Pragma" content="no-cache">
+                <meta http-equiv="Expires" content="0">
+                <title>로그인 - MOA2</title>
+                <style>
+                    body {
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
+                        padding: 20px;
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 12px;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        max-width: 500px;
+                        width: 100%%;
+                        text-align: center;
+                    }
+                    h1 {
+                        color: #333;
+                        margin-bottom: 10px;
+                    }
+                    .subtitle {
+                        color: #666;
+                        margin-bottom: 30px;
+                    }
+                    .login-buttons {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 15px;
+                    }
+                    .login-btn {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 15px 24px;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s;
+                        text-decoration: none;
+                        color: white;
+                    }
+                    .login-btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    }
+                    .login-btn:active {
+                        transform: translateY(0);
+                    }
+                    .btn-google {
+                        background: #4285f4;
+                    }
+                    .btn-google:hover {
+                        background: #357ae8;
+                    }
+                    .btn-naver {
+                        background: #03c75a;
+                    }
+                    .btn-naver:hover {
+                        background: #02b350;
+                    }
+                    .btn-icon {
+                        margin-right: 10px;
+                        font-size: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🔐 로그인</h1>
+                    <p class="subtitle">소셜 계정으로 로그인하세요</p>
+                    <div class="login-buttons">
+                        <a href="/oauth2/authorization/google" class="login-btn btn-google">
+                            <span class="btn-icon">🔵</span>
+                            Google로 로그인
+                        </a>
+                        <a href="/oauth2/authorization/naver" class="login-btn btn-naver">
+                            <span class="btn-icon">🟢</span>
+                            Naver로 로그인
+                        </a>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """;
     }
 
     /**

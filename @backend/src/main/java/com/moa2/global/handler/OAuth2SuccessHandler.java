@@ -37,63 +37,61 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                                         Authentication authentication) throws IOException {
         
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-        String email = null;
+        User user = null;
         
-        // 1. OAuth2User attributes에서 직접 이메일 추출 시도 (구글 등)
-        email = oAuth2User.getAttribute("email");
-        
-        // 2. 이메일이 없으면 DB에서 사용자 조회 (네이버 등 response 안에 있는 경우)
-        if (email == null) {
-            try {
-                OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
-                String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
-                
-                // OAuthAttributes로 변환하여 providerId 추출
-                Map<String, Object> attributes = oAuth2User.getAttributes();
-                OAuthAttributes oauthAttributes = OAuthAttributes.of(registrationId, attributes);
-                
-                // DB에서 사용자 조회
-                User user = userRepository
-                        .findBySocialProviderAndProviderId(oauthAttributes.getProvider(), oauthAttributes.getProviderId())
-                        .orElse(null);
-                
-                if (user != null) {
-                    email = user.getEmail();
-                    log.debug("DB에서 사용자 이메일 조회 성공: {} ({})", 
-                            LogMaskingUtil.maskEmail(email), oauthAttributes.getProvider());
-                }
-            } catch (Exception e) {
-                log.warn("DB에서 사용자 조회 실패: {}", e.getMessage());
+        try {
+            // providerId로 사용자 조회 (가장 정확한 방법)
+            OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
+            String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+            
+            // OAuthAttributes로 변환하여 providerId 추출
+            Map<String, Object> attributes = oAuth2User.getAttributes();
+            OAuthAttributes oauthAttributes = OAuthAttributes.of(registrationId, attributes);
+            
+            // DB에서 사용자 조회 (providerId로 조회 - 가장 정확함)
+            user = userRepository
+                    .findBySocialProviderAndProviderId(oauthAttributes.getProvider(), oauthAttributes.getProviderId())
+                    .orElse(null);
+            
+            if (user == null) {
+                log.error("사용자 정보를 찾을 수 없습니다: {} ({})", 
+                        oauthAttributes.getProviderId(), oauthAttributes.getProvider());
+                response.sendRedirect("/api/auth/error?message=사용자 정보를 찾을 수 없습니다.");
+                return;
             }
+            
+            log.debug("사용자 조회 성공: {} ({})", 
+                    LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
+            
+        } catch (Exception e) {
+            log.error("사용자 조회 실패: {}", e.getMessage(), e);
+            response.sendRedirect("/api/auth/error?message=사용자 정보 조회 중 오류가 발생했습니다.");
+            return;
         }
 
+        String email = user.getEmail();
         if (email == null || email.trim().isEmpty()) {
-            log.error("OAuth2 사용자 정보에서 이메일을 찾을 수 없습니다.");
+            log.error("사용자 이메일이 없습니다: {}", user.getId());
             response.sendRedirect("/api/auth/error?message=이메일 정보를 찾을 수 없습니다.");
             return;
         }
 
         // Access Token 생성
         String accessToken = jwtTokenProvider.createAccessToken(email);
-        log.info("Access Token 생성 완료: {}", LogMaskingUtil.maskEmail(email));
+        log.info("Access Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
 
         // Refresh Token 생성
         String refreshToken = jwtTokenProvider.createRefreshToken(email);
-        log.info("Refresh Token 생성 완료: {}", LogMaskingUtil.maskEmail(email));
+        log.info("Refresh Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
 
-        // Refresh Token을 DB에 저장
-        refreshTokenService.createRefreshToken(email, refreshToken);
+        // Refresh Token을 DB에 저장 (소셜 제공자 포함)
+        refreshTokenService.createRefreshToken(email, refreshToken, user.getSocialProvider());
 
-        // DB에서 사용자 정보 조회 (socialProvider 확인용)
-        User user = userRepository.findByEmail(email).orElse(null);
-        String socialProviderName = "Google"; // 기본값
-        if (user != null) {
-            switch (user.getSocialProvider()) {
-                case GOOGLE -> socialProviderName = "Google";
-                case NAVER -> socialProviderName = "Naver";
-                case KAKAO -> socialProviderName = "Kakao";
-            }
-        }
+        String socialProviderName = switch (user.getSocialProvider()) {
+            case GOOGLE -> "Google";
+            case NAVER -> "Naver";
+            case KAKAO -> "Kakao";
+        };
 
         // 세션에 토큰 및 제공자 정보 저장
         HttpSession session = request.getSession();

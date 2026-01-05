@@ -28,10 +28,25 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findByUserEmail(String userEmail);
 
     /**
+     * 사용자 이메일과 소셜 제공자로 Refresh Token 조회
+     * @param userEmail 사용자 이메일
+     * @param socialProvider 소셜 제공자
+     * @return RefreshToken 엔티티
+     */
+    Optional<RefreshToken> findByUserEmailAndSocialProvider(String userEmail, com.moa2.global.model.SocialProvider socialProvider);
+
+    /**
      * 사용자 이메일로 Refresh Token 삭제 (로그아웃 시)
      * @param userEmail 사용자 이메일
      */
     void deleteByUserEmail(String userEmail);
+
+    /**
+     * 사용자 이메일과 소셜 제공자로 Refresh Token 삭제
+     * @param userEmail 사용자 이메일
+     * @param socialProvider 소셜 제공자
+     */
+    void deleteByUserEmailAndSocialProvider(String userEmail, com.moa2.global.model.SocialProvider socialProvider);
 
     /**
      * 토큰으로 Refresh Token 삭제
@@ -45,5 +60,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
      * @return 존재 여부
      */
     boolean existsByUserEmail(String userEmail);
+
+    /**
+     * 사용자 이메일과 소셜 제공자로 Refresh Token 존재 여부 확인
+     * @param userEmail 사용자 이메일
+     * @param socialProvider 소셜 제공자
+     * @return 존재 여부
+     */
+    boolean existsByUserEmailAndSocialProvider(String userEmail, com.moa2.global.model.SocialProvider socialProvider);
 }
 

@@ -3,6 +3,7 @@ package com.moa2.global.service;
 import com.moa2.domain.user.entity.User;
 import com.moa2.domain.user.repository.UserRepository;
 import com.moa2.global.dto.OAuthAttributes;
+import com.moa2.global.model.Gender;
 import com.moa2.global.util.LogMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
 
@@ -107,6 +109,9 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             String oldName = user.getName();
             String oldPicture = user.getPicture();
             String oldPhone = user.getPhone();
+            Gender oldGender = user.getGender();
+            LocalDate oldBirthDate = user.getBirthDate();
+            String oldAgeRange = user.getAgeRange();
             
             // 이름: DB에 값이 있으면 유지, 없으면 OAuth 정보 사용
             String newName = (oldName != null && !oldName.trim().isEmpty()) 
@@ -126,19 +131,61 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 newPhone = oldPhone;
             }
             
+            // 성별: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
+            Gender newGender = attributes.getGender();
+            if (newGender == null) {
+                newGender = oldGender;
+            } else if (oldGender == null) {
+                // 새 성별이 있고 기존 성별이 없으면 업데이트
+            } else {
+                // 둘 다 있으면 기존 값 유지
+                newGender = oldGender;
+            }
+            
+            // 생년월일: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
+            LocalDate newBirthDate = attributes.getBirthDate();
+            if (newBirthDate == null) {
+                newBirthDate = oldBirthDate;
+            } else if (oldBirthDate == null) {
+                // 새 생년월일이 있고 기존 생년월일이 없으면 업데이트
+            } else {
+                // 둘 다 있으면 기존 값 유지
+                newBirthDate = oldBirthDate;
+            }
+            
+            // 연령대: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
+            String newAgeRange = attributes.getAgeRange();
+            if (newAgeRange == null || newAgeRange.trim().isEmpty()) {
+                newAgeRange = oldAgeRange;
+            } else if (oldAgeRange == null || oldAgeRange.trim().isEmpty()) {
+                // 새 연령대가 있고 기존 연령대가 없으면 업데이트
+            } else {
+                // 둘 다 있으면 기존 값 유지
+                newAgeRange = oldAgeRange;
+            }
+            
             // 변경사항이 있을 때만 업데이트
             boolean nameChanged = !newName.equals(oldName);
             boolean pictureChanged = (newPicture != null && !newPicture.equals(oldPicture)) 
                     || (newPicture == null && oldPicture != null);
             boolean phoneChanged = (newPhone != null && !newPhone.equals(oldPhone))
                     || (newPhone == null && oldPhone != null);
+            boolean genderChanged = (newGender != null && !newGender.equals(oldGender))
+                    || (newGender == null && oldGender != null);
+            boolean birthDateChanged = (newBirthDate != null && !newBirthDate.equals(oldBirthDate))
+                    || (newBirthDate == null && oldBirthDate != null);
+            boolean ageRangeChanged = (newAgeRange != null && !newAgeRange.equals(oldAgeRange))
+                    || (newAgeRange == null && oldAgeRange != null);
             
-            if (nameChanged || pictureChanged || phoneChanged) {
-                user.updateOAuth2Info(newName, newPicture, newPhone);
+            if (nameChanged || pictureChanged || phoneChanged || genderChanged || birthDateChanged || ageRangeChanged) {
+                user.updateOAuth2Info(newName, newPicture, newPhone, newGender, newBirthDate, newAgeRange);
                 user = userRepository.save(user);
-                log.info("기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {})", 
+                log.info("기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {}, gender: {}, birthDate: {}, ageRange: {})", 
                         user.getEmail(), newName, newPicture, 
-                        newPhone != null ? LogMaskingUtil.mask(newPhone) : "null");
+                        newPhone != null ? LogMaskingUtil.mask(newPhone) : "null",
+                        newGender != null ? newGender : "null",
+                        newBirthDate != null ? newBirthDate : "null",
+                        newAgeRange != null ? newAgeRange : "null");
             }
         }
 
