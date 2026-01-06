@@ -81,7 +81,7 @@ export function AdminBreadcrumb() {
           const isLast = index === items.length - 1;
 
           return (
-            <React.Fragment key={item.path}>
+            <React.Fragment key={item.label}>
               <BreadcrumbItem>
                 {isLast ? (
                   <BreadcrumbPage>{item.label}</BreadcrumbPage>
