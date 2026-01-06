@@ -10,13 +10,18 @@ export default function AdminLayout({
 }) {
   return (
     <SidebarProvider style={{ "--sidebar-width": "12rem" } as React.CSSProperties}>
-      <div className="flex min-h-screen w-full ">
+      <div className="flex min-h-screen w-full">
         <AdminSidebar />
-        <main className="flex-1 bg-muted/40 p-6">
-          <div className="mb-4 pb-4 border-b">
+        <main className="flex-1 bg-muted/40">
+          {/* Breadcrumb */}
+          <div className="border-b bg-background px-6 py-4">
             <AdminBreadcrumb />
           </div>
-          {children}
+
+          {/* 메인 콘텐츠 영역 */}
+          <div className="p-6">
+            {children}
+          </div>
         </main>
       </div>
     </SidebarProvider>
