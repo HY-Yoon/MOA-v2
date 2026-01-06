@@ -12,11 +12,6 @@ const notoSansKr = Noto_Sans_KR({
   variable: "--font-noto-kr",
 })
 
-const sansation = Sansation({
-  subsets: ["latin"],
-  weight: "700",          
-  variable: "--font-sansation",
-})
 
 export default function RootLayout({
   children,
@@ -24,9 +19,21 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ko">
+    <html  lang="ko">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Sansation:wght@700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
-        className={`${inter.variable} ${notoSansKr.variable} ${sansation.variable} font-sans`}
+        className={`${inter.variable} ${notoSansKr.variable} font-sans`}
       >
         {children}
       </body>
