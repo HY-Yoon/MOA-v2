@@ -29,6 +29,7 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
 
         String errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
         String errorCode = "unknown_error";
+        int statusCode = HttpServletResponse.SC_BAD_REQUEST;
 
         // OAuth2 인증 예외 처리
         if (exception instanceof OAuth2AuthenticationException) {
@@ -38,12 +39,49 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
 
             // 에러 코드별 사용자 친화적 메시지
             errorMessage = getErrorMessage(errorCode, errorDescription);
+            statusCode = getHttpStatusCode(errorCode);
 
             // 로그에 상세 정보 기록 (민감 정보 마스킹)
             log.error("OAuth2 인증 실패 - ErrorCode: {}, Description: {}, URI: {}",
                     errorCode,
                     LogMaskingUtil.mask(errorDescription),
                     error.getUri());
+
+            // 카카오 에러인 경우 더 상세한 정보 로깅
+            if (errorDescription != null && errorDescription.toLowerCase().contains("kakao")) {
+                log.error("=== 카카오 OAuth2 에러 상세 정보 ===");
+                log.error("Error Code: {}", errorCode);
+                log.error("Error Description (전체): {}", errorDescription);
+                log.error("Error URI: {}", error.getUri());
+                if (exception.getCause() != null) {
+                    log.error("Exception Cause: {}", exception.getCause().getClass().getName());
+                    log.error("Exception Cause Message: {}", exception.getCause().getMessage());
+                    if (exception.getCause().getCause() != null) {
+                        log.error("Root Cause: {}", exception.getCause().getCause().getClass().getName());
+                        log.error("Root Cause Message: {}", exception.getCause().getCause().getMessage());
+                    }
+                }
+                log.error("Stack Trace:");
+                exception.printStackTrace();
+                log.error("===================================");
+            }
+
+            // invalid_token_response 에러인 경우 특별 처리
+            if ("invalid_token_response".equals(errorCode)) {
+                log.error("=== invalid_token_response 에러 상세 분석 ===");
+                log.error("이 에러는 OAuth2 토큰 교환 단계에서 발생합니다.");
+                log.error("가능한 원인:");
+                log.error("1. 카카오 토큰 응답 형식이 예상과 다름 (JSON vs form-urlencoded)");
+                log.error("2. 카카오 토큰 응답에 필수 필드가 없음 (access_token, token_type 등)");
+                log.error("3. 카카오 Client ID/Secret이 잘못됨");
+                log.error("4. 카카오 Redirect URI가 등록되지 않음");
+                log.error("Error Description: {}", errorDescription);
+                if (exception.getCause() != null) {
+                    log.error("Exception: {}", exception.getCause().getClass().getName());
+                    log.error("Exception Message: {}", exception.getCause().getMessage());
+                }
+                log.error("=============================================");
+            }
         } else {
             // 일반 인증 예외
             log.error("인증 실패: {}", exception.getMessage());
@@ -79,6 +117,19 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
                 log.warn("알 수 없는 OAuth2 에러 코드: {}", errorCode);
                 yield "로그인 중 오류가 발생했습니다. 다시 시도해주세요.";
             }
+        };
+    }
+
+    /**
+     * 에러 코드별 HTTP 상태 코드 반환
+     */
+    private int getHttpStatusCode(String errorCode) {
+        return switch (errorCode) {
+            case "invalid_grant", "unauthorized_client" -> HttpServletResponse.SC_UNAUTHORIZED;
+            case "invalid_client", "invalid_request", "invalid_scope", "invalid_token_response" ->
+                HttpServletResponse.SC_BAD_REQUEST;
+            case "server_error", "temporarily_unavailable" -> HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+            default -> HttpServletResponse.SC_BAD_REQUEST;
         };
     }
 

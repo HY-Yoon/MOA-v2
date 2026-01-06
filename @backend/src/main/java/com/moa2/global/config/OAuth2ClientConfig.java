@@ -11,14 +11,16 @@ import java.time.Duration;
 
 /**
  * OAuth2 클라이언트 설정
- * Google API 호출 시 타임아웃 설정
+ * OAuth2 API 호출 시 타임아웃 설정
+ * 
+ * 참고: Spring Security OAuth2 5.x 이상에서는 카카오의 JSON 토큰 응답을 자동으로 처리합니다.
  */
 @Configuration
 public class OAuth2ClientConfig {
 
     /**
      * RestTemplate 빈 설정 (타임아웃 포함)
-     * Google API 호출 시 사용
+     * OAuth2 API 호출 시 사용
      */
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {

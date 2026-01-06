@@ -23,26 +23,28 @@ import java.nio.charset.StandardCharsets;
 public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
     @Override
-    public void onAuthenticationFailure(HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException exception) throws IOException {
-
+    public void onAuthenticationFailure(HttpServletRequest request, 
+                                       HttpServletResponse response, 
+                                       AuthenticationException exception) throws IOException {
+        
         String errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
         String errorCode = "unknown_error";
+        int statusCode = HttpServletResponse.SC_BAD_REQUEST;
 
         // OAuth2 인증 예외 처리
         if (exception instanceof OAuth2AuthenticationException) {
             OAuth2Error error = ((OAuth2AuthenticationException) exception).getError();
             errorCode = error.getErrorCode();
             String errorDescription = error.getDescription();
-
+            
             // 에러 코드별 사용자 친화적 메시지
             errorMessage = getErrorMessage(errorCode, errorDescription);
-
+            statusCode = getHttpStatusCode(errorCode);
+            
             // 로그에 상세 정보 기록 (민감 정보 마스킹)
-            log.error("OAuth2 인증 실패 - ErrorCode: {}, Description: {}, URI: {}",
-                    errorCode,
-                    LogMaskingUtil.mask(errorDescription),
+            log.error("OAuth2 인증 실패 - ErrorCode: {}, Description: {}, URI: {}", 
+                    errorCode, 
+                    LogMaskingUtil.mask(errorDescription), 
                     error.getUri());
         } else {
             // 일반 인증 예외
@@ -53,9 +55,9 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
         }
 
         // 에러 페이지로 리다이렉트
-        String redirectUrl = "/api/auth/error?message=" + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8)
+        String redirectUrl = "/api/auth/error?message=" + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8) 
                 + "&code=" + URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
-
+        
         log.info("OAuth2 로그인 실패 - 사용자를 에러 페이지로 리다이렉트: {}", redirectUrl);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
@@ -82,4 +84,17 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
         };
     }
 
+    /**
+     * 에러 코드별 HTTP 상태 코드 반환
+     */
+    private int getHttpStatusCode(String errorCode) {
+        return switch (errorCode) {
+            case "invalid_grant", "unauthorized_client" -> HttpServletResponse.SC_UNAUTHORIZED;
+            case "invalid_client", "invalid_request", "invalid_scope", "invalid_token_response" -> HttpServletResponse.SC_BAD_REQUEST;
+            case "server_error", "temporarily_unavailable" -> HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+            default -> HttpServletResponse.SC_BAD_REQUEST;
+        };
+    }
+
 }
+
