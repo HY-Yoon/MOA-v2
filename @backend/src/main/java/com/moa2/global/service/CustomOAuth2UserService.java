@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.Collections;
-import java.util.Map;
 
 /**
  * OAuth2 사용자 정보를 로드하고 DB에 저장/업데이트하는 서비스
@@ -64,21 +63,22 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         } catch (OAuth2AuthenticationException e) {
             // OAuth2 인증 예외는 그대로 전파
             OAuth2Error error = e.getError();
-            log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}", 
+            log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}, URI={}", 
                     registrationId, 
                     error.getErrorCode(), 
-                    LogMaskingUtil.mask(error.getDescription()));
+                    LogMaskingUtil.mask(error.getDescription()),
+                    error.getUri());
             throw e;
             
         } catch (Exception e) {
             // 예상치 못한 예외 (네트워크 오류, JSON 파싱 오류 등)
-            log.error("Google API 호출 실패 [{}]: {}", registrationId, e.getMessage(), e);
+            log.error("OAuth2 API 호출 실패 [{}]: {}", registrationId, e.getMessage(), e);
             
             // OAuth2AuthenticationException으로 변환
             throw new OAuth2AuthenticationException(
                     new org.springframework.security.oauth2.core.OAuth2Error(
                             "server_error",
-                            "Google API 호출 중 오류가 발생했습니다: " + e.getMessage(),
+                            "OAuth2 API 호출 중 오류가 발생했습니다: " + e.getMessage(),
                             null
                     ),
                     e

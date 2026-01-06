@@ -1,0 +1,8 @@
+# Project Context
+- Language: Java 17 (JDK 17)
+- Framework: Spring Boot 3.4.1
+- DB: PostgreSQL
+- ORM: JPA
+- Build Tool: Gradle
+
+# Rules for AI

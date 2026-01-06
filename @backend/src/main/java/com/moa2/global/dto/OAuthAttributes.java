@@ -36,6 +36,8 @@ public class OAuthAttributes {
             return ofGoogle(attributes);
         } else if ("naver".equals(providerName)) {
             return ofNaver(attributes);
+        } else if ("kakao".equals(providerName)) {
+            return ofKakao(attributes);
         }
         throw new IllegalArgumentException("지원하지 않는 제공자입니다: " + providerName);
     }
@@ -132,6 +134,66 @@ public class OAuthAttributes {
                 .ageRange(age) // 연령대 저장
                 .providerId(id)
                 .provider(SocialProvider.NAVER)
+                .build();
+    }
+
+    /**
+     * Kakao OAuth2 응답 파싱
+     * @param attributes Kakao OAuth2 응답
+     * @return OAuthAttributes 객체
+     */
+    @SuppressWarnings("unchecked")
+    private static OAuthAttributes ofKakao(Map<String, Object> attributes) {
+        // 카카오는 id가 최상위 레벨에 있음 (Long 타입일 수 있음)
+        Object idObj = attributes.get("id");
+        String id;
+        if (idObj instanceof Long) {
+            id = String.valueOf((Long) idObj);
+        } else if (idObj instanceof Integer) {
+            id = String.valueOf((Integer) idObj);
+        } else {
+            id = (String) idObj;
+        }
+        
+        if (id == null || id.trim().isEmpty()) {
+            throw new IllegalArgumentException("카카오 OAuth2 응답에 id가 없습니다.");
+        }
+
+        // kakao_account는 선택적 (사용자가 동의하지 않을 수 있음)
+        Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+        
+        String email = null;
+        String name = null;
+        String profileImage = null;
+        
+        if (kakaoAccount != null) {
+            // email 추출
+            email = (String) kakaoAccount.get("email");
+            
+            // profile 추출
+            Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+            if (profile != null) {
+                name = (String) profile.get("nickname");
+                profileImage = (String) profile.get("profile_image_url");
+            }
+        }
+        
+        // email이 null이면 기본값 설정
+        if (email == null || email.trim().isEmpty()) {
+            email = "no-email-" + id + "@kakao.local";
+        }
+        
+        // name이 null이면 기본값 설정
+        if (name == null || name.trim().isEmpty()) {
+            name = "카카오 사용자";
+        }
+
+        return OAuthAttributes.builder()
+                .name(name)
+                .email(email)
+                .picture(profileImage)
+                .providerId(id)
+                .provider(SocialProvider.KAKAO)
                 .build();
     }
 

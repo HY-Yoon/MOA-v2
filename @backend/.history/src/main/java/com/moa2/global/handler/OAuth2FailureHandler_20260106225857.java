@@ -29,6 +29,7 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
 
         String errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
         String errorCode = "unknown_error";
+        int statusCode = HttpServletResponse.SC_BAD_REQUEST;
 
         // OAuth2 인증 예외 처리
         if (exception instanceof OAuth2AuthenticationException) {
@@ -38,6 +39,7 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
 
             // 에러 코드별 사용자 친화적 메시지
             errorMessage = getErrorMessage(errorCode, errorDescription);
+            statusCode = getHttpStatusCode(errorCode);
 
             // 로그에 상세 정보 기록 (민감 정보 마스킹)
             log.error("OAuth2 인증 실패 - ErrorCode: {}, Description: {}, URI: {}",
@@ -79,6 +81,19 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
                 log.warn("알 수 없는 OAuth2 에러 코드: {}", errorCode);
                 yield "로그인 중 오류가 발생했습니다. 다시 시도해주세요.";
             }
+        };
+    }
+
+    /**
+     * 에러 코드별 HTTP 상태 코드 반환
+     */
+    private int getHttpStatusCode(String errorCode) {
+        return switch (errorCode) {
+            case "invalid_grant", "unauthorized_client" -> HttpServletResponse.SC_UNAUTHORIZED;
+            case "invalid_client", "invalid_request", "invalid_scope", "invalid_token_response" ->
+                HttpServletResponse.SC_BAD_REQUEST;
+            case "server_error", "temporarily_unavailable" -> HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+            default -> HttpServletResponse.SC_BAD_REQUEST;
         };
     }
 

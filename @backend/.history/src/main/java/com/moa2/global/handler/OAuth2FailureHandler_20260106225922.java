@@ -82,4 +82,17 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
         };
     }
 
+    /**
+     * 에러 코드별 HTTP 상태 코드 반환
+     */
+    private int getHttpStatusCode(String errorCode) {
+        return switch (errorCode) {
+            case "invalid_grant", "unauthorized_client" -> HttpServletResponse.SC_UNAUTHORIZED;
+            case "invalid_client", "invalid_request", "invalid_scope", "invalid_token_response" ->
+                HttpServletResponse.SC_BAD_REQUEST;
+            case "server_error", "temporarily_unavailable" -> HttpServletResponse.SC_SERVICE_UNAVAILABLE;
+            default -> HttpServletResponse.SC_BAD_REQUEST;
+        };
+    }
+
 }
