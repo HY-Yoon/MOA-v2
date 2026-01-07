@@ -18,79 +18,45 @@ import { z } from 'zod';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@/components/admin/show/upsert/FormField';
+import { SHOW_FORM_FIELDS } from '@/constants/admin/show';
+import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 
 interface Props {
   id?: string;
 }
 
-const SHOW_FORM_FIELDS = {
-  TITLE: 'title', // 제목
-  GENRE: 'genre', // 장르
-  REGION: 'region', // 지역
-  VENUE_NAME: 'venueName', // 장소
-  HALL_NAME: 'hallName', // 공연장
-  RUNNING_TIME: 'runningTime', // 관람시간
-  CAST: 'cast', // 출연진
-  BOOKING_PERIOD: 'bookingPeriod', // 예매 일정
-  START_DATE: 'startDate', // 예매 시작일
-  END_DATE: 'endDate', // 예매 종료일
-  SCHEDULES: 'schedules', // 공연 일정
-  SHOW_DATE: 'showDate', // 공연 일자
-  SHOW_TIME: 'showTime', // 공연 시간
-  TICKET_OPEN_TIME: 'ticketOpenTime', // 티켓 오픈 시간
-} as const;
+const requiredStringSchema = (fieldName: string, action: '입력' | '선택' = '입력') =>
+  z.string().min(1, `${fieldName}을(를) ${action}하세요.`);
+
+const dateSchema = (fieldName: string) =>
+  z
+    .string()
+    .min(1, `${fieldName}을(를) 입력하세요.`)
+    .refine((str) => !isNaN(new Date(str).getTime()), {
+      message: '올바른 날짜 형식이 아닙니다.',
+    });
 
 const scheduleSchema = z.object({
-  [SHOW_FORM_FIELDS.SHOW_DATE]: z
-    .string()
-    .min(1, '공연일을 입력하세요.')
-    .refine(
-      (str) => {
-        if (!str) return false;
-        const date = new Date(str);
-        return !isNaN(date.getTime());
-      },
-      { message: '올바른 날짜 형식이 아닙니다.' },
-    ),
-  [SHOW_FORM_FIELDS.SHOW_TIME]: z.string().min(1, '공연 시간을 입력하세요.'),
-  [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: z
-    .string()
-    .min(1, '티켓 오픈 시간을 입력하세요.')
-    .refine(
-      (str) => {
-        if (!str) return false;
-        const date = new Date(str);
-        return !isNaN(date.getTime());
-      },
-      { message: '올바른 날짜 형식이 아닙니다.' },
-    ),
+  [SHOW_FORM_FIELDS.SHOW_DATE]: dateSchema('공연일'),
+  [SHOW_FORM_FIELDS.SHOW_TIME]: requiredStringSchema('공연 시간'),
+  [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dateSchema('티켓 오픈 시간'),
 });
 const showFormSchema = z.object({
-  [SHOW_FORM_FIELDS.TITLE]: z
-    .string()
-    .min(1, '제목을 입력하세요.')
-    .max(100, '제목은 100자 이하여야 합니다'),
-  [SHOW_FORM_FIELDS.GENRE]: z.string().min(1, '장르를 선택하세요.'),
-  [SHOW_FORM_FIELDS.REGION]: z.string().min(1, '지역을 선택하세요.'),
-  [SHOW_FORM_FIELDS.VENUE_NAME]: z.string().min(1, '장소를 선택하세요.'),
-  [SHOW_FORM_FIELDS.HALL_NAME]: z.string().min(1, '공연장을 선택하세요.'),
-  [SHOW_FORM_FIELDS.RUNNING_TIME]: z.number().min(1, '관람 시간은 1분 이상이어야 합니다.'),
-  [SHOW_FORM_FIELDS.CAST]: z
-    .string()
-    .min(1, '출연진을 입력하세요.')
-    .max(500, '출연진은 500자 이내로 입력하세요.'),
-  [SHOW_FORM_FIELDS.START_DATE]: z
-    .string()
-    .min(1, '예매 시작일을 입력하세요.')
-    .refine(
-      (str) => {
-        if (!str) return false;
-        const date = new Date(str);
-        return !isNaN(date.getTime());
-      },
-      { message: '올바른 날짜 형식이 아닙니다.' },
-    ),
-  [SHOW_FORM_FIELDS.SCHEDULES]: z.array(scheduleSchema),
+  [SHOW_FORM_FIELDS.TITLE]: requiredStringSchema('제목').max(100, '제목은 100자 이하여야 합니다'),
+  [SHOW_FORM_FIELDS.GENRE]: requiredStringSchema('장르', '선택'),
+  [SHOW_FORM_FIELDS.REGION]: requiredStringSchema('지역', '선택'),
+  [SHOW_FORM_FIELDS.VENUE_NAME]: requiredStringSchema('장소', '선택'),
+  [SHOW_FORM_FIELDS.HALL_NAME]: requiredStringSchema('공연장', '선택'),
+  [SHOW_FORM_FIELDS.RUNNING_TIME]: requiredStringSchema('관람 시간').regex(
+    /^\d+분$/,
+    '분 단위로 입력하세요. (ex. 100분)',
+  ),
+  [SHOW_FORM_FIELDS.CAST]: requiredStringSchema('출연진').max(
+    500,
+    '출연진은 500자 이내로 입력하세요.',
+  ),
+  [SHOW_FORM_FIELDS.START_DATE]: dateSchema('예매 시작일'),
+  // [SHOW_FORM_FIELDS.SCHEDULES]: z.array(scheduleSchema),
   // poster: z
   //   .instanceof(FileList)
   //   .refine((files) => files.length > 0, '포스터 이미지는 필수입니다')
@@ -104,6 +70,16 @@ export default function PerformanceRegistrationForm(props: Props) {
   const isUpdate = !!props.id;
   const flag = isUpdate ? '수정' : '등록';
 
+  // TODO: api 적용 예정
+  const [venueOptions, setVenueOptions] = useState([
+    { label: '예술의 전당', value: 'aa' },
+    { label: '오페라 하우스', value: 'bb' },
+  ]);
+  // TODO: api 적용 예정
+  const [hallOptions, setHallOptions] = useState([
+    { label: '큰홀', value: 'big' },
+    { label: '작은홀', value: 'small' },
+  ]);
   const [imagePreview, setImagePreview] = useState(null);
 
   const {
@@ -143,7 +119,7 @@ export default function PerformanceRegistrationForm(props: Props) {
                 id={SHOW_FORM_FIELDS.TITLE}
                 {...register(SHOW_FORM_FIELDS.TITLE)}
                 className={errors.title ? 'border-red-500' : ''}
-                placeholder="제목을 입력하세요."
+                placeholder="제목을 입력하세요. (100자 이내)"
               />
             </FormField>
 
@@ -159,12 +135,15 @@ export default function PerformanceRegistrationForm(props: Props) {
                 defaultValue=""
                 render={({ field }) => (
                   <Select value={field.value || ''} onValueChange={field.onChange}>
-                    <SelectTrigger id={SHOW_FORM_FIELDS.GENRE} className="h-11">
+                    <SelectTrigger id={SHOW_FORM_FIELDS.GENRE} className="w-64">
                       <SelectValue placeholder="장르를 선택하세요." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="musical">뮤지컬</SelectItem>
-                      <SelectItem value="concert">콘서트</SelectItem>
+                      {GENRE_OPTIONS.map((gerne) => (
+                        <SelectItem key={gerne.value} value={gerne.value}>
+                          {gerne.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
@@ -177,33 +156,53 @@ export default function PerformanceRegistrationForm(props: Props) {
               error={errors.region?.message}
               required={true}
             >
-              <Select>
-                <SelectTrigger id={SHOW_FORM_FIELDS.REGION} className="h-11">
-                  <SelectValue placeholder="지역을 선택하세요." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="seoul">서울</SelectItem>
-                  <SelectItem value="busan">부산</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                name={SHOW_FORM_FIELDS.REGION}
+                control={control}
+                defaultValue=""
+                render={({ field }) => (
+                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <SelectTrigger id={SHOW_FORM_FIELDS.REGION} className="w-64">
+                      <SelectValue placeholder="지역을 선택하세요." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REGION_OPTIONS.map((region) => (
+                        <SelectItem key={region.value} value={region.value}>
+                          {region.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 xl:grid-cols-2">
               <FormField
                 label="장소"
                 htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
                 error={errors.venueName?.message}
                 required={true}
               >
-                <Select>
-                  <SelectTrigger id={SHOW_FORM_FIELDS.VENUE_NAME} className="h-11">
-                    <SelectValue placeholder="장소를 선택하세요." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a">예술의 전당</SelectItem>
-                    <SelectItem value="b">오페라하우스</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name={SHOW_FORM_FIELDS.VENUE_NAME}
+                  control={control}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger id={SHOW_FORM_FIELDS.VENUE_NAME} className="w-64">
+                        <SelectValue placeholder="장소를 선택하세요." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {venueOptions.map((venue) => (
+                          <SelectItem key={venue.value} value={venue.value}>
+                            {venue.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </FormField>
 
               <FormField
@@ -212,15 +211,25 @@ export default function PerformanceRegistrationForm(props: Props) {
                 error={errors.hallName?.message}
                 required={true}
               >
-                <Select>
-                  <SelectTrigger id={SHOW_FORM_FIELDS.HALL_NAME} className="h-11">
-                    <SelectValue placeholder="공연장을 선택하세요." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a">A홀</SelectItem>
-                    <SelectItem value="b">B홀</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name={SHOW_FORM_FIELDS.HALL_NAME}
+                  control={control}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger id={SHOW_FORM_FIELDS.HALL_NAME} className="w-64">
+                        <SelectValue placeholder="공연장을 선택하세요." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hallOptions.map((hall) => (
+                          <SelectItem key={hall.value} value={hall.value}>
+                            {hall.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </FormField>
             </div>
 
@@ -234,7 +243,7 @@ export default function PerformanceRegistrationForm(props: Props) {
                 id={SHOW_FORM_FIELDS.RUNNING_TIME}
                 {...register(SHOW_FORM_FIELDS.RUNNING_TIME)}
                 className={errors.runningTime ? 'border-red-500' : ''}
-                placeholder="관람 시간을 입력하세요."
+                placeholder="관람 시간을 입력하세요. (분 단위, ex. 100분)"
               />
             </FormField>
 
@@ -248,7 +257,7 @@ export default function PerformanceRegistrationForm(props: Props) {
                 id={SHOW_FORM_FIELDS.CAST}
                 {...register(SHOW_FORM_FIELDS.CAST)}
                 className={errors.cast ? 'border-red-500' : ''}
-                placeholder="출연진을 입력하세요."
+                placeholder="출연진을 입력하세요. (500자 이내)"
               />
             </FormField>
 
