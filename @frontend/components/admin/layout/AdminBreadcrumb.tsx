@@ -12,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/adminRoutes';
+import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 
 export function AdminBreadcrumb() {
   function makeBreadcrumbItems(pathname: string) {

@@ -5,14 +5,14 @@ import { usePathname } from 'next/navigation';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarFooter,
-  SidebarHeader,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -21,8 +21,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, Theater, Armchair, Users, type LucideIcon } from 'lucide-react';
-import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/adminRoutes';
+import { Armchair, LayoutDashboard, Theater, Users } from 'lucide-react';
+import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { useEffect, useState } from 'react';
 
 const ADMIN_ROUTE_ITEMS = [
@@ -68,7 +68,7 @@ export function AdminSidebar() {
       <SidebarHeader>
         <Link
           href={ADMIN_ROUTE_ITEMS[0].href}
-          className="flex h-14 items-center text-center justify-center text-[1.5rem] font-logo "
+          className="font-logo flex h-14 items-center justify-center text-center text-[1.5rem]"
         >
           MOA Place
         </Link>
@@ -99,7 +99,7 @@ export function AdminSidebar() {
         {mounted && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-muted">
+              <button className="hover:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={adminUser.image} />
                   <AvatarFallback>{adminUser.name.slice(0, 1)}</AvatarFallback>
@@ -107,7 +107,7 @@ export function AdminSidebar() {
 
                 <div className="flex flex-col text-left leading-tight">
                   <span className="font-medium">{adminUser.name}</span>
-                  <span className="text-xs text-muted-foreground">{adminUser.email}</span>
+                  <span className="text-muted-foreground text-xs">{adminUser.email}</span>
                 </div>
               </button>
             </DropdownMenuTrigger>
