@@ -37,29 +37,23 @@ public class CustomOAuth2AuthorizationRequestResolver implements OAuth2Authoriza
             return null;
         }
 
-        // 기존 파라미터에 prompt=consent 추가
-        // consent: 항상 동의 화면 표시 (이미 동의한 경우에도 다시 표시하여 완전히 처음처럼 보이게 함)
         Map<String, Object> additionalParameters = new HashMap<>(authorizationRequest.getAdditionalParameters());
-        
+
         // 제공자별 파라미터 설정
         String registrationId = authorizationRequest.getAttribute("registration_id");
         if (registrationId != null) {
             if ("google".equals(registrationId)) {
-                // 구글: prompt=consent 사용
                 additionalParameters.put("prompt", "consent");
             } else if ("naver".equals(registrationId)) {
-                // 네이버: auth_type=reauthenticate 사용 (개인정보 동의 화면 강제 표시)
-                // 네이버는 authorization-uri에 이미 auth_type=reauthenticate가 포함되어 있지만
-                // 추가 파라미터로 강제할 수도 있음
                 additionalParameters.put("auth_type", "reauthenticate");
             }
         } else {
-            // 기본값: consent 사용
             additionalParameters.put("prompt", "consent");
         }
 
         return OAuth2AuthorizationRequest.from(authorizationRequest)
                 .additionalParameters(additionalParameters)
+                .redirectUri(authorizationRequest.getRedirectUri())
                 .build();
     }
 }

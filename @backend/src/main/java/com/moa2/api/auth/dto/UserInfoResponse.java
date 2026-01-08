@@ -20,6 +20,7 @@ public class UserInfoResponse {
     private String name;
     private String picture;
     private SocialProvider provider;
+    private String providerId;  // 소셜 제공자 ID 추가
     private UserRole role;
 
     /**
@@ -33,6 +34,7 @@ public class UserInfoResponse {
                 .name(user.getName())
                 .picture(user.getPicture())
                 .provider(user.getSocialProvider())
+                .providerId(user.getProviderId())  // providerId 추가
                 .role(user.getRole())
                 .build();
     }

@@ -11,10 +11,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
 
 /**
  * Spring Security 설정
@@ -31,11 +34,40 @@ public class SecurityConfig {
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final ClientRegistrationRepository clientRegistrationRepository;
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // 허용할 Origin (프론트엔드 주소)
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        
+        // 허용할 HTTP 메서드
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        
+        // 허용할 헤더
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        
+        // 쿠키 전송 허용
+        configuration.setAllowCredentials(true);
+        
+        // 브라우저가 응답 헤더를 읽을 수 있도록 노출
+        configuration.setExposedHeaders(Arrays.asList("Set-Cookie"));
+        
+        // Preflight 요청 캐싱 시간 (1시간)
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // CORS 적용
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            
             // CSRF 비활성화 (API 서버이므로)
             .csrf(AbstractHttpConfigurer::disable)
             
@@ -52,13 +84,17 @@ public class SecurityConfig {
                     "/error",
                     "/oauth2/**",
                     "/login/**",
-                    "/auth/login",
+                    "/api/auth/login",
                     "/api/auth/verify",
                     "/api/auth/success",
                     "/api/auth/refresh",
                     "/api/auth/logout",
                     "/api/auth/logout/complete",
-                    "/api/auth/error"
+                    "/api/auth/error",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                     "/v3/api-docs/**",
+                        "/api/v1/admin/**"
                 ).permitAll()
                 
                 // 나머지 모든 요청은 인증 필요
@@ -67,33 +103,18 @@ public class SecurityConfig {
             
             // OAuth2 로그인 설정
             .oauth2Login(oauth2 -> oauth2
-                .userInfoEndpoint(userInfo -> userInfo
+                    .loginPage("/api/auth/login")
+                    .userInfoEndpoint(userInfo -> userInfo
                     .userService(customOAuth2UserService)
                 )
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
-                .authorizationEndpoint(authorization -> authorization
-                    .authorizationRequestResolver(customAuthorizationRequestResolver())
-                )
             )
             
             // JWT 인증 필터 추가 (OAuth2 필터 이후에 실행)
             .addFilterAfter(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
-    }
-
-    /**
-     * OAuth2 인증 요청 리졸버 설정
-     * prompt=select_account consent를 추가하여 항상 계정 선택 및 동의 화면이 표시되도록 함
-     */
-    private OAuth2AuthorizationRequestResolver customAuthorizationRequestResolver() {
-        OAuth2AuthorizationRequestResolver defaultResolver = 
-            new org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver(
-                clientRegistrationRepository,
-                "/oauth2/authorization"
-            );
-        return new com.moa2.global.config.CustomOAuth2AuthorizationRequestResolver(defaultResolver);
     }
 }
 

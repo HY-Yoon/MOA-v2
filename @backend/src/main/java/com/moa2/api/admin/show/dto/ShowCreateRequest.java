@@ -1,11 +1,11 @@
 package com.moa2.api.admin.show.dto;
 
+import com.moa2.global.model.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
-import java.time.LocalDate;
 import java.util.List;
 
 @Getter
@@ -25,18 +25,17 @@ public class ShowCreateRequest {
     @NotNull(message = "장소 정보는 필수입니다")
     private LocationRequest location;
 
-    @Schema(description = "상영 시간(분)", example = "150", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotNull(message = "상영 시간은 필수입니다")
-    @Min(value = 1, message = "상영 시간은 1분 이상이어야 합니다")
-    private Integer runningTime;
+    @Schema(description = "상영 시간", example = "150분", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "상영 시간은 필수입니다")
+    private String runningTime;
 
-    @Schema(description = "출연진 정보 (문자열)", example = "김철수, 이영희, 박민수")
+    @Schema(description = "출연진 정보 (문자열)", example = "출연진1, 출연진2, 출연진3")
     private String cast;
 
-    @Schema(description = "예약 가능 기간", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "판매 기간", requiredMode = Schema.RequiredMode.REQUIRED)
     @Valid
-    @NotNull(message = "예약 가능 기간은 필수입니다")
-    private BookingPeriodRequest bookingPeriod;
+    @NotNull(message = "판매 기간은 필수입니다")
+    private SalePeriodRequest salePeriod;
 
     @Schema(description = "공연 스케줄 목록", requiredMode = Schema.RequiredMode.REQUIRED)
     @Valid
@@ -47,9 +46,9 @@ public class ShowCreateRequest {
     @Setter
     @Schema(description = "장소 정보")
     public static class LocationRequest {
-        @Schema(description = "지역", example = "서울", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "지역은 필수입니다")
-        private String region;
+        @Schema(description = "지역", example = "SEOUL", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "지역은 필수입니다")
+        private Region region;
 
         @Schema(description = "공연장명", example = "올림픽공원", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "공연장명은 필수입니다")
@@ -62,15 +61,15 @@ public class ShowCreateRequest {
 
     @Getter
     @Setter
-    @Schema(description = "예약 가능 기간")
-    public static class BookingPeriodRequest {
-        @Schema(description = "예약 시작일", example = "2024-01-01", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "예약 시작일은 필수입니다")
-        private LocalDate startDate;
+    @Schema(description = "판매 기간")
+    public static class SalePeriodRequest {
+        @Schema(description = "판매 시작일시", example = "2024-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "판매 시작일시는 필수입니다")
+        private java.time.LocalDateTime startDate;
 
-        @Schema(description = "예약 종료일", example = "2024-01-31", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "예약 종료일은 필수입니다")
-        private LocalDate endDate;
+        @Schema(description = "판매 종료일시", example = "2024-01-31T23:59:59", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull(message = "판매 종료일시는 필수입니다")
+        private java.time.LocalDateTime endDate;
     }
 
     @Getter

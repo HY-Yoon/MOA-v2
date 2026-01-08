@@ -6,9 +6,9 @@ import com.moa2.global.dto.OAuthAttributes;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.service.RefreshTokenService;
 import com.moa2.global.util.LogMaskingUtil;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -87,18 +87,24 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // Refresh Token을 DB에 저장 (소셜 제공자 포함)
         refreshTokenService.createRefreshToken(email, refreshToken, user.getSocialProvider());
 
-        String socialProviderName = switch (user.getSocialProvider()) {
-            case GOOGLE -> "Google";
-            case NAVER -> "Naver";
-            case KAKAO -> "Kakao";
-        };
-
-        // 세션에 토큰 및 제공자 정보 저장
-        HttpSession session = request.getSession();
-        session.setAttribute("access_token", accessToken);
-        session.setAttribute("refresh_token", refreshToken);
-        session.setAttribute("user_email", email);
-        session.setAttribute("social_provider", socialProviderName);
+        // Access Token 쿠키 설정 (30분)
+        Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setSecure(false); // SSL 설정 전까지 false (개발 환경)
+        accessTokenCookie.setPath("/");
+        accessTokenCookie.setMaxAge(30 * 60); // 30분 (초 단위)
+        response.addCookie(accessTokenCookie);
+        
+        // Refresh Token 쿠키 설정 (14일)
+        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setSecure(false); // SSL 설정 전까지 false (개발 환경)
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setMaxAge(14 * 24 * 60 * 60); // 14일 (초 단위)
+        response.addCookie(refreshTokenCookie);
+        
+        log.info("OAuth2 로그인 성공: {} ({}) - Cookie 설정 완료", 
+                LogMaskingUtil.maskEmail(email), user.getSocialProvider());
 
         // 성공 페이지로 리다이렉트
         getRedirectStrategy().sendRedirect(request, response, "/api/auth/success");

@@ -34,7 +34,7 @@ public class Show {
     @Enumerated(EnumType.STRING)
     private Genre genre; // MUSICAL, CONCERT...
     
-    private Integer runningTime;
+    private String runningTime; // 상영 시간 (예: "150분", "2시간 30분")
     private String posterUrl;
     
     @Column(name = "\"cast\"")

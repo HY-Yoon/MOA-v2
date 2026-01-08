@@ -45,6 +45,17 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                     .getUserInfoEndpoint()
                     .getUserNameAttributeName();
 
+            // 카카오의 경우 접속 IP 로깅 (IP 제한 에러 디버깅용)
+            if ("kakao".equals(registrationId)) {
+                try {
+                    // 카카오 API 호출 시 사용되는 IP 정보 로깅
+                    log.info("[Kakao] OAuth2 사용자 정보 조회 성공 - ID: {}", oAuth2User.getAttributes().get("id"));
+                    // IP는 서버의 아웃바운드 IP이므로 직접 확인 불가, 카카오 개발자 콘솔 로그에서 확인 필요
+                } catch (Exception ex) {
+                    log.debug("카카오 정보 로깅 중 오류 (무시)", ex);
+                }
+            }
+
             // OAuth2 응답을 OAuthAttributes로 변환
             OAuthAttributes attributes = OAuthAttributes.of(registrationId, oAuth2User.getAttributes());
 
@@ -63,11 +74,19 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         } catch (OAuth2AuthenticationException e) {
             // OAuth2 인증 예외는 그대로 전파
             OAuth2Error error = e.getError();
-            log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}, URI={}", 
-                    registrationId, 
-                    error.getErrorCode(), 
-                    LogMaskingUtil.mask(error.getDescription()),
-                    error.getUri());
+            
+            // 카카오의 경우 IP 제한 에러 체크
+            if ("kakao".equals(registrationId) && error.getDescription() != null 
+                    && error.getDescription().contains("ip mismatched")) {
+                log.error("OAuth2 인증 실패 [{}]: IP 제한 에러 - {}", 
+                        registrationId, error.getDescription());
+            } else {
+                log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}, URI={}", 
+                        registrationId, 
+                        error.getErrorCode(), 
+                        LogMaskingUtil.mask(error.getDescription()),
+                        error.getUri());
+            }
             throw e;
             
         } catch (Exception e) {

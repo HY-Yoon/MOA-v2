@@ -59,9 +59,12 @@ public class AdminShowService {
 
         List<ShowListResponse> content = shows.getContent().stream()
             .map(show -> {
-                ShowSchedule firstSchedule = showScheduleRepository
-                    .findByShowIdOrderByDateAndTime(show.getId())
-                    .stream()
+                // 모든 일정 조회
+                List<ShowSchedule> allSchedules = showScheduleRepository
+                    .findByShowIdOrderByDateAndTime(show.getId());
+
+                // 첫 번째 일정 (기존 호환성 유지)
+                ShowSchedule firstSchedule = allSchedules.stream()
                     .findFirst()
                     .orElse(null);
 
@@ -71,6 +74,33 @@ public class AdminShowService {
                         firstSchedule.getShowDate(),
                         firstSchedule.getShowTime()
                     );
+                }
+
+                // 일정 목록 생성 (회차 자동 계산)
+                Map<LocalDate, Integer> sessionCountByDate = new HashMap<>();
+                List<ShowListResponse.ScheduleInfo> scheduleInfos = allSchedules.stream()
+                    .map(schedule -> {
+                        // 같은 날짜의 회차 계산
+                        LocalDate date = schedule.getShowDate();
+                        int session = sessionCountByDate.getOrDefault(date, 0) + 1;
+                        sessionCountByDate.put(date, session);
+
+                        return ShowListResponse.ScheduleInfo.builder()
+                            .keyId(schedule.getId())
+                            .date(schedule.getShowDate())
+                            .time(schedule.getShowTime())
+                            .session(session)
+                            .build();
+                    })
+                    .collect(Collectors.toList());
+
+                // 판매 기간 생성
+                ShowListResponse.SalePeriod salePeriod = null;
+                if (show.getSaleStartDate() != null || show.getSaleEndDate() != null) {
+                    salePeriod = ShowListResponse.SalePeriod.builder()
+                        .startDate(show.getSaleStartDate())
+                        .endDate(show.getSaleEndDate())
+                        .build();
                 }
 
                 return ShowListResponse.builder()
@@ -84,8 +114,8 @@ public class AdminShowService {
                         ? show.getVenue().getRegion().name() : null)
                     .hallName(show.getVenue() != null ? show.getVenue().getHallName() : null)
                     .firstScheduleDate(firstScheduleDate)
-                    .saleStartDate(show.getSaleStartDate())
-                    .saleEndDate(show.getSaleEndDate())
+                    .salePeriod(salePeriod)
+                    .schedules(scheduleInfos)
                     .build();
             })
             .collect(Collectors.toList());
@@ -173,10 +203,8 @@ public class AdminShowService {
             detailImageUrls = fileService.uploadFiles(detailImages, "details");
         }
 
-        // location 정보로 Region enum 변환 (한글 -> enum)
-        Region region = convertRegionFromKorean(request.getLocation().getRegion());
-        
         // location 정보로 Venue 조회, 없으면 자동 생성
+        Region region = request.getLocation().getRegion();
         String venueName = request.getLocation().getVenueName();
         String hallName = request.getLocation().getHallName();
         
@@ -222,8 +250,8 @@ public class AdminShowService {
             .cast(request.getCast())
             .status(ShowStatus.WAITING)
             .saleStatus(SaleStatus.ALLOWED)
-            .saleStartDate(LocalDateTime.of(request.getBookingPeriod().getStartDate(), LocalTime.MIN))
-            .saleEndDate(LocalDateTime.of(request.getBookingPeriod().getEndDate(), LocalTime.of(23, 59, 59)))
+            .saleStartDate(request.getSalePeriod().getStartDate())
+            .saleEndDate(request.getSalePeriod().getEndDate())
             .startDate(firstShowDate)
             .endDate(lastShowDate)
             .viewCount(0L)
@@ -286,8 +314,8 @@ public class AdminShowService {
             if (request.getLocation() != null) {
                 throw new RuntimeException("판매중인 공연은 장소를 수정할 수 없습니다");
             }
-            if (request.getSaleStartDate() != null) {
-                throw new RuntimeException("판매중인 공연은 예매 시작일을 수정할 수 없습니다");
+            if (request.getSalePeriod() != null) {
+                throw new RuntimeException("판매중인 공연은 판매 기간을 수정할 수 없습니다");
             }
         }
 
@@ -308,10 +336,8 @@ public class AdminShowService {
                 show.setGenre(Genre.valueOf(request.getGenre()));
             }
             if (request.getLocation() != null) {
-                // location 정보로 Region enum 변환 (한글 -> enum)
-                Region region = convertRegionFromKorean(request.getLocation().getRegion());
-                
                 // location 정보로 Venue 조회, 없으면 자동 생성
+                Region region = request.getLocation().getRegion();
                 String venueName = request.getLocation().getVenueName();
                 String hallName = request.getLocation().getHallName();
                 
@@ -337,8 +363,9 @@ public class AdminShowService {
                 log.debug("사용할 Venue: id={}, name={}, hallName={}, region={}", venue.getId(), venue.getName(), venue.getHallName(), venue.getRegion());
                 show.setVenue(venue);
             }
-            if (request.getSaleStartDate() != null) {
-                show.setSaleStartDate(request.getSaleStartDate());
+            if (request.getSalePeriod() != null) {
+                show.setSaleStartDate(request.getSalePeriod().getStartDate());
+                show.setSaleEndDate(request.getSalePeriod().getEndDate());
             }
         }
 
@@ -587,16 +614,5 @@ public class AdminShowService {
         }
     }
 
-    /**
-     * 한글 지역명을 Region enum으로 변환
-     */
-    private Region convertRegionFromKorean(String koreanRegion) {
-        for (Region region : Region.values()) {
-            if (region.getName().equals(koreanRegion)) {
-                return region;
-            }
-        }
-        throw new IllegalArgumentException("지원하지 않는 지역입니다: " + koreanRegion);
-    }
 }
 

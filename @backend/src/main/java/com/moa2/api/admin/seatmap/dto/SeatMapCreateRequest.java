@@ -1,5 +1,6 @@
 package com.moa2.api.admin.seatmap.dto;
 
+import com.moa2.global.model.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -14,9 +15,9 @@ import java.util.List;
 @Schema(description = "좌석배치도 등록 요청")
 public class SeatMapCreateRequest {
     
-    @Schema(description = "지역", example = "서울", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "지역은 필수입니다")
-    private String region;
+    @Schema(description = "지역 enum (SEOUL, GYEONGGI, BUSAN 등)", example = "SEOUL", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "지역은 필수입니다")
+    private Region region;
     
     @Schema(description = "공연장명", example = "올림픽공원", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "공연장명은 필수입니다")
