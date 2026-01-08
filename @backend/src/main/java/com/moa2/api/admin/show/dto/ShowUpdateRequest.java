@@ -1,5 +1,6 @@
 package com.moa2.api.admin.show.dto;
 
+import com.moa2.global.model.Region;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import lombok.Getter;
@@ -21,14 +22,15 @@ public class ShowUpdateRequest {
     @Valid
     private LocationRequest location;
 
-    @Schema(description = "상영 시간(분)", example = "150")
-    private Integer runningTime;
+    @Schema(description = "상영 시간", example = "150분")
+    private String runningTime;
 
-    @Schema(description = "출연진 정보 (문자열)", example = "김철수, 이영희, 박민수")
+    @Schema(description = "출연진 정보 (문자열)", example = "출연진1, 출연진2, 출연진3")
     private String cast;
 
-    @Schema(description = "판매 시작일시 (ON_SALE 이후 수정 불가)", example = "2024-01-01T00:00:00")
-    private LocalDateTime saleStartDate;
+    @Schema(description = "판매 기간 (ON_SALE 이후 수정 불가)")
+    @Valid
+    private SalePeriodRequest salePeriod;
 
     @Schema(description = "공연 스케줄 목록 (추가/수정/삭제 모두 포함)\n\n" +
                         "- **추가**: scheduleId 없음 (null)\n" +
@@ -46,14 +48,25 @@ public class ShowUpdateRequest {
     @Setter
     @Schema(description = "장소 정보")
     public static class LocationRequest {
-        @Schema(description = "지역", example = "서울")
-        private String region;
+        @Schema(description = "지역", example = "SEOUL")
+        private Region region;
 
         @Schema(description = "공연장명", example = "올림픽공원")
         private String venueName;
 
         @Schema(description = "홀명", example = "KSPO DOME")
         private String hallName;
+    }
+
+    @Getter
+    @Setter
+    @Schema(description = "판매 기간")
+    public static class SalePeriodRequest {
+        @Schema(description = "판매 시작일시", example = "2024-01-01T10:00:00")
+        private LocalDateTime startDate;
+
+        @Schema(description = "판매 종료일시", example = "2024-01-31T23:59:59")
+        private LocalDateTime endDate;
     }
 
     @Getter

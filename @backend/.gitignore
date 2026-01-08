@@ -41,12 +41,10 @@ SEATS_INFO.md
 SOCIAL_LOGIN.md
 GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
 
+.history
+.cursorrules
 
 app
 
 src/main/resources/application.properties
-
-
-
-.cursorrules
 

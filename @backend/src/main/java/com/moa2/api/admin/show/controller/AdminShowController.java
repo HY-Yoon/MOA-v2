@@ -208,7 +208,7 @@ public class AdminShowController {
                 description = "공연 정보 (JSON 문자열, 수정할 필드만 포함)\n\n" +
                             "**수정 가능 필드:**\n" +
                             "- `title`: 공연 제목\n" +
-                            "- `runningTime`: 상영 시간(분)\n" +
+                            "- `runningTime`: 상영 시간 (문자열, 예: \"150분\")\n" +
                             "- `cast`: 출연진 정보\n" +
                             "- `genre`: 장르 (WAITING 상태에서만 수정 가능)\n" +
                             "- `location`: 장소 정보 (WAITING 상태에서만 수정 가능)\n" +
@@ -222,28 +222,7 @@ public class AdminShowController {
                             "- 추가: `scheduleId` 없음\n" +
                             "- 수정: `scheduleId` 있음\n" +
                             "- 삭제: `deletedScheduleIds`에 포함\n" +
-                            "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n" +
-                            "**예시:**\n" +
-                            "```json\n" +
-                            "{\n" +
-                            "  \"title\": \"레미제라블 (수정)\",\n" +
-                            "  \"runningTime\": 160,\n" +
-                            "  \"cast\": \"김철수, 이영희, 박민수\",\n" +
-                            "  \"schedules\": [\n" +
-                            "    {\n" +
-                            "      \"scheduleId\": 1,\n" +
-                            "      \"showDate\": \"2024-01-20\",\n" +
-                            "      \"showTime\": \"19:00\",\n" +
-                            "      \"ticketOpenTime\": \"2024-01-01T10:00:00\"\n" +
-                            "    },\n" +
-                            "    {\n" +
-                            "      \"showDate\": \"2024-01-25\",\n" +
-                            "      \"showTime\": \"19:00\",\n" +
-                            "      \"ticketOpenTime\": \"2024-01-01T10:00:00\"\n" +
-                            "    }\n" +
-                            "  ]\n" +
-                            "}\n" +
-                            "```", 
+                            "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n",
                 required = true,
                 schema = @Schema(implementation = ShowUpdateRequest.class),
                 examples = {
@@ -253,7 +232,7 @@ public class AdminShowController {
                     ),
                     @ExampleObject(
                         name = "상영시간 수정",
-                        value = "{\"runningTime\":160}"
+                        value = "{\"runningTime\":\"160분\"}"
                     ),
                     @ExampleObject(
                         name = "WAITING 상태 - 전체 수정",

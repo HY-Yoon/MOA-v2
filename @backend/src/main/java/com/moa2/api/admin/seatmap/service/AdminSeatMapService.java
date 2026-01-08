@@ -35,15 +35,9 @@ public class AdminSeatMapService {
      * 좌석배치도 목록 조회 (필터링 및 페이징)
      */
     public Page<SeatMapListResponse> getSeatMapList(SeatMapListRequest request, Pageable pageable) {
-        // 한글 지역명을 Region enum으로 변환
-        Region region = null;
-        if (request.getRegion() != null && !request.getRegion().trim().isEmpty()) {
-            region = convertRegionFromKorean(request.getRegion());
-        }
-        
         // 필터링된 목록 조회
         Page<SeatMap> seatMaps = seatMapRepository.findByFilters(
-            region,
+            request.getRegion(),
             request.getVenueName(),
             request.getHallName(),
             pageable
@@ -53,7 +47,7 @@ public class AdminSeatMapService {
         List<SeatMapListResponse> content = seatMaps.getContent().stream()
             .map(seatMap -> SeatMapListResponse.builder()
                 .seatMapId(generateSeatMapId(seatMap.getId()))
-                .region(seatMap.getRegion().getName())
+                .region(seatMap.getRegion().name()) // enum name (SEOUL, GYEONGGI 등)
                 .venueName(seatMap.getVenueName())
                 .hallName(seatMap.getHallName())
                 .createdAt(seatMap.getCreatedAt())
@@ -75,12 +69,9 @@ public class AdminSeatMapService {
                 .build();
         }
         
-        // 한글 지역명을 Region enum으로 변환
-        Region region = convertRegionFromKorean(request.getRegion());
-        
         // 중복 검사
         boolean isDuplicate = seatMapRepository.findByRegionAndVenueNameAndHallName(
-            region,
+            request.getRegion(),
             request.getVenueName(),
             request.getHallName()
         ).isPresent();
@@ -95,15 +86,12 @@ public class AdminSeatMapService {
      */
     @Transactional
     public SeatMapCreateResponse createSeatMap(SeatMapCreateRequest request) {
-        // 한글 지역명을 Region enum으로 변환
-        Region region = convertRegionFromKorean(request.getRegion());
-        
         // 중복 검사
-        seatMapRepository.findByRegionAndVenueNameAndHallName(region, request.getVenueName(), request.getHallName())
+        seatMapRepository.findByRegionAndVenueNameAndHallName(request.getRegion(), request.getVenueName(), request.getHallName())
             .ifPresent(existing -> {
                 throw new RuntimeException(
                     String.format("이미 등록된 좌석배치도입니다: %s, %s, %s", 
-                        request.getRegion(), request.getVenueName(), request.getHallName())
+                        request.getRegion().name(), request.getVenueName(), request.getHallName())
                 );
             });
         
@@ -143,14 +131,14 @@ public class AdminSeatMapService {
         Venue venue = venueRepository.findByNameAndHallNameAndRegion(
             request.getVenueName(),
             request.getHallName(),
-            region
+            request.getRegion()
         ).orElseGet(() -> {
             log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", 
-                request.getVenueName(), request.getHallName(), region);
+                request.getVenueName(), request.getHallName(), request.getRegion());
             Venue newVenue = Venue.builder()
                 .name(request.getVenueName())
                 .hallName(request.getHallName())
-                .region(region)
+                .region(request.getRegion())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -196,7 +184,7 @@ public class AdminSeatMapService {
         
         // SeatMap 엔티티 생성
         SeatMap seatMap = SeatMap.builder()
-            .region(region)
+            .region(request.getRegion())
             .venueName(request.getVenueName())
             .hallName(request.getHallName())
             .canvas(canvasMap)
@@ -211,18 +199,6 @@ public class AdminSeatMapService {
         return SeatMapCreateResponse.builder()
             .seatMapId(generateSeatMapId(seatMap.getId()))
             .build();
-    }
-    
-    /**
-     * 한글 지역명을 Region enum으로 변환
-     */
-    private Region convertRegionFromKorean(String koreanRegion) {
-        for (Region region : Region.values()) {
-            if (region.getName().equals(koreanRegion)) {
-                return region;
-            }
-        }
-        throw new IllegalArgumentException("지원하지 않는 지역입니다: " + koreanRegion);
     }
     
     /**

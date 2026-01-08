@@ -1,5 +1,6 @@
 package com.moa2.api.admin.show.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,7 +23,8 @@ public class ShowDetailResponse {
     @Schema(description = "공연 제목", example = "레미제라블", requiredMode = Schema.RequiredMode.REQUIRED)
     private String title;
 
-    @Schema(description = "장르", example = "MUSICAL", allowableValues = {"MUSICAL", "CONCERT", "PLAY", "CLASSIC", "DANCE"})
+    @Schema(description = "장르", example = "MUSICAL", allowableValues = { "MUSICAL", "CONCERT", "PLAY", "CLASSIC",
+            "DANCE" })
     private String genre;
 
     @Schema(description = "시설명", example = "예술의전당")
@@ -31,11 +33,13 @@ public class ShowDetailResponse {
     @Schema(description = "홀명", example = "오페라극장")
     private String hallName;
 
-    @Schema(description = "지역", example = "SEOUL", allowableValues = {"SEOUL", "GYEONGGI", "INCHEON", "BUSAN", "DAEGU", "DAEJEON", "GWANGJU", "ULSAN", "SEJONG", "GANGWON", "CHUNGBUK", "CHUNGNAM", "JEONBUK", "JEONNAM", "GYEONGBUK", "GYEONGNAM", "JEJU"})
-    private String region;
+    @Schema(description = "지역 enum (SEOUL, GYEONGGI, BUSAN 등)", example = "SEOUL", allowableValues = { "SEOUL",
+            "GYEONGGI", "INCHEON", "BUSAN", "DAEGU", "DAEJEON", "GWANGJU", "ULSAN", "SEJONG", "GANGWON", "CHUNGBUK",
+            "CHUNGNAM", "JEONBUK", "JEONNAM", "GYEONGBUK", "GYEONGNAM", "JEJU" })
+    private String region; // Region enum의 name() 값
 
-    @Schema(description = "상영 시간(분)", example = "150")
-    private Integer runningTime;
+    @Schema(description = "상영 시간", example = "150분")
+    private String runningTime;
 
     @Schema(description = "포스터 이미지 URL", example = "/images/posters/show1.jpg")
     private String posterUrl;
@@ -46,10 +50,11 @@ public class ShowDetailResponse {
     @Schema(description = "출연진 정보", example = "김철수, 이영희, 박민수")
     private String cast;
 
-    @Schema(description = "공연 상태", example = "ON_SALE", allowableValues = {"WAITING", "ON_SALE", "SOLD_OUT", "ENDED", "SUSPENDED"})
+    @Schema(description = "공연 상태", example = "ON_SALE", allowableValues = { "WAITING", "ON_SALE", "SOLD_OUT", "ENDED",
+            "SUSPENDED" })
     private String status;
 
-    @Schema(description = "판매 상태", example = "ALLOWED", allowableValues = {"ALLOWED", "NOT_ALLOWED"})
+    @Schema(description = "판매 상태", example = "ALLOWED", allowableValues = { "ALLOWED", "NOT_ALLOWED" })
     private String saleStatus;
 
     @Schema(description = "판매 시작일시", example = "2024-01-01T00:00:00")
@@ -79,13 +84,16 @@ public class ShowDetailResponse {
         @Schema(description = "스케줄 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
         private Long scheduleId;
 
-        @Schema(description = "공연일", example = "2024-01-15", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "공연일", example = "2024-01-15", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate showDate;
 
-        @Schema(description = "공연 시간", example = "19:00", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "공연 시간", example = "19:00", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonFormat(pattern = "HH:mm")
         private LocalTime showTime;
 
-        @Schema(description = "티켓 오픈 시간", example = "2024-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "티켓 오픈 시간", example = "2024-01-01T10:00:00", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime ticketOpenTime;
 
         @Schema(description = "남은 좌석 수", example = "50", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -114,4 +122,3 @@ public class ShowDetailResponse {
         private Integer price;
     }
 }
-

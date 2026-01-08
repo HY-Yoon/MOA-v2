@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class SeatMapListResponse {
     private String seatMapId; // "SM001" 형식
-    private String region;
+    private String region; // Region enum의 name() 값 (SEOUL, GYEONGGI 등)
     private String venueName;
     private String hallName;
     private LocalDateTime createdAt;

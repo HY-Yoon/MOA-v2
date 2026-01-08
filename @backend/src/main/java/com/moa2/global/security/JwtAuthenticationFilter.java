@@ -52,14 +52,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * HTTP 요청 헤더에서 Bearer 토큰 추출
+     * HTTP 요청에서 JWT 토큰 추출 (Cookie에서만)
      * @param request HTTP 요청
      * @return JWT 토큰 문자열 (없으면 null)
      */
     private String getTokenFromRequest(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
+        // Cookie에서 accessToken 확인
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
         }
         return null;
     }
