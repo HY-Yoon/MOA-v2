@@ -5,6 +5,7 @@ import com.moa2.global.model.Gender;
 import com.moa2.global.model.SocialProvider;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Map;
 /**
  * OAuth2 제공자로부터 받은 사용자 정보를 담는 DTO
  */
+@Slf4j
 @Getter
 @Builder
 public class OAuthAttributes {
@@ -86,6 +88,17 @@ public class OAuthAttributes {
         String birthyear = (String) response.get("birthyear"); // "YYYY" 형식
         String age = (String) response.get("age"); // 연령대 (예: "20-29")
 
+        // 디버깅: NAVER가 실제로 보내는 데이터 로깅 (민감정보 마스킹)
+        log.info("[NAVER OAuth2] 받은 데이터 - id: {}, email: {}, name: {}, mobile: {}, gender: {}, birthday: {}, birthyear: {}, age: {}",
+                id != null ? "***" + id.substring(Math.max(0, id.length() - 4)) : null,
+                email != null ? email.replaceAll("(.{1,3})@", "***@") : null,
+                name != null ? name.charAt(0) + "**" : null,
+                mobile != null ? "***" : null,
+                genderStr,
+                birthday,
+                birthyear,
+                age);
+
         // email이 null이면 기본값 설정
         if (email == null || email.trim().isEmpty()) {
             email = "no-email-" + id + "@naver.local";
@@ -107,6 +120,8 @@ public class OAuthAttributes {
         }
 
         // 생년월일 변환: birthyear + birthday -> LocalDate
+        // 주의: NAVER는 사용자가 동의 화면에서 선택하지 않았더라도,
+        // 이미 보유하고 있는 정보는 API 응답에 포함시킬 수 있습니다.
         LocalDate birthDate = null;
         if (birthyear != null && !birthyear.trim().isEmpty() && 
             birthday != null && !birthday.trim().isEmpty()) {
@@ -118,10 +133,14 @@ public class OAuthAttributes {
                     int day = Integer.parseInt(dateParts[1]);
                     int year = Integer.parseInt(birthyear);
                     birthDate = LocalDate.of(year, month, day);
+                    log.info("[NAVER OAuth2] 생년월일 파싱 성공: {}-{}-{}", year, month, day);
                 }
             } catch (Exception e) {
-                // 파싱 실패 시 무시
+                log.warn("[NAVER OAuth2] 생년월일 파싱 실패 - birthday: {}, birthyear: {}, error: {}", 
+                        birthday, birthyear, e.getMessage());
             }
+        } else {
+            log.info("[NAVER OAuth2] 생년월일 정보 없음 - birthday: {}, birthyear: {}", birthday, birthyear);
         }
 
         return OAuthAttributes.builder()

@@ -559,36 +559,6 @@ public class AdminShowService {
             .build();
     }
 
-    /**
-     * 공연 일정 추가 (ON_SALE 이후에도 가능)
-     * 일정 추가 시 공연의 종료일(endDate, saleEndDate) 자동 재계산
-     */
-    @Transactional
-    public ScheduleAddResponse addSchedule(Long showId, ScheduleAddRequest request) {
-        Show show = showRepository.findByIdAndNotDeleted(showId);
-        if (show == null) {
-            throw new RuntimeException("공연을 찾을 수 없습니다");
-        }
-
-        // 새 스케줄 추가
-        LocalTime showTime = LocalTime.parse(request.getShowTime(), DateTimeFormatter.ofPattern("HH:mm"));
-        ShowSchedule newSchedule = ShowSchedule.builder()
-            .show(show)
-            .showDate(request.getShowDate())
-            .showTime(showTime)
-            .ticketOpenTime(request.getTicketOpenTime())
-            .status(ScheduleStatus.BEFORE_OPEN)
-            .build();
-        newSchedule = showScheduleRepository.save(newSchedule);
-
-        // 공연 종료일 재계산 (일정 추가 시 자동 업데이트)
-        updateShowEndDates(show);
-
-        return ScheduleAddResponse.builder()
-            .scheduleId(newSchedule.getId())
-            .message("일정이 추가되었습니다. 예매 종료일이 자동으로 재계산되었습니다.")
-            .build();
-    }
 
     /**
      * 공연의 종료일(endDate, saleEndDate) 재계산
