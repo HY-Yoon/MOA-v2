@@ -249,8 +249,7 @@ public class AdminShowController {
             @RequestPart(value = "poster", required = false) MultipartFile poster,
             @Parameter(description = "상세 이미지 파일 목록 (선택, 새 파일 업로드 시에만)")
             @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages) throws Exception {
-        
-        // JSON 문자열을 DTO로 파싱 및 검증
+
         ShowUpdateRequest request = parseAndValidate(dataJson, ShowUpdateRequest.class);
         
         ShowUpdateResponse result = adminShowService.updateShow(id, request, poster, detailImages);
@@ -318,9 +317,6 @@ public class AdminShowController {
     public ResponseEntity<ApiResponse<ShowSaleStatusUpdateResponse>> updateSaleStatus(
             @Parameter(description = "공연 ID", required = true) @PathVariable Long id,
             @RequestBody ShowSaleStatusUpdateRequest showSaleResponse) throws IOException {
-        log.info("test  : {}",showSaleResponse.toString());
-        log.info("=== 판매 상태 변경 ===");
-        log.info("Show ID: {}", id);
 
         try {
             ShowSaleStatusUpdateResponse response = adminShowService.updateSaleStatus(id, showSaleResponse);
