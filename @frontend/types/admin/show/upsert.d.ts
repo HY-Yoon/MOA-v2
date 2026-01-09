@@ -2,6 +2,12 @@ import { Genre, Region } from '@shared/enums';
 
 declare global {
   namespace ShowUpsertType {
+    interface ScheduleItem {
+      showDate: string;
+      showTime: string;
+      ticketOpenTime: string;
+    }
+
     interface ShowUpsertForm {
       title: string;
       genre: Genre;
@@ -16,13 +22,7 @@ declare global {
         startDate: Date;
         endDate: Date;
       };
-      schedules: [
-        {
-          showDate: Date;
-          showTime: string;
-          ticketOpenTime: Date;
-        },
-      ];
+      schedules: ScheduleItem[];
     }
   }
 }
