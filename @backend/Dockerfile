@@ -50,10 +50,9 @@ ENV PORT=8081
 
 # JVM 메모리 최적화
 ENTRYPOINT ["sh", "-c", "java \
-    -Xms256m \
-    -Xmx360m \
+    -Xms128m \
+    -Xmx256m \
     -XX:+UseContainerSupport \
-    -XX:MaxRAMPercentage=70.0 \
     -XX:+UseSerialGC \
     -Djava.security.egd=file:/dev/./urandom \
     -Duser.timezone=Asia/Seoul \
