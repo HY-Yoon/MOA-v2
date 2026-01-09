@@ -6,11 +6,12 @@ import com.moa2.global.dto.OAuthAttributes;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.service.RefreshTokenService;
 import com.moa2.global.util.LogMaskingUtil;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -21,7 +22,8 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * OAuth2 로그인 성공 시 Access Token과 Refresh Token을 생성하고 세션에 저장한 후 리다이렉트하는 핸들러
+ * OAuth2 로그인 성공 시 Access Token과 Refresh Token을 생성하고 쿠키에 저장한 후 리다이렉트하는 핸들러
+ * Cross-Site 환경(백엔드: Koyeb, 프론트엔드: Local/Vercel)을 지원하기 위해 SameSite=None 설정
  */
 @Slf4j
 @Component
@@ -31,6 +33,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
+
+    // Cross-Site 쿠키 설정 (환경변수로 제어 가능)
+    @Value("${security.cookie.secure:true}")
+    private boolean cookieSecure;
+
+    @Value("${security.cookie.same-site:None}")
+    private String cookieSameSite;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -87,24 +96,28 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         // Refresh Token을 DB에 저장 (소셜 제공자 포함)
         refreshTokenService.createRefreshToken(email, refreshToken, user.getSocialProvider());
 
-        // Access Token 쿠키 설정 (30분)
-        Cookie accessTokenCookie = new Cookie("accessToken", accessToken);
-        accessTokenCookie.setHttpOnly(true);
-        accessTokenCookie.setSecure(false); // SSL 설정 전까지 false (개발 환경)
-        accessTokenCookie.setPath("/");
-        accessTokenCookie.setMaxAge(30 * 60); // 30분 (초 단위)
-        response.addCookie(accessTokenCookie);
+        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", accessToken)
+                .path("/")                          // 모든 경로에서 쿠키 사용 가능
+                .httpOnly(true)                     // JavaScript 접근 차단 (XSS 방지)
+                .secure(cookieSecure)               // HTTPS에서만 전송 (SameSite=None 사용 시 필수)
+                .sameSite(cookieSameSite)           // Cross-Site 요청 허용 (None으로 설정)
+                .maxAge(30 * 60)                    // 30분 (초 단위)
+                .build();
+
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
+                .path("/")                          // 모든 경로에서 쿠키 사용 가능
+                .httpOnly(true)                     // JavaScript 접근 차단 (XSS 방지)
+                .secure(cookieSecure)               // HTTPS에서만 전송 (SameSite=None 사용 시 필수)
+                .sameSite(cookieSameSite)           // Cross-Site 요청 허용 (None으로 설정)
+                .maxAge(14 * 24 * 60 * 60)          // 14일 (초 단위)
+                .build();
         
-        // Refresh Token 쿠키 설정 (14일)
-        Cookie refreshTokenCookie = new Cookie("refreshToken", refreshToken);
-        refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false); // SSL 설정 전까지 false (개발 환경)
-        refreshTokenCookie.setPath("/");
-        refreshTokenCookie.setMaxAge(14 * 24 * 60 * 60); // 14일 (초 단위)
-        response.addCookie(refreshTokenCookie);
+        // Set-Cookie 헤더에 쿠키 추가
+        response.addHeader("Set-Cookie", accessTokenCookie.toString());
+        response.addHeader("Set-Cookie", refreshTokenCookie.toString());
         
-        log.info("OAuth2 로그인 성공: {} ({}) - Cookie 설정 완료", 
-                LogMaskingUtil.maskEmail(email), user.getSocialProvider());
+        log.info("OAuth2 로그인 성공: {} ({}) - Cross-Site Cookie 설정 완료 (SameSite={}, Secure={})", 
+                LogMaskingUtil.maskEmail(email), user.getSocialProvider(), cookieSameSite, cookieSecure);
 
         // 성공 페이지로 리다이렉트
         getRedirectStrategy().sendRedirect(request, response, "/api/auth/success");

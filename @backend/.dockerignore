@@ -1,0 +1,66 @@
+# Gradle
+.gradle
+build
+!gradle/wrapper/gradle-wrapper.jar
+bin
+out
+
+# IDE
+.idea
+.vscode
+.eclipse
+.settings
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+SAMPLE_DATA.md
+SEATS_INFO.md
+GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
+
+# Environment & Config
+.env
+.env.*
+*.env
+application-local.properties
+application-dev.properties
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*.tmp
+*.swp
+*~
+
+# Logs
+*.log
+logs
+log
+
+# Uploads (local development)
+uploads
+
+# Test
+src/test
+**/test
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Other
+node_modules
+package-lock.json
+

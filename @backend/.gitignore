@@ -40,11 +40,11 @@ SAMPLE_DATA.md
 SEATS_INFO.md
 SOCIAL_LOGIN.md
 GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
+SECURITY_CONFIG_README.md
 
 .history
 .cursorrules
 
 app
 
-src/main/resources/application.properties
 
