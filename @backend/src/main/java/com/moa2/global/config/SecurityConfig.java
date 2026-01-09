@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -152,6 +153,7 @@ public class SecurityConfig {
 
                 // 경로별 권한 설정
                 .authorizeHttpRequests(auth -> auth
+                         
                         // 공개 경로 (인증 불필요)
                         .requestMatchers(
                                 "/",
