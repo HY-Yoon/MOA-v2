@@ -6,3 +6,4 @@ export * from './FormField';
 export * from './FormInputField';
 export * from './FormSelectField';
 export * from './FormScheduleTableField';
+export * from './FormFileField';

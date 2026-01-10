@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/atoms';
 import { Upload, X } from 'lucide-react';
 import { useRef, ChangeEvent, useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -113,7 +113,10 @@ export function FormFileField({
               {multiple ? (
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {previews.map((preview, index) => (
-                    <div key={index} className="group relative aspect-square overflow-hidden rounded-lg">
+                    <div
+                      key={index}
+                      className="group relative aspect-square overflow-hidden rounded-lg"
+                    >
                       <Image
                         src={preview}
                         alt={`미리보기 ${index + 1}`}
@@ -139,7 +142,7 @@ export function FormFileField({
                       alt="미리보기"
                       width={400}
                       height={400}
-                      className="h-auto w-full max-h-96 object-contain shadow-md"
+                      className="h-auto max-h-96 w-full object-contain shadow-md"
                       unoptimized // blob URL은 최적화 불가
                     />
                   </div>
