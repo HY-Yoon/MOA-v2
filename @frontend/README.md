@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MOA (Musical On Air) 🎭
 
-## Getting Started
+Next.js를 기반으로 한 공연 예매 플랫폼 프론트엔드 프로젝트입니다.
 
-First, run the development server:
+## 시작하기
+
+### 환경 설정
+
+프로젝트 루트 디렉토리에 `.env.local` 파일을 생성하고 다음 변수를 설정하세요:
+
+```env
+# 백엔드 API URL
+BACKEND_URL=http://localhost:8080
+```
+
+## 🏗️ 아키텍처
+
+이 프로젝트는 **Atomic Design** 원칙에 따라 컴포넌트를 구성합니다:
+
+```
+components/
+├── atoms/           # 기본 UI 컴포넌트 (Button, Input, Card...)
+├── molecules/       # 복합 UI 컴포넌트 (FormField, FormInput...)
+├── organisms/       # 재사용 가능한 복합 컴포넌트 (AdminSidebar, AdminBreadcrumb)
+└── pages/           # 도메인별 페이지 컴포넌트
+app/
+└── admin/show/upsert/
+    └── _components/ # 페이지별 컴포넌트 (ShowUpsertForm) - Next.js 라우팅 제외
+```
+
+### API 호출 방식
+
+- **개발 환경** (`NODE_ENV=development`): 클라이언트가 직접 백엔드 API를 호출합니다. 네트워크 탭에서 API 요청을 확인할 수 있습니다.
+- **프로덕션 환경** (`NODE_ENV=production`): Next.js API Routes를 통해 백엔드 API를 호출합니다. 백엔드 API가 네트워크 탭에 노출되지 않습니다.
+
+### 개발 서버 실행
+
+개발 서버를 실행합니다:
 
 ```bash
 npm run dev
-# or
+# 또는
 yarn dev
-# or
+# 또는
 pnpm dev
-# or
+# 또는
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 결과를 확인하세요.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`app/page.tsx` 파일을 수정하면 페이지가 자동으로 업데이트됩니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 기술 스택
 
-## Learn More
+- **Framework**: Next.js 16.1.1 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: TanStack Query (React Query)
+- **Form Handling**: React Hook Form + Zod
+- **UI Components**: Radix UI + Shadcn/ui
+- **Font**: Inter, Noto Sans KR (next/font 사용)
 
-To learn more about Next.js, take a look at the following resources:
+## 배포
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Vercel 플랫폼을 사용하여 손쉽게 배포할 수 있습니다:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=github&utm_campaign=github-readme)
 
-## Deploy on Vercel
+Next.js 배포 문서를 확인하세요: [https://nextjs.org/docs/app/building-your-application/deploying](https://nextjs.org/docs/app/building-your-application/deploying)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 더 알아보기
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js에 대해 더 자세히 알아보려면 다음 리소스를 확인하세요:
+
+- [Next.js 문서](https://nextjs.org/docs) - Next.js 기능 및 API
+- [Next.js 학습](https://nextjs.org/learn) - 대화형 Next.js 튜토리얼
+
+[Next.js GitHub 저장소](https://github.com/vercel/next.js)를 확인하고 피드백이나 기여를 환영합니다!

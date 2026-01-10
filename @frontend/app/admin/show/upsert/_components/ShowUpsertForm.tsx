@@ -1,19 +1,13 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label } from '@/components/atoms';
+import { FormField, FormSelectField, FormInputField, FormScheduleTableField } from '@/components/molecules';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 import { FieldErrors, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FormField } from '@/components/admin/show/upsert/FormField';
-import { FormSelectField } from '@/components/admin/show/upsert/FormSelectField';
-import { FormInputField } from '@/components/admin/show/upsert/FormInputField';
-import { FormScheduleTableField } from '@/components/admin/show/upsert/FormScheduleTableField';
 import { SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 import dayjs from '@/plugins/dayjs';

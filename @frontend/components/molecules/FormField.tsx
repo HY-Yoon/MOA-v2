@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/atoms/label';
 import classNames from 'classnames';
 
 interface FormFieldProps {

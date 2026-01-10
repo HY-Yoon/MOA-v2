@@ -7,7 +7,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/atoms/select';
 import { FormField } from './FormField';
 
 interface Option {
@@ -25,6 +25,7 @@ interface SelectFieldProps<T extends FieldValues> {
   placeholder: string;
   required?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function FormSelectField<T extends FieldValues>({
@@ -37,6 +38,7 @@ export function FormSelectField<T extends FieldValues>({
   placeholder,
   required = false,
   className,
+  disabled = false,
 }: SelectFieldProps<T>) {
   const error = errors?.[name as keyof typeof errors]?.message as string | undefined;
 
@@ -52,7 +54,7 @@ export function FormSelectField<T extends FieldValues>({
         name={name as Path<T>}
         control={control}
         render={({ field }) => (
-          <Select value={field.value || ''} onValueChange={field.onChange}>
+          <Select value={field.value || ''} onValueChange={field.onChange} disabled={disabled}>
             <SelectTrigger id={htmlFor} className="w-64">
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>

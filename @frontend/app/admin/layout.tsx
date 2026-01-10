@@ -1,6 +1,8 @@
-import { SidebarProvider } from '@/components/ui/sidebar';
-import { AdminSidebar } from '@/components/admin/layout/AdminSidebar';
-import { AdminBreadcrumb } from '@/components/admin/layout/AdminBreadcrumb';
+'use client';
+
+import { SidebarProvider } from '@/components/atoms/sidebar';
+import { AdminSidebar } from '@/components/organisms/AdminSidebar';
+import { AdminBreadcrumb } from '@/components/organisms/AdminBreadcrumb';
 import React from 'react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
