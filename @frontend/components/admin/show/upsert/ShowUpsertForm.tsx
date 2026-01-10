@@ -2,68 +2,116 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
-import { FieldErrors, useFieldArray, useForm } from 'react-hook-form';
+import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@/components/admin/show/upsert/FormField';
 import { FormSelectField } from '@/components/admin/show/upsert/FormSelectField';
 import { FormInputField } from '@/components/admin/show/upsert/FormInputField';
 import { FormScheduleTableField } from '@/components/admin/show/upsert/FormScheduleTableField';
-import { SHOW_FORM_FIELDS } from '@/constants/admin/show';
+import { FormFileField } from '@/components/admin/show/upsert/FormFileField';
+import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 import dayjs from '@/plugins/dayjs';
+import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { Genre, Region } from '@shared/enums';
+import { stringToDate } from '@/lib/common/date';
+import { getFirstShowDate } from '@/lib/admin/show';
 
 interface Props {
   id?: string;
 }
+type ActionType = '입력' | '선택';
 
-const requiredStringSchema = (fieldName: string, action: '입력' | '선택' = '입력') =>
-  z.string().min(1, `${fieldName}을(를) ${action}하세요.`);
+const requiredStringSchema = (field: string, action: ActionType) =>
+  z.string().min(1, `${field}을(를) ${action}하세요.`);
 
-const dateSchema = (fieldName: string) =>
-  requiredStringSchema(fieldName).refine((str) => dayjs(str).isValid(), {
-    message: '올바른 날짜 형식이 아닙니다. (YYYY-MM-DD)',
+const dateTimeSchema = (field: string) =>
+  requiredStringSchema(field, '입력').refine((str) => dayjs(str).isValid(), {
+    message: ERROR_MESSAGES.NOT_VALID_FORMAT,
   });
 
-const timeSchema = (fieldName: string) =>
-  requiredStringSchema(fieldName).regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
-    message: '올바른 시간 형식이 아닙니다. (HH:mm)',
+const timeSchema = (field: string) =>
+  requiredStringSchema(field, '입력').regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: ERROR_MESSAGES.NOT_VALID_FORMAT,
   });
 
-const scheduleSchema = z.object({
-  [SHOW_FORM_FIELDS.SHOW_DATE]: dateSchema('공연일'),
-  [SHOW_FORM_FIELDS.SHOW_TIME]: requiredStringSchema('회차'),
-  [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: timeSchema('티켓 오픈 시간'),
-});
-const showFormSchema = z.object({
-  [SHOW_FORM_FIELDS.TITLE]: requiredStringSchema('제목').max(100, '제목은 100자 이하여야 합니다'),
-  [SHOW_FORM_FIELDS.GENRE]: requiredStringSchema('장르', '선택'),
-  [SHOW_FORM_FIELDS.REGION]: requiredStringSchema('지역', '선택'),
-  [SHOW_FORM_FIELDS.VENUE_NAME]: requiredStringSchema('장소', '선택'),
-  [SHOW_FORM_FIELDS.HALL_NAME]: requiredStringSchema('공연장', '선택'),
-  [SHOW_FORM_FIELDS.RUNNING_TIME]: requiredStringSchema('관람 시간').regex(
-    /^\d+분$/,
-    '분 단위로 입력하세요. (ex. 100분)',
-  ),
-  [SHOW_FORM_FIELDS.CAST]: requiredStringSchema('출연진').max(
-    500,
-    '출연진은 500자 이내로 입력하세요.',
-  ),
-  [SHOW_FORM_FIELDS.START_DATE]: dateSchema('예매 시작일'),
-  [SHOW_FORM_FIELDS.SCHEDULES]: z.array(scheduleSchema),
-  // poster: z
-  //   .instanceof(FileList)
-  //   .refine((files) => files.length > 0, '포스터 이미지는 필수입니다')
-  //   .refine((files) => files[0]?.size <= 10 * 1024 * 1024, '파일 크기는 10MB 이하여야 합니다'),
-});
+const scheduleSchema = z
+  .object({
+    [SHOW_FORM_FIELDS.SHOW_DATE]: dateTimeSchema('공연일'),
+    [SHOW_FORM_FIELDS.SHOW_TIME]: timeSchema('공연 시간'),
+    [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dateTimeSchema('티켓 오픈일'),
+  })
+  .refine(
+    (s) => {
+      // 공연일과 공연시간이 모두 입력되어야 비교 가능
+      if (!s.showDate || !s.showTime || !s.ticketOpenTime) {
+        return true; // 다른 필드 입력시 처리
+      }
+
+      // 공연일 + 공연시간 조합
+      const showDateTime = dayjs(`${s.showDate}T${s.showTime}`);
+      const ticketOpenDateTime = dayjs(s.ticketOpenTime);
+
+      // 티켓 오픈일이 공연일+시간보다 이전이어야 함
+      return ticketOpenDateTime.isBefore(showDateTime);
+    },
+    {
+      message: '티켓 오픈일은 공연일보다 이전이어야 합니다.',
+      path: [SHOW_FORM_FIELDS.TICKET_OPEN_TIME],
+    },
+  );
+
+const showFormSchema = z
+  .object({
+    [SHOW_FORM_FIELDS.TITLE]: requiredStringSchema('제목', '입력').max(
+      100,
+      '제목은 100자 이내로 입력하세요.',
+    ),
+    [SHOW_FORM_FIELDS.GENRE]: requiredStringSchema('장르', '선택'),
+    [SHOW_FORM_FIELDS.REGION]: requiredStringSchema('지역', '선택'),
+    [SHOW_FORM_FIELDS.VENUE_NAME]: requiredStringSchema('장소', '선택'),
+    [SHOW_FORM_FIELDS.HALL_NAME]: requiredStringSchema('공연장', '선택'),
+    [SHOW_FORM_FIELDS.RUNNING_TIME]: requiredStringSchema('관람 시간', '입력').regex(
+      /^\d+분$/,
+      '분 단위로 입력하세요. (ex. 100분)',
+    ),
+    [SHOW_FORM_FIELDS.CAST]: requiredStringSchema('출연진', '입력').max(
+      500,
+      '출연진은 500자 이내로 입력하세요.',
+    ),
+    [SHOW_FORM_FIELDS.START_DATE]: dateTimeSchema('예매 시작일'),
+    [SHOW_FORM_FIELDS.END_DATE]: z.string(),
+    [SHOW_FORM_FIELDS.SCHEDULES]: z.array(scheduleSchema),
+  })
+  .refine(
+    (form) => {
+      // 예매 시작일과 일정이 모두 입력되어야 비교 가능
+      if (!form.startDate || !form.schedules || form.schedules.length === 0) {
+        return true; // 다른 필드 입력시 처리
+      }
+
+      const firstShowDate = getFirstShowDate(form.schedules);
+      if (!firstShowDate) {
+        return true; // 공연일이 입력되지 않았으면 우선 리턴
+      }
+
+      const startDateTime = dayjs(form.startDate);
+
+      // 예매 시작일이 첫 번째 공연일보다 이전이어야 함
+      return startDateTime.isBefore(firstShowDate);
+    },
+    {
+      message: ERROR_MESSAGES.START_DATE_EARLY,
+      path: [SHOW_FORM_FIELDS.START_DATE],
+    },
+  );
 export type ShowFormData = z.infer<typeof showFormSchema>;
 
-export default function PerformanceRegistrationForm(props: Props) {
+export default function ShowUpsertForm(props: Props) {
   const router = useRouter();
 
   const isUpdate = !!props.id;
@@ -79,7 +127,8 @@ export default function PerformanceRegistrationForm(props: Props) {
     { label: '큰홀', value: 'big' },
     { label: '작은홀', value: 'small' },
   ]);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [detailFiles, setDetailFiles] = useState<File[]>([]);
 
   function createEmptySchedule() {
     return {
@@ -107,6 +156,7 @@ export default function PerformanceRegistrationForm(props: Props) {
       [SHOW_FORM_FIELDS.RUNNING_TIME]: '',
       [SHOW_FORM_FIELDS.CAST]: '',
       [SHOW_FORM_FIELDS.START_DATE]: '',
+      [SHOW_FORM_FIELDS.END_DATE]: '',
       [SHOW_FORM_FIELDS.SCHEDULES]: [createEmptySchedule()],
     };
   }
@@ -115,10 +165,14 @@ export default function PerformanceRegistrationForm(props: Props) {
     register,
     handleSubmit,
     control,
+    setValue,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<ShowFormData>({
     resolver: zodResolver(showFormSchema),
     defaultValues: getDefaultValues(),
+    mode: 'onChange', // 필드 변경 시 자동 검증
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -126,8 +180,188 @@ export default function PerformanceRegistrationForm(props: Props) {
     name: SHOW_FORM_FIELDS.SCHEDULES,
   });
 
+  // 일정 및 예매 시작일 변경 감지
+  const [schedules, startDate] = useWatch({
+    control,
+    name: [SHOW_FORM_FIELDS.SCHEDULES, SHOW_FORM_FIELDS.START_DATE],
+  });
+
+  // 1. 공연 일정 중복 검증
+  const hasDuplicateSchedule = useMemo(() => {
+    if (!schedules || schedules.length === 0) return false;
+
+    const seen = new Set<string>();
+    for (const schedule of schedules) {
+      if (!schedule.showDate || !schedule.showTime) continue;
+      const key = `${schedule.showDate}_${schedule.showTime}`;
+      if (seen.has(key)) return true;
+      seen.add(key);
+    }
+    return false;
+  }, [schedules]);
+
+  useEffect(() => {
+    if (hasDuplicateSchedule) {
+      setError(SHOW_FORM_FIELDS.SCHEDULES, {
+        type: 'manual',
+        message: '중복된 공연 일정이 있습니다.',
+      });
+    } else {
+      clearErrors(SHOW_FORM_FIELDS.SCHEDULES);
+    }
+  }, [hasDuplicateSchedule, setError, clearErrors]);
+
+  // 2. 예매 시작일 또는 첫 번째 공연일이 변경될 때 재검증
+  const firstShowDateStr = useMemo(() => {
+    if (!schedules || schedules.length === 0) return null;
+    const firstShowDate = getFirstShowDate(schedules);
+    return firstShowDate ? firstShowDate.format(DATE_FORMAT.DATE_ONLY) : null;
+  }, [schedules]);
+
+  useEffect(() => {
+    if (!startDate || !firstShowDateStr) {
+      clearErrors(SHOW_FORM_FIELDS.START_DATE);
+      return;
+    }
+
+    // 예매 시작일 재검증
+    const startDateTime = dayjs(startDate);
+    const firstShowDateTime = dayjs(firstShowDateStr);
+    const isValid = startDateTime.isBefore(firstShowDateTime);
+
+    if (!isValid) {
+      setError(SHOW_FORM_FIELDS.START_DATE, {
+        type: 'manual',
+        message: ERROR_MESSAGES.START_DATE_EARLY,
+      });
+    } else {
+      clearErrors(SHOW_FORM_FIELDS.START_DATE);
+    }
+  }, [startDate, firstShowDateStr, setError, clearErrors]);
+
+  // 3. 일정 공연일이 변경될 때 마지막 공연일을 endDate 설정
+  useEffect(() => {
+    // 유효한 공연일 체크
+    const validDates =
+      schedules
+        ?.map((schedule) => schedule.showDate)
+        .filter((date) => date && dayjs(date).isValid())
+        .map((date) => dayjs(date)) ?? [];
+
+    if (validDates.length === 0) {
+      setValue(SHOW_FORM_FIELDS.END_DATE, '');
+      return;
+    }
+
+    // 마지막 날짜 찾기
+    const lastDate = validDates.reduce((latest, current) => {
+      return current.isAfter(latest) ? current : latest;
+    }, validDates[0]);
+
+    setValue(SHOW_FORM_FIELDS.END_DATE, lastDate.format(DATE_FORMAT.DATE_ONLY));
+  }, [schedules, setValue]);
+
+  // 메인 포스터 파일 변경 핸들러
+  const handlePosterChange = (files: File[]) => {
+    setPosterFile(files.length > 0 ? files[0] : null);
+
+    // 파일이 첨부되면 에러 메시지 제거
+    if (files.length > 0) {
+      clearErrors('root.poster');
+    }
+  };
+
+  // 상세 이미지 파일 변경 핸들러
+  const handleDetailImagesChange = (files: File[]) => {
+    setDetailFiles(files);
+
+    // 파일이 첨부되면 에러 메시지 제거
+    if (files.length > 0) {
+      clearErrors('root.details');
+    }
+  };
+
+  // 이미지 파일 유효성 검사
+  function validateImageFiles(): boolean {
+    const errors: Array<{ field: string; message: string }> = [];
+
+    // 메인 포스터
+    if (!posterFile) {
+      errors.push({ field: 'poster', message: '메인 포스터를 첨부하세요.' });
+    }
+    // 상세 이미지
+    if (detailFiles.length === 0) {
+      errors.push({ field: 'details', message: '상세 이미지를 하나 이상 첨부하세요.' });
+    }
+
+    // 에러가 있으면 모두 설정하고 false 반환
+    if (errors.length > 0) {
+      errors.forEach(({ field, message }) => {
+        setError(`root.${field}`, { type: 'manual', message });
+      });
+      return false;
+    }
+    return true;
+  }
+
+  // api request body 설정
   async function onSubmit(formData: ShowFormData) {
-    alert(`폼 데이터(FormData): ${formData}`);
+    // 이미지 파일 유효성 검사
+    if (!validateImageFiles()) return;
+
+    const {
+      title,
+      genre,
+      region,
+      venueName,
+      hallName,
+      runningTime,
+      cast,
+      startDate,
+      endDate,
+      schedules,
+    } = formData;
+
+    const requestBody = {
+      data: {
+        title,
+        genre: genre as Genre,
+        location: {
+          region: region as Region,
+          venueName,
+          hallName,
+        },
+        runningTime,
+        cast,
+        salePeriod: {
+          startDate: stringToDate(startDate),
+          endDate: stringToDate(endDate),
+        },
+        schedules: schedules.map((schedule) => ({
+          showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
+          showTime: schedule.showTime, // HH:mm -> string
+          ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
+        })),
+      },
+      poster: posterFile,
+      detailImages: detailFiles,
+    };
+
+    console.log('요청 데이터:', requestBody);
+
+    // TODO: API 호출
+    // const formDataToSend = new FormData();
+    // formDataToSend.append('form', JSON.stringify(requestBody.form));
+    // formDataToSend.append('poster', requestBody.poster);
+    // requestBody.detailImages.forEach((file, index) => {
+    //   formDataToSend.append(`detailImages[${index}]`, file);
+    // });
+    //
+    // if (isUpdate) {
+    //   await updateShow(props.id, formDataToSend);
+    // } else {
+    //   await createShow(formDataToSend);
+    // }
   }
 
   return (
@@ -135,7 +369,7 @@ export default function PerformanceRegistrationForm(props: Props) {
       {/*header*/}
       <CardHeader>
         <div className="flex items-center">
-          <Button type="button" variant="ghost" onClick={() => router.back()}>
+          <Button type="button" variant="ghost" onClick={router.back}>
             <ArrowLeft className="!size-6" />
           </Button>
           <CardTitle className="text-2xl font-bold">공연 {flag}</CardTitle>
@@ -144,8 +378,9 @@ export default function PerformanceRegistrationForm(props: Props) {
 
       {/*content*/}
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, (errors) => console.log('통과안됨', errors))}>
           <div className="space-y-6">
+            {/* 1. 제목 */}
             <FormInputField
               name={SHOW_FORM_FIELDS.TITLE}
               label="제목"
@@ -156,6 +391,7 @@ export default function PerformanceRegistrationForm(props: Props) {
               required={true}
             />
 
+            {/* 2. 장르 */}
             <FormSelectField
               name={SHOW_FORM_FIELDS.GENRE}
               label="장르"
@@ -167,6 +403,7 @@ export default function PerformanceRegistrationForm(props: Props) {
               required={true}
             />
 
+            {/* 3. 지역 */}
             <FormSelectField
               name={SHOW_FORM_FIELDS.REGION}
               label="지역"
@@ -178,42 +415,44 @@ export default function PerformanceRegistrationForm(props: Props) {
               required={true}
             />
 
-            <div className="grid grid-cols-1 gap-x-6 gap-y-4 xl:grid-cols-2">
-              <FormSelectField
-                name={SHOW_FORM_FIELDS.VENUE_NAME}
-                label="장소"
-                htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
-                control={control}
-                errors={errors}
-                options={venueOptions}
-                placeholder="장소를 선택하세요."
-                required={true}
-                className="xl:col-span-1"
-              />
+            {/* 4. 장소 */}
+            <FormSelectField
+              name={SHOW_FORM_FIELDS.VENUE_NAME}
+              label="장소"
+              htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
+              control={control}
+              errors={errors}
+              options={venueOptions}
+              placeholder="장소를 선택하세요."
+              required={true}
+              className="xl:col-span-1"
+            />
 
-              <FormSelectField
-                name={SHOW_FORM_FIELDS.HALL_NAME}
-                label="공연장"
-                htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
-                control={control}
-                errors={errors}
-                options={hallOptions}
-                placeholder="공연장을 선택하세요."
-                required={true}
-                className="xl:col-span-1"
-              />
-            </div>
+            {/* 5. 공연장 */}
+            <FormSelectField
+              name={SHOW_FORM_FIELDS.HALL_NAME}
+              label="공연장"
+              htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
+              control={control}
+              errors={errors}
+              options={hallOptions}
+              placeholder="공연장을 선택하세요."
+              required={true}
+              className="xl:col-span-1"
+            />
 
+            {/* 6. 관람시간 */}
             <FormInputField
               name={SHOW_FORM_FIELDS.RUNNING_TIME}
-              label="관람 시간"
+              label="관람시간"
               htmlFor={SHOW_FORM_FIELDS.RUNNING_TIME}
               register={register}
               errors={errors}
-              placeholder="관람 시간을 입력하세요. (분 단위, ex. 100분)"
+              placeholder="관람시간을 입력하세요. (분 단위, ex. 100분)"
               required={true}
             />
 
+            {/* 7. 출연진 */}
             <FormInputField
               name={SHOW_FORM_FIELDS.CAST}
               label="출연진"
@@ -224,47 +463,68 @@ export default function PerformanceRegistrationForm(props: Props) {
               required={true}
             />
 
-            <FormField label="일정" htmlFor={SHOW_FORM_FIELDS.SCHEDULES} required={true}>
+            {/* 8. 일정(테이블) */}
+            <FormField
+              label="일정"
+              htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
+              required={true}
+              error={errors?.schedules?.message}
+            >
               <FormScheduleTableField<ShowFormData>
                 fields={fields}
                 register={register}
-                scheduleErrors={errors?.schedules as FieldErrors<ShowUpsertType.ScheduleItem[]>}
+                scheduleErrors={errors?.schedules as FieldErrors<ShowUpsertType.Schedule[]>}
                 removeSchedule={remove}
                 addSchedule={() => append(createEmptySchedule())}
               />
             </FormField>
 
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4">
-              <Label htmlFor="poster" className="text-sm font-medium">
-                메인 포스터 <span className="text-red-500">*</span>
-              </Label>
+            {/* 9. 예매 시작일 */}
+            <FormInputField
+              name={SHOW_FORM_FIELDS.START_DATE}
+              label="예매 시작일"
+              htmlFor={SHOW_FORM_FIELDS.START_DATE}
+              type="date"
+              min={dayjs().format(DATE_FORMAT.DATE_ONLY)}
+              register={register}
+              errors={errors}
+              placeholder="예매 시작일을 입력하세요."
+              required={true}
+              description="예매 종료일은 마지막 공연일로 자동 설정됩니다."
+            />
 
-              <div className="rounded-lg border-2 border-dashed border-slate-300 p-8 text-center transition-colors hover:border-slate-400">
-                {imagePreview ? (
-                  <div className="space-y-4">
-                    <img
-                      src={imagePreview}
-                      alt="포스터 미리보기"
-                      className="mx-auto max-h-96 rounded-lg shadow-md"
-                    />
-                    <Button type="button" variant="outline" onClick={() => setImagePreview(null)}>
-                      이미지 변경
-                    </Button>
-                  </div>
-                ) : (
-                  <label htmlFor="poster" className="block cursor-pointer">
-                    <Upload className="mx-auto mb-4 h-12 w-12 text-slate-400" />
-                    <p className="mb-2 text-sm text-slate-600">클릭하여 이미지를 업로드하세요</p>
-                    <p className="text-xs text-slate-400">JPG, PNG 파일 (최대 10MB)</p>
-                    <Input id="poster" type="file" accept="image/*" className="hidden" />
-                  </label>
-                )}
-              </div>
-            </div>
+            {/* 10. 메인 포스터 */}
+            <FormFileField
+              label="메인 포스터"
+              htmlFor="poster"
+              required={true}
+              accept="image/*"
+              maxSize={10}
+              onFileChange={handlePosterChange}
+              error={errors.root?.poster?.message}
+            />
+
+            {/* 11. 상세 이미지 */}
+            <FormFileField
+              label="상세 이미지"
+              htmlFor="detail-images"
+              accept="image/*"
+              required={true}
+              multiple={true}
+              maxSize={10}
+              onFileChange={handleDetailImagesChange}
+              error={errors.root?.details?.message}
+            />
 
             {/*footer*/}
             <div className="flex gap-4 border-t pt-6">
-              <Button type="button" variant="outline" size="lg" className="h-12 flex-1 text-base">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-12 flex-1 text-base"
+                onClick={router.back}
+              >
                 이전
               </Button>
               <Button
