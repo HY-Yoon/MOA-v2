@@ -1,5 +1,5 @@
-import ShowUpsertForm from '@/components/admin/show/upsert/ShowUpsertForm';
+import ShowUpsertForm from './_components/ShowUpsertForm';
 
 export default function ShowUpsert() {
   return <ShowUpsertForm />;
-}
+} 

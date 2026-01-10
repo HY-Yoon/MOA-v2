@@ -8,8 +8,8 @@ import {
   FieldErrors,
   Path,
 } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/atoms/button';
+import { Input } from '@/components/atoms/input';
 import { SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import dayjs from '@/plugins/dayjs';
