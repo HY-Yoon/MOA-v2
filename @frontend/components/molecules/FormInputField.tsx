@@ -1,7 +1,7 @@
 'use client';
 
 import { UseFormRegister, FieldErrors, FieldValues, Path } from 'react-hook-form';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/atoms/input';
 import { FormField } from './FormField';
 import classNames from 'classnames';
 
