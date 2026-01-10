@@ -2,27 +2,29 @@ import { Genre, Region } from '@shared/enums';
 
 declare global {
   namespace ShowUpsertType {
-    interface ScheduleItem {
-      showDate: string;
+    interface Location {
+      region: Region;
+      venueName: string;
+      hallName: string;
+    }
+
+    interface Schedule {
+      showDate: Date;
       showTime: string;
-      ticketOpenTime: string;
+      ticketOpenTime: Date; // YYYY-MM-DD HH:mm (시간 포함)
     }
 
     interface ShowUpsertForm {
       title: string;
       genre: Genre;
-      location: {
-        region: Region;
-        venueName: string;
-        hallName: string;
-      };
+      location: Location;
       runningTime: string;
       cast: string;
-      bookingPeriod: {
+      salePeriod: {
         startDate: Date;
         endDate: Date;
       };
-      schedules: ScheduleItem[];
+      schedules: Schedule[];
     }
   }
 }
