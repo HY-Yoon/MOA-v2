@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-import { Inter, Noto_Sans_KR, Sansation } from "next/font/google";
+import { Inter, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { Providers } from '@/lib/client-providers';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,7 +35,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${notoSansKr.variable} font-sans`}
       >
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   )
