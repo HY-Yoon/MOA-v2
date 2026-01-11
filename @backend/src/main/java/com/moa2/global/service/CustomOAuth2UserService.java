@@ -4,6 +4,7 @@ import com.moa2.domain.user.entity.User;
 import com.moa2.domain.user.repository.UserRepository;
 import com.moa2.global.dto.OAuthAttributes;
 import com.moa2.global.model.Gender;
+import com.moa2.global.model.UserStatus;
 import com.moa2.global.util.LogMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +34,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        
+
         try {
             // 기본 OAuth2UserService를 사용하여 사용자 정보 로드
             OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate = new DefaultOAuth2UserService();
@@ -68,50 +69,48 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             return new DefaultOAuth2User(
                     Collections.singleton(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())),
                     oAuth2User.getAttributes(),
-                    userNameAttributeName
-            );
-            
+                    userNameAttributeName);
+
         } catch (OAuth2AuthenticationException e) {
             // OAuth2 인증 예외는 그대로 전파
             OAuth2Error error = e.getError();
-            
+
             // 카카오의 경우 IP 제한 에러 체크
-            if ("kakao".equals(registrationId) && error.getDescription() != null 
+            if ("kakao".equals(registrationId) && error.getDescription() != null
                     && error.getDescription().contains("ip mismatched")) {
-                log.error("OAuth2 인증 실패 [{}]: IP 제한 에러 - {}", 
+                log.error("OAuth2 인증 실패 [{}]: IP 제한 에러 - {}",
                         registrationId, error.getDescription());
             } else {
-                log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}, URI={}", 
-                        registrationId, 
-                        error.getErrorCode(), 
+                log.error("OAuth2 인증 실패 [{}]: ErrorCode={}, Description={}, URI={}",
+                        registrationId,
+                        error.getErrorCode(),
                         LogMaskingUtil.mask(error.getDescription()),
                         error.getUri());
             }
             throw e;
-            
+
         } catch (Exception e) {
             // 예상치 못한 예외 (네트워크 오류, JSON 파싱 오류 등)
             log.error("OAuth2 API 호출 실패 [{}]: {}", registrationId, e.getMessage(), e);
-            
+
             // OAuth2AuthenticationException으로 변환
             throw new OAuth2AuthenticationException(
                     new org.springframework.security.oauth2.core.OAuth2Error(
                             "server_error",
                             "OAuth2 API 호출 중 오류가 발생했습니다: " + e.getMessage(),
-                            null
-                    ),
-                    e
-            );
+                            null),
+                    e);
         }
     }
-    
 
     /**
      * 사용자를 DB에 저장하거나 업데이트
+     * 
      * @param attributes OAuth2 사용자 정보
      * @return 저장/업데이트된 User 엔티티
      */
     private User saveOrUpdate(OAuthAttributes attributes) {
+
         User user = userRepository
                 .findBySocialProviderAndProviderId(attributes.getProvider(), attributes.getProviderId())
                 .orElse(null);
@@ -120,8 +119,14 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             // 신규 사용자 저장
             user = attributes.toEntity();
             user = userRepository.save(user);
-            log.info("신규 사용자 등록: {} (name: {}, picture: {})", 
+            log.info("신규 사용자 등록: {} (name: {}, picture: {})",
                     user.getEmail(), user.getName(), user.getPicture());
+        } else if (user.getStatus() == UserStatus.DELETED) {
+            // 탈퇴한 사용자 재가입 처리
+            user.activate(); //
+            user = userRepository.save(user); //
+            log.info("탈퇴한 사용자 재가입: {} ({}) - 상태를 ACTIVE로 복구",
+                    LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
         } else {
             // 기존 사용자 정보 업데이트
             // DB에 이미 정보가 있으면 유지, 없으면 OAuth 정보 사용
@@ -131,25 +136,25 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             Gender oldGender = user.getGender();
             LocalDate oldBirthDate = user.getBirthDate();
             String oldAgeRange = user.getAgeRange();
-            
+
             // 이름: DB에 값이 있으면 유지, 없으면 OAuth 정보 사용
-            String newName = (oldName != null && !oldName.trim().isEmpty()) 
-                    ? oldName 
+            String newName = (oldName != null && !oldName.trim().isEmpty())
+                    ? oldName
                     : attributes.getName();
-            
+
             // 프로필 이미지: OAuth 정보로 항상 업데이트 (최신 프로필 사진 반영)
             String newPicture = attributes.getPicture();
-            
+
             // 전화번호: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
             String newPhone = attributes.getPhone();
-            if (newPhone != null && !newPhone.trim().isEmpty() && 
-                (oldPhone == null || oldPhone.trim().isEmpty())) {
+            if (newPhone != null && !newPhone.trim().isEmpty() &&
+                    (oldPhone == null || oldPhone.trim().isEmpty())) {
                 // 새 전화번호가 있고 기존 전화번호가 없으면 업데이트
             } else if (newPhone == null || newPhone.trim().isEmpty()) {
                 // OAuth에서 전화번호를 제공하지 않으면 기존 값 유지
                 newPhone = oldPhone;
             }
-            
+
             // 성별: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
             Gender newGender = attributes.getGender();
             if (newGender == null) {
@@ -160,7 +165,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 // 둘 다 있으면 기존 값 유지
                 newGender = oldGender;
             }
-            
+
             // 생년월일: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
             LocalDate newBirthDate = attributes.getBirthDate();
             if (newBirthDate == null) {
@@ -171,7 +176,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 // 둘 다 있으면 기존 값 유지
                 newBirthDate = oldBirthDate;
             }
-            
+
             // 연령대: OAuth에서 제공되면 업데이트 (기존 값이 없거나 새 값이 있으면)
             String newAgeRange = attributes.getAgeRange();
             if (newAgeRange == null || newAgeRange.trim().isEmpty()) {
@@ -182,10 +187,10 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 // 둘 다 있으면 기존 값 유지
                 newAgeRange = oldAgeRange;
             }
-            
+
             // 변경사항이 있을 때만 업데이트
             boolean nameChanged = !newName.equals(oldName);
-            boolean pictureChanged = (newPicture != null && !newPicture.equals(oldPicture)) 
+            boolean pictureChanged = (newPicture != null && !newPicture.equals(oldPicture))
                     || (newPicture == null && oldPicture != null);
             boolean phoneChanged = (newPhone != null && !newPhone.equals(oldPhone))
                     || (newPhone == null && oldPhone != null);
@@ -195,12 +200,13 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                     || (newBirthDate == null && oldBirthDate != null);
             boolean ageRangeChanged = (newAgeRange != null && !newAgeRange.equals(oldAgeRange))
                     || (newAgeRange == null && oldAgeRange != null);
-            
+
             if (nameChanged || pictureChanged || phoneChanged || genderChanged || birthDateChanged || ageRangeChanged) {
                 user.updateOAuth2Info(newName, newPicture, newPhone, newGender, newBirthDate, newAgeRange);
                 user = userRepository.save(user);
-                log.info("기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {}, gender: {}, birthDate: {}, ageRange: {})", 
-                        user.getEmail(), newName, newPicture, 
+                log.info(
+                        "기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {}, gender: {}, birthDate: {}, ageRange: {})",
+                        user.getEmail(), newName, newPicture,
                         newPhone != null ? LogMaskingUtil.mask(newPhone) : "null",
                         newGender != null ? newGender : "null",
                         newBirthDate != null ? newBirthDate : "null",
@@ -211,4 +217,3 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
         return user;
     }
 }
-

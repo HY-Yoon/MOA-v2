@@ -153,20 +153,32 @@ public class RefreshTokenService {
             throw e; // 원본 예외 그대로 전파
         }
 
-        // 4. 이메일 추출
+        // 4. 이메일 및 제공자 추출
         String email;
+        String provider;
         try {
             email = jwtTokenProvider.getEmailFromRefreshToken(refreshToken);
+            provider = jwtTokenProvider.getProviderFromRefreshToken(refreshToken);
+            
+            // provider가 없으면 예외 발생 (구형 토큰일 수 있음)
+            if (provider == null || provider.isEmpty()) {
+                log.warn("Refresh Token에 provider 정보가 없습니다. 구형 토큰일 수 있습니다: {}", LogMaskingUtil.maskEmail(email));
+                throw new RefreshTokenException.InvalidGrantException(
+                        "토큰에 제공자 정보가 없습니다. 다시 로그인해주세요."
+                );
+            }
+        } catch (RefreshTokenException e) {
+            throw e; // 이미 처리된 예외는 그대로 전파
         } catch (Exception e) {
             // JWT 파싱 오류
-            log.error("Refresh Token에서 이메일 추출 실패: {}", e.getMessage());
+            log.error("Refresh Token에서 정보 추출 실패: {}", e.getMessage());
             throw new RefreshTokenException.InvalidGrantException(
                     "토큰 파싱 중 오류가 발생했습니다. 다시 로그인해주세요."
             );
         }
 
-        // 5. 새 Access Token 생성
-        String newAccessToken = jwtTokenProvider.createAccessToken(email);
+        // 5. 새 Access Token 생성 (provider 정보 포함)
+        String newAccessToken = jwtTokenProvider.createAccessToken(email, provider);
 
         log.info("Access Token 갱신 완료: {}", LogMaskingUtil.maskEmail(email));
 

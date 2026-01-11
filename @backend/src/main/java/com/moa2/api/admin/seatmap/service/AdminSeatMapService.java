@@ -127,18 +127,22 @@ public class AdminSeatMapService {
             })
             .collect(Collectors.toList());
         
+        // 좌석 전체 개수 계산
+        int totalSeatsCount = request.getSeats().size();
+        
         // Venue 찾기 또는 생성
         Venue venue = venueRepository.findByNameAndHallNameAndRegion(
             request.getVenueName(),
             request.getHallName(),
             request.getRegion()
         ).orElseGet(() -> {
-            log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", 
-                request.getVenueName(), request.getHallName(), request.getRegion());
+            log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}, totalSeats={}", 
+                request.getVenueName(), request.getHallName(), request.getRegion(), totalSeatsCount);
             Venue newVenue = Venue.builder()
                 .name(request.getVenueName())
                 .hallName(request.getHallName())
                 .region(request.getRegion())
+                .totalSeats(totalSeatsCount)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();

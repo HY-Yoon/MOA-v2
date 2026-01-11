@@ -85,12 +85,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             return;
         }
 
-        // Access Token 생성
-        String accessToken = jwtTokenProvider.createAccessToken(email);
+        // Access Token 생성 (provider 정보 포함)
+        String provider = user.getSocialProvider().name();
+        String accessToken = jwtTokenProvider.createAccessToken(email, provider);
         log.info("Access Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
 
-        // Refresh Token 생성
-        String refreshToken = jwtTokenProvider.createRefreshToken(email);
+        // Refresh Token 생성 (provider 정보 포함)
+        String refreshToken = jwtTokenProvider.createRefreshToken(email, provider);
         log.info("Refresh Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
 
         // Refresh Token을 DB에 저장 (소셜 제공자 포함)

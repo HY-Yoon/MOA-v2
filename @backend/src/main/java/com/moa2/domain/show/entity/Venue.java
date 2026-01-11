@@ -16,7 +16,10 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Table(name = "venues")
+@Table(name = "venues", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_venue_name_hall_region",
+                columnNames = {"name", "hall_name", "region"})
+})
 public class Venue {
     
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

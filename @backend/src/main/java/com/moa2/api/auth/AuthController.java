@@ -6,6 +6,7 @@ import com.moa2.api.auth.dto.UserInfoResponse;
 import com.moa2.domain.user.entity.User;
 import com.moa2.domain.user.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
+import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.service.RefreshTokenService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,15 +71,38 @@ public class AuthController {
         try {
             if (jwtTokenProvider.validateRefreshToken(refreshToken)) {
                 email = jwtTokenProvider.getEmailFromRefreshToken(refreshToken);
-                
-                // DB에서 사용자 정보 조회하여 소셜 제공자 확인
-                User user = userRepository.findByEmail(email).orElse(null);
-                if (user != null) {
-                    socialProvider = switch (user.getSocialProvider()) {
-                        case GOOGLE -> "Google";
-                        case NAVER -> "Naver";
-                        case KAKAO -> "Kakao";
-                    };
+                String providerStr = jwtTokenProvider.getProviderFromRefreshToken(refreshToken);
+
+                // provider 정보가 있으면 SocialProvider Enum으로 변환
+                SocialProvider socialProviderEnum = null;
+                if (providerStr != null && !providerStr.isEmpty()) {
+                    try {
+                        socialProviderEnum = SocialProvider.valueOf(providerStr);
+                        socialProvider = switch (socialProviderEnum) {
+                            case GOOGLE -> "Google";
+                            case NAVER -> "Naver";
+                            case KAKAO -> "Kakao";
+                        };
+                    } catch (IllegalArgumentException e) {
+                        log.warn("알 수 없는 provider 값: {}", providerStr);
+                    }
+                }
+
+                // DB에서 사용자 정보 조회 (이메일 + 제공자로 유니크하게 조회)
+                User user = null;
+                if (socialProviderEnum != null) {
+                    user = userRepository.findByEmailAndSocialProvider(email, socialProviderEnum).orElse(null);
+                } else {
+                    // provider 정보가 없는 구형 토큰인 경우, 이메일로만 조회 (하위 호환성)
+                    log.warn("토큰에 provider 정보가 없습니다. 구형 토큰일 수 있습니다. 이메일로만 조회합니다.");
+                    user = userRepository.findByEmail(email).orElse(null);
+                    if (user != null) {
+                        socialProvider = switch (user.getSocialProvider()) {
+                            case GOOGLE -> "Google";
+                            case NAVER -> "Naver";
+                            case KAKAO -> "Kakao";
+                        };
+                    }
                 }
             }
         } catch (Exception e) {
@@ -134,8 +158,43 @@ public class AuthController {
                     .body(ApiResponse.error("인증이 필요합니다."));
         }
 
-        // 4. 사용자 정보 조회
-        User user = userRepository.findByEmail(email).orElse(null);
+        // 4. Access Token에서 provider 정보 추출 및 사용자 정보 조회
+        User user = null;
+        
+        // 쿠키에서 Access Token 추출
+        String accessToken = null;
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    accessToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        
+        // Access Token에서 provider 정보 추출 시도
+        if (accessToken != null) {
+            try {
+                String providerStr = jwtTokenProvider.getProviderFromAccessToken(accessToken);
+                if (providerStr != null && !providerStr.isEmpty()) {
+                    try {
+                        SocialProvider socialProvider = SocialProvider.valueOf(providerStr);
+                        user = userRepository.findByEmailAndSocialProvider(email, socialProvider).orElse(null);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("알 수 없는 provider 값: {}", providerStr);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("토큰에서 provider 추출 실패: {}", e.getMessage());
+            }
+        }
+        
+        // provider 정보가 없거나 조회 실패한 경우, 이메일로만 조회 (하위 호환성)
+        if (user == null) {
+            log.warn("provider 정보로 사용자를 찾을 수 없음. 이메일로만 조회합니다: {}", email);
+            user = userRepository.findByEmail(email).orElse(null);
+        }
+        
         if (user == null) {
             log.warn("사용자를 찾을 수 없음: {}", email);
             return ResponseEntity.status(404)
@@ -164,7 +223,28 @@ public class AuthController {
         }
 
         String email = jwtTokenProvider.getEmailFromAccessToken(token);
-        User user = userRepository.findByEmail(email).orElse(null);
+        
+        // provider 정보 추출 및 사용자 조회
+        User user = null;
+        try {
+            String providerStr = jwtTokenProvider.getProviderFromAccessToken(token);
+            if (providerStr != null && !providerStr.isEmpty()) {
+                try {
+                    SocialProvider socialProvider = SocialProvider.valueOf(providerStr);
+                    user = userRepository.findByEmailAndSocialProvider(email, socialProvider).orElse(null);
+                } catch (IllegalArgumentException e) {
+                    log.warn("알 수 없는 provider 값: {}", providerStr);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("토큰에서 provider 추출 실패: {}", e.getMessage());
+        }
+        
+        // provider 정보가 없거나 조회 실패한 경우, 이메일로만 조회 (하위 호환성)
+        if (user == null) {
+            log.warn("provider 정보로 사용자를 찾을 수 없음. 이메일로만 조회합니다: {}", email);
+            user = userRepository.findByEmail(email).orElse(null);
+        }
 
         if (user == null) {
             TokenVerifyResponse response = TokenVerifyResponse.builder()
@@ -248,20 +328,29 @@ public class AuthController {
                 }
             }
             
-            // 2. Refresh Token에서 이메일 추출 후 DB에서 삭제
+            // 2. Refresh Token에서 이메일 및 provider 추출 후 DB에서 삭제
             if (refreshToken != null) {
                 try {
                     if (jwtTokenProvider.validateRefreshToken(refreshToken)) {
                         String email = jwtTokenProvider.getEmailFromRefreshToken(refreshToken);
+                        String providerStr = jwtTokenProvider.getProviderFromRefreshToken(refreshToken);
                         
-                        // DB에서 사용자 조회하여 소셜 제공자 확인
-                        User user = userRepository.findByEmail(email).orElse(null);
-                        if (user != null) {
-                            refreshTokenService.deleteByUserEmailAndSocialProvider(email, user.getSocialProvider());
-                            log.info("로그아웃 완료: {} ({})", email, user.getSocialProvider());
+                        // provider 정보가 있으면 SocialProvider Enum으로 변환하여 삭제
+                        if (providerStr != null && !providerStr.isEmpty()) {
+                            try {
+                                SocialProvider socialProvider = SocialProvider.valueOf(providerStr);
+                                refreshTokenService.deleteByUserEmailAndSocialProvider(email, socialProvider);
+                                log.info("로그아웃 완료: {} ({})", email, socialProvider);
+                            } catch (IllegalArgumentException e) {
+                                log.warn("알 수 없는 provider 값: {}. 이메일로만 삭제합니다.", providerStr);
+                                refreshTokenService.deleteByUserEmail(email);
+                                log.info("로그아웃 완료: {} (provider 정보 없음)", email);
+                            }
                         } else {
+                            // provider 정보가 없는 구형 토큰인 경우, 이메일로만 삭제 (하위 호환성)
+                            log.warn("토큰에 provider 정보가 없습니다. 구형 토큰일 수 있습니다. 이메일로만 삭제합니다.");
                             refreshTokenService.deleteByUserEmail(email);
-                            log.info("로그아웃 완료: {} (사용자 정보 없음)", email);
+                            log.info("로그아웃 완료: {} (provider 정보 없음)", email);
                         }
                     }
                 } catch (Exception e) {

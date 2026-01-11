@@ -41,6 +41,11 @@ SEATS_INFO.md
 SOCIAL_LOGIN.md
 GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
 SECURITY_CONFIG_README.md
+src/main/resources/dummy-data.sql
+src/main/resources/README-DUMMY-DATA.md
+src/main/resources/clear_all_data.sql
+src/main/resources/application.properties
+
 
 .history
 .cursorrules

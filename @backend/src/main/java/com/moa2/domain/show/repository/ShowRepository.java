@@ -1,6 +1,8 @@
 package com.moa2.domain.show.repository;
 
 import com.moa2.domain.show.entity.Show;
+import com.moa2.global.model.Genre;
+import com.moa2.global.model.Region;
 import com.moa2.global.model.ShowStatus;
 import com.moa2.global.model.SaleStatus;
 import org.springframework.data.domain.Page;
@@ -31,5 +33,28 @@ public interface ShowRepository extends JpaRepository<Show, Long> {
     
     @Query("SELECT s FROM Show s WHERE s.id = :id")
     Show findByIdAndNotDeleted(@Param("id") Long id);
+    
+    /**
+     * 사용자용 공연 목록 조회
+     * - 판매 허용(ALLOWED)된 공연만
+     * - 판매중(ON_SALE) 또는 매진(SOLD_OUT) 상태만 (TODO: 프로덕션에서는 WAITING 제외)
+     * - 장르, 지역, 키워드, 날짜 필터 지원
+     */
+    @Query("SELECT s FROM Show s " +
+           "WHERE s.saleStatus = 'ALLOWED' " +
+           "AND s.status IN ('WAITING', 'ON_SALE', 'SOLD_OUT') " +  // 임시: WAITING 포함
+           "AND (:genre IS NULL OR s.genre = :genre) " +
+           "AND (:region IS NULL OR s.venue.region = :region) " +
+           "AND (:keyword IS NULL OR s.title LIKE :keyword) " +
+           "AND (CAST(:startDate AS date) IS NULL OR s.startDate >= :startDate) " +
+           "AND (CAST(:endDate AS date) IS NULL OR s.endDate <= :endDate)")
+    Page<Show> findShowsForUser(
+        @Param("genre") Genre genre,
+        @Param("region") Region region,
+        @Param("keyword") String keyword,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        Pageable pageable
+    );
 }
 

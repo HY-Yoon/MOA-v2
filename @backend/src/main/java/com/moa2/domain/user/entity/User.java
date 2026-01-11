@@ -142,6 +142,7 @@ public class User {
         this.status = UserStatus.ACTIVE;
         this.suspensionReason = null;
         this.suspendedAt = null;
+        this.deletedAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 }
