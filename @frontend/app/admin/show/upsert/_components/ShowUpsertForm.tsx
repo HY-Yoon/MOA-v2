@@ -21,6 +21,8 @@ import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import { Genre, Region } from '@shared/enums';
 import { stringToDate } from '@/lib/common/date';
 import { getFirstShowDate } from '@/lib/admin/show';
+import { getShow } from '@/lib/api/admin/show';
+import { useQuery } from '@tanstack/react-query';
 
 interface Props {
   id?: string;
@@ -115,8 +117,12 @@ export type ShowFormData = z.infer<typeof showFormSchema>;
 export default function ShowUpsertForm(props: Props) {
   const router = useRouter();
 
-  const isUpdate = !!props.id;
+  const showId = Number(props.id) || -1;
+  const isUpdate = !!showId && showId > 0;
   const flag = isUpdate ? '수정' : '등록';
+
+  const { data } = useQuery(getShow(showId));
+  console.log('detail', data);
 
   // TODO: api 적용 예정
   const [venueOptions, setVenueOptions] = useState([
