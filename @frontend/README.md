@@ -10,7 +10,7 @@ Next.js를 기반으로 한 공연 예매 플랫폼 프론트엔드 프로젝트
 
 ```env
 # 백엔드 API URL
-BACKEND_URL=http://localhost:8080
+NEXT_PUBLIC_BACKEND_URL=https://registered-rozalin-moa-v2-65e6ffe7.koyeb.app
 ```
 
 ## 🏗️ 아키텍처

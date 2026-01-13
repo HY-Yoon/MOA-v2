@@ -5,10 +5,10 @@
 import axios, { AxiosInstance } from 'axios';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 // axios 인스턴스 설정
-const axiosInstance: AxiosInstance = axios.create({
+export const axiosInstance: AxiosInstance = axios.create({
   baseURL: isProduction ? '' : backendUrl, // 개발: 백엔드 직접, 프로덕션: 상대경로
   timeout: 10000,
   headers: {
@@ -22,5 +22,5 @@ axiosInstance.interceptors.response.use(
   (error) => {
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
-  }
+  },
 );
