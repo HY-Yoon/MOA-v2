@@ -3,26 +3,27 @@
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/atoms';
 import {
   FormField,
-  FormSelectField,
+  FormFileField,
   FormInputField,
   FormScheduleTableField,
-  FormFileField,
+  FormSelectField,
 } from '@/components/molecules';
+import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
+import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
+import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
+import { getFirstShowDate } from '@/lib/admin/show';
+import { createShow, getShow } from '@/lib/api/admin/show';
+import { stringToDate } from '@/lib/common/date';
+import dayjs from '@/plugins/dayjs';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Genre, Region } from '@shared/enums';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { z } from 'zod';
 import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
-import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
-import dayjs from '@/plugins/dayjs';
-import { DATE_FORMAT } from '@/constants/common/dateFormat';
-import { Genre, Region } from '@shared/enums';
-import { stringToDate } from '@/lib/common/date';
-import { getFirstShowDate } from '@/lib/admin/show';
-import { getShow } from '@/lib/api/admin/show';
-import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 interface Props {
   id?: string;
@@ -123,6 +124,8 @@ export default function ShowUpsertForm(props: Props) {
 
   const { data } = useQuery(getShow(showId));
   console.log('detail', data);
+
+  const createShowMutation = useMutation(createShow());
 
   // TODO: api 적용 예정
   const [venueOptions, setVenueOptions] = useState([
@@ -311,7 +314,27 @@ export default function ShowUpsertForm(props: Props) {
     return true;
   }
 
-  // api request body 설정
+  // formData 생성
+  function createFormData(request: ShowUpsertType.ShowForm): FormData {
+    const formData = new FormData();
+
+    // data 필드를 JSON 문자열로 추가
+    formData.append('data', JSON.stringify(request));
+
+    // 포스터 파일 추가
+    if (posterFile) {
+      formData.append('poster', posterFile);
+    }
+
+    // 상세 이미지 파일들 추가
+    detailFiles.forEach((file) => {
+      formData.append('detailImages', file);
+    });
+
+    return formData;
+  }
+
+  // api request 설정
   async function onSubmit(formData: ShowFormData) {
     // 이미지 파일 유효성 검사
     if (!validateImageFiles()) return;
@@ -329,46 +352,40 @@ export default function ShowUpsertForm(props: Props) {
       schedules,
     } = formData;
 
-    const requestBody = {
-      data: {
-        title,
-        genre: genre as Genre,
-        location: {
-          region: region as Region,
-          venueName,
-          hallName,
-        },
-        runningTime,
-        cast,
-        salePeriod: {
-          startDate: stringToDate(startDate),
-          endDate: stringToDate(endDate),
-        },
-        schedules: schedules.map((schedule) => ({
-          showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
-          showTime: schedule.showTime, // HH:mm -> string
-          ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
-        })),
+    const request: ShowUpsertType.ShowForm = {
+      title,
+      genre: genre as Genre,
+      location: {
+        region: region as Region,
+        venueName,
+        hallName,
       },
-      poster: posterFile,
-      detailImages: detailFiles,
+      runningTime,
+      cast,
+      salePeriod: {
+        startDate: stringToDate(startDate),
+        endDate: stringToDate(endDate),
+      },
+      schedules: schedules.map((schedule) => ({
+        showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
+        showTime: schedule.showTime, // HH:mm -> string
+        ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
+      })),
     };
 
-    console.log('요청 데이터:', requestBody);
-
-    // TODO: API 호출
-    // const formDataToSend = new FormData();
-    // formDataToSend.append('form', JSON.stringify(requestBody.form));
-    // formDataToSend.append('poster', requestBody.poster);
-    // requestBody.detailImages.forEach((file, index) => {
-    //   formDataToSend.append(`detailImages[${index}]`, file);
-    // });
-    //
+    // TODO: 수정인 경우
     // if (isUpdate) {
     //   await updateShow(props.id, formDataToSend);
     // } else {
     //   await createShow(formDataToSend);
     // }
+    const requestFormData = createFormData(request);
+    const response = await createShowMutation.mutateAsync(requestFormData);
+
+    // 등록 성공시 목록 화면으로 이동
+    if (response.success && response.data.showId > 0) {
+      router.push(ADMIN_ROUTES.SHOW);
+    }
   }
 
   return (
