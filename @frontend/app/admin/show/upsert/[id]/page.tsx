@@ -1,4 +1,4 @@
-import ShowUpsertForm from '@/components/admin/show/upsert/ShowUpsertForm';
+import ShowUpsertForm from '../_components/ShowUpsertForm';
 
 interface Props {
   params: Promise<{ id: string }>;

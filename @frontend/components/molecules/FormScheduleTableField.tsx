@@ -8,8 +8,8 @@ import {
   FieldErrors,
   Path,
 } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/atoms/button';
+import { Input } from '@/components/atoms/input';
 import { SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import dayjs from '@/plugins/dayjs';
@@ -19,7 +19,7 @@ import { Plus } from 'lucide-react';
 interface Props<T extends FieldValues> {
   fields: FieldArrayWithId<T, ArrayPath<T>, 'id'>[];
   register: UseFormRegister<T>;
-  scheduleErrors?: FieldErrors<ShowUpsertType.ScheduleItem[]>;
+  scheduleErrors?: FieldErrors<ShowUpsertType.Schedule[]>;
   removeSchedule: (index: number) => void;
   addSchedule: () => void;
 }
@@ -41,13 +41,15 @@ const SCHEDULE_FIELDS: ScheduleFieldConfig[] = [
   },
   {
     fieldName: SHOW_FORM_FIELDS.SHOW_TIME,
-    header: '회차',
-    placeholder: '회차를 입력하세요. (ex. 1회 17:00)',
+    header: '공연 시간',
+    placeholder: '공연 시간을 입력하세요.',
+    inputType: 'time',
   },
   {
     fieldName: SHOW_FORM_FIELDS.TICKET_OPEN_TIME,
-    header: '티켓 오픈 시간',
-    inputType: 'time',
+    header: '티켓 오픈일',
+    inputType: 'datetime-local',
+    min: dayjs().format(DATE_FORMAT.FULL_NO_SEC),
   },
 ];
 
@@ -62,8 +64,7 @@ export function FormScheduleTableField<T extends FieldValues>({
 }: Props<T>) {
   function renderScheduleCell(fieldConfig: ScheduleFieldConfig, index: number) {
     const fieldPath = `${SHOW_FORM_FIELDS.SCHEDULES}.${index}.${fieldConfig.fieldName}` as Path<T>;
-    const error =
-      scheduleErrors?.[index]?.[fieldConfig.fieldName as keyof ShowUpsertType.ScheduleItem];
+    const error = scheduleErrors?.[index]?.[fieldConfig.fieldName as keyof ShowUpsertType.Schedule];
 
     return (
       <td key={fieldConfig.fieldName} className={CELL_CLASSNAME}>

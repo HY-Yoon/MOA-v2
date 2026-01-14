@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/atoms/label';
 import classNames from 'classnames';
 
 interface FormFieldProps {
@@ -11,6 +11,7 @@ interface FormFieldProps {
   error?: string;
   children: React.ReactNode;
   className?: string;
+  description?: string;
 }
 
 export function FormField({
@@ -20,6 +21,7 @@ export function FormField({
   error,
   children,
   className,
+  description,
 }: FormFieldProps) {
   return (
     <div className={classNames('grid grid-cols-[200px_1fr] items-start gap-4', className)}>
@@ -28,7 +30,8 @@ export function FormField({
       </Label>
       <div>
         {children}
-        <div className="pl-2">{error && <p className="mt-1 text-sm text-red-500">{error}</p>}</div>
+        {description && <p className="mt-1.5 text-xs text-slate-500">{description}</p>}
+        {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
       </div>
     </div>
   );

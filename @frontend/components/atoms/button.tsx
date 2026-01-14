@@ -1,3 +1,6 @@
+// ATOMS/Button - 가장 기본적인 UI 컴포넌트
+// 다른 컴포넌트들의 기반이 되는 기본 버튼 컴포넌트
+
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
