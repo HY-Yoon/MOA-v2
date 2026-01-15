@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
       // 백엔드 서버 도메인
       {
         protocol: 'https',
-        hostname: 'registered-rozalin-moa-v2-65e6ffe7.koyeb.app',
+        hostname: process.env.NEXT_PUBLIC_BACKEND_URL || '',
       },
     ],
   },

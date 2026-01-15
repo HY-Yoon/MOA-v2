@@ -2,14 +2,14 @@
 // 개발 환경: 직접 백엔드 API 호출 (네트워크 탭에서 확인 가능)
 // 프로덕션 환경: Next.js API Routes를 통해 호출 (백엔드 API 노출 방지)
 
+import { BE_URL } from '@/constants/common/url';
 import axios, { AxiosInstance } from 'axios';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 // axios 인스턴스 설정
 export const axiosInstance: AxiosInstance = axios.create({
-  baseURL: isProduction ? '' : backendUrl, // 개발: 백엔드 직접, 프로덕션: 상대경로
+  baseURL: isProduction ? '' : BE_URL, // 개발: 백엔드 직접, 프로덕션: 상대경로
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
