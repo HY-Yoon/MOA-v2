@@ -1,10 +1,10 @@
 import { axiosInstance } from '@/lib/api-client';
-import { UseMutationOptions, UseQueryOptions } from '@tanstack/react-query';
+import { UseMutationOptions } from '@tanstack/react-query';
 
 const BASE_URL = '/api/v1/admin/shows' as const;
 
 // 공연 상세 조회
-export const getShow = (id: number): UseQueryOptions<Show.DetailResponse> => ({
+export const getShow = (id: number) => ({
   queryKey: ['admin', 'show', 'detail', id],
   queryFn: async () => {
     const response = await axiosInstance.get(`${BASE_URL}/${id}`);

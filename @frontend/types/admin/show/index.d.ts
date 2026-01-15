@@ -51,10 +51,4 @@ namespace Show {
     createdAt: string;
     updatedAt: string;
   }
-
-  interface DetailResponse {
-    success: boolean;
-    data: Detail;
-    message: string;
-  }
 }
