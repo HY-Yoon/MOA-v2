@@ -1,3 +1,5 @@
+import { BE_URL } from '@/constants/common/url';
+
 /**
  * 이미지 URL 처리 유틸리티
  */
@@ -6,17 +8,15 @@
  * 백엔드 baseURL 가져오기
  */
 function getBackendBaseUrl(): string {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-
   // 서버 사이드
-  if (typeof window === 'undefined') return backendUrl;
+  if (typeof window === 'undefined') return BE_URL;
 
   // 클라이언트 사이드
   // 1. 프로덕션 환경: 상대 경로 (Next.js API Routes 통해)
   if (process.env.NODE_ENV === 'production') return '';
 
   // 2. 개발 환경: 백엔드 URL
-  return backendUrl;
+  return BE_URL;
 }
 
 /**
