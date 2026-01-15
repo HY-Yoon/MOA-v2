@@ -16,6 +16,7 @@ interface Option {
 }
 
 interface SelectFieldProps<T extends FieldValues> {
+  isLoading?: boolean;
   name: string;
   label: string;
   htmlFor: string;
@@ -29,6 +30,7 @@ interface SelectFieldProps<T extends FieldValues> {
 }
 
 export function FormSelectField<T extends FieldValues>({
+  isLoading,
   name,
   label,
   htmlFor,
@@ -44,6 +46,7 @@ export function FormSelectField<T extends FieldValues>({
 
   return (
     <FormField
+      isLoading={isLoading}
       label={label}
       htmlFor={htmlFor}
       error={error}
