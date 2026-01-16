@@ -8,6 +8,7 @@ import {
   FormScheduleTableField,
   FormSelectField,
 } from '@/components/molecules';
+import { useAlert } from '@/components/molecules/AlertContext';
 import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
@@ -117,6 +118,7 @@ export type ShowFormData = z.infer<typeof showFormSchema>;
 
 export default function ShowUpsertForm(props: Props) {
   const router = useRouter();
+  const { confirm } = useAlert();
 
   const showId = Number(props.id) || -1;
   const isUpdate = !!showId && showId > 0;
@@ -366,6 +368,15 @@ export default function ShowUpsertForm(props: Props) {
   async function onSubmit(formData: ShowFormData) {
     // 이미지 파일 유효성 검사
     if (!validateImageFiles()) return;
+
+    // 확인 모달
+    const confirmed = await confirm({
+      title: `공연 ${flag}`,
+      description: `${formData.title} 공연을 ${flag}하시겠습니까?`,
+      confirmText: flag,
+      cancelText: '취소',
+    });
+    if (!confirmed) return; // 취소하면 중단
 
     const {
       title,
