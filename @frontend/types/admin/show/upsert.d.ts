@@ -11,7 +11,7 @@ namespace ShowUpsertType {
     ticketOpenTime: Date;
   }
 
-  interface ShowUpsertForm {
+  interface ShowForm {
     title: string;
     genre: import('@shared/enums').Genre;
     location: Location;

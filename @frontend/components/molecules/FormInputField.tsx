@@ -6,6 +6,7 @@ import { FormField } from './FormField';
 import classNames from 'classnames';
 
 interface InputFieldProps<T extends FieldValues> {
+  isLoading?: boolean;
   name: string;
   label: string;
   htmlFor: string;
@@ -20,6 +21,7 @@ interface InputFieldProps<T extends FieldValues> {
 }
 
 export function FormInputField<T extends FieldValues>({
+  isLoading,
   name,
   label,
   htmlFor,
@@ -37,6 +39,7 @@ export function FormInputField<T extends FieldValues>({
 
   return (
     <FormField
+      isLoading={isLoading}
       label={label}
       htmlFor={htmlFor}
       error={error}

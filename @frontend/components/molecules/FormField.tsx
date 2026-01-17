@@ -3,8 +3,10 @@
 import * as React from 'react';
 import { Label } from '@/components/atoms/label';
 import classNames from 'classnames';
+import { Skeleton } from '@/components/atoms';
 
 interface FormFieldProps {
+  isLoading?: boolean;
   label: string;
   htmlFor: string;
   required?: boolean;
@@ -15,6 +17,7 @@ interface FormFieldProps {
 }
 
 export function FormField({
+  isLoading,
   label,
   htmlFor,
   required = false,
@@ -23,7 +26,12 @@ export function FormField({
   className,
   description,
 }: FormFieldProps) {
-  return (
+  return isLoading ? (
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-16" />
+      <Skeleton className="h-10 w-full" />
+    </div>
+  ) : (
     <div className={classNames('grid grid-cols-[200px_1fr] items-start gap-4', className)}>
       <Label htmlFor={htmlFor} className="pt-2 text-sm font-medium">
         {label} {required && <span className="text-red-500">*</span>}

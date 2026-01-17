@@ -1,28 +1,30 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/atoms';
+import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/atoms';
 import {
   FormField,
-  FormSelectField,
+  FormFileField,
   FormInputField,
   FormScheduleTableField,
-  FormFileField,
+  FormSelectField,
 } from '@/components/molecules';
+import { useAlert } from '@/components/molecules/AlertContext';
+import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
+import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
+import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
+import { getFirstShowDate } from '@/lib/admin/show';
+import { createShow, getShow } from '@/lib/api/admin/show';
+import { stringToDate } from '@/lib/common/date';
+import dayjs from '@/plugins/dayjs';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Genre, Region } from '@shared/enums';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { z } from 'zod';
 import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
-import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
-import dayjs from '@/plugins/dayjs';
-import { DATE_FORMAT } from '@/constants/common/dateFormat';
-import { Genre, Region } from '@shared/enums';
-import { stringToDate } from '@/lib/common/date';
-import { getFirstShowDate } from '@/lib/admin/show';
-import { getShow } from '@/lib/api/admin/show';
-import { useQuery } from '@tanstack/react-query';
+import { z } from 'zod';
 
 interface Props {
   id?: string;
@@ -116,13 +118,14 @@ export type ShowFormData = z.infer<typeof showFormSchema>;
 
 export default function ShowUpsertForm(props: Props) {
   const router = useRouter();
+  const { confirm } = useAlert();
 
   const showId = Number(props.id) || -1;
   const isUpdate = !!showId && showId > 0;
   const flag = isUpdate ? '수정' : '등록';
 
-  const { data } = useQuery(getShow(showId));
-  console.log('detail', data);
+  const { data, isLoading } = useQuery(getShow(showId));
+  const createShowMutation = useMutation(createShow());
 
   // TODO: api 적용 예정
   const [venueOptions, setVenueOptions] = useState([
@@ -146,14 +149,6 @@ export default function ShowUpsertForm(props: Props) {
   }
 
   function getDefaultValues(): ShowFormData {
-    // TODO: 수정인 경우 API 데이터 설정
-    // if (isUpdate && showData) {
-    //   return {
-    //     ...showData,
-    //     schedules: showData.schedules.length > 0 ? showData.schedules : [createEmptySchedule()],
-    //   };
-    // }
-
     return {
       [SHOW_FORM_FIELDS.TITLE]: '',
       [SHOW_FORM_FIELDS.GENRE]: '',
@@ -175,6 +170,7 @@ export default function ShowUpsertForm(props: Props) {
     setValue,
     setError,
     clearErrors,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ShowFormData>({
     resolver: zodResolver(showFormSchema),
@@ -186,6 +182,43 @@ export default function ShowUpsertForm(props: Props) {
     control,
     name: SHOW_FORM_FIELDS.SCHEDULES,
   });
+
+  // 수정인 경우 데이터 로드 후 폼 초기화
+  useEffect(() => {
+    if (!isUpdate || !data) return;
+
+    const formSchedules =
+      data.schedules.length > 0
+        ? data.schedules.map((schedule: Show.Schedules) => ({
+            [SHOW_FORM_FIELDS.SHOW_DATE]: schedule.showDate,
+            [SHOW_FORM_FIELDS.SHOW_TIME]: schedule.showTime,
+            [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dayjs(schedule.ticketOpenTime).format(
+              DATE_FORMAT.FULL_NO_SEC,
+            ),
+          }))
+        : [createEmptySchedule()];
+
+    const formValues = {
+      [SHOW_FORM_FIELDS.TITLE]: data.title,
+      [SHOW_FORM_FIELDS.GENRE]: data.genre,
+      [SHOW_FORM_FIELDS.REGION]: data.region,
+      [SHOW_FORM_FIELDS.VENUE_NAME]: data.venueName,
+      [SHOW_FORM_FIELDS.HALL_NAME]: data.hallName,
+      [SHOW_FORM_FIELDS.RUNNING_TIME]: data.runningTime,
+      [SHOW_FORM_FIELDS.CAST]: data.cast,
+      [SHOW_FORM_FIELDS.START_DATE]: dayjs(data.saleStartDate).format(DATE_FORMAT.DATE_ONLY),
+      [SHOW_FORM_FIELDS.SCHEDULES]: formSchedules,
+    };
+
+    // Controller가 마운트된 후 reset 실행
+    requestAnimationFrame(() => {
+      reset(formValues, {
+        keepDefaultValues: false,
+        keepDirty: false,
+        keepErrors: false,
+      });
+    });
+  }, [isUpdate, data, reset]);
 
   // 일정 및 예매 시작일 변경 감지
   const [schedules, startDate] = useWatch({
@@ -311,10 +344,39 @@ export default function ShowUpsertForm(props: Props) {
     return true;
   }
 
-  // api request body 설정
+  // formData 생성
+  function createFormData(request: ShowUpsertType.ShowForm): FormData {
+    const formData = new FormData();
+
+    // data 필드를 JSON 문자열로 추가
+    formData.append('data', JSON.stringify(request));
+
+    // 포스터 파일 추가
+    if (posterFile) {
+      formData.append('poster', posterFile);
+    }
+
+    // 상세 이미지 파일들 추가
+    detailFiles.forEach((file) => {
+      formData.append('detailImages', file);
+    });
+
+    return formData;
+  }
+
+  // api request 설정
   async function onSubmit(formData: ShowFormData) {
     // 이미지 파일 유효성 검사
     if (!validateImageFiles()) return;
+
+    // 확인 모달
+    const confirmed = await confirm({
+      title: `공연 ${flag}`,
+      description: `${formData.title} 공연을 ${flag}하시겠습니까?`,
+      confirmText: flag,
+      cancelText: '취소',
+    });
+    if (!confirmed) return; // 취소하면 중단
 
     const {
       title,
@@ -329,46 +391,40 @@ export default function ShowUpsertForm(props: Props) {
       schedules,
     } = formData;
 
-    const requestBody = {
-      data: {
-        title,
-        genre: genre as Genre,
-        location: {
-          region: region as Region,
-          venueName,
-          hallName,
-        },
-        runningTime,
-        cast,
-        salePeriod: {
-          startDate: stringToDate(startDate),
-          endDate: stringToDate(endDate),
-        },
-        schedules: schedules.map((schedule) => ({
-          showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
-          showTime: schedule.showTime, // HH:mm -> string
-          ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
-        })),
+    const request: ShowUpsertType.ShowForm = {
+      title,
+      genre: genre as Genre,
+      location: {
+        region: region as Region,
+        venueName,
+        hallName,
       },
-      poster: posterFile,
-      detailImages: detailFiles,
+      runningTime,
+      cast,
+      salePeriod: {
+        startDate: stringToDate(startDate),
+        endDate: stringToDate(endDate),
+      },
+      schedules: schedules.map((schedule) => ({
+        showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
+        showTime: schedule.showTime, // HH:mm -> string
+        ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
+      })),
     };
 
-    console.log('요청 데이터:', requestBody);
-
-    // TODO: API 호출
-    // const formDataToSend = new FormData();
-    // formDataToSend.append('form', JSON.stringify(requestBody.form));
-    // formDataToSend.append('poster', requestBody.poster);
-    // requestBody.detailImages.forEach((file, index) => {
-    //   formDataToSend.append(`detailImages[${index}]`, file);
-    // });
-    //
+    // TODO: 수정인 경우
     // if (isUpdate) {
     //   await updateShow(props.id, formDataToSend);
     // } else {
     //   await createShow(formDataToSend);
     // }
+    const requestFormData = createFormData(request);
+    const response = await createShowMutation.mutateAsync(requestFormData);
+
+    // 등록 성공시 목록 화면으로 이동
+    if (response.success && response.data.showId > 0) {
+      router.push(ADMIN_ROUTES.SHOW);
+    }
   }
 
   return (
@@ -389,6 +445,7 @@ export default function ShowUpsertForm(props: Props) {
           <div className="space-y-6">
             {/* 1. 제목 */}
             <FormInputField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.TITLE}
               label="제목"
               htmlFor={SHOW_FORM_FIELDS.TITLE}
@@ -400,6 +457,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 2. 장르 */}
             <FormSelectField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.GENRE}
               label="장르"
               htmlFor={SHOW_FORM_FIELDS.GENRE}
@@ -412,6 +470,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 3. 지역 */}
             <FormSelectField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.REGION}
               label="지역"
               htmlFor={SHOW_FORM_FIELDS.REGION}
@@ -424,6 +483,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 4. 장소 */}
             <FormSelectField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.VENUE_NAME}
               label="장소"
               htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
@@ -437,6 +497,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 5. 공연장 */}
             <FormSelectField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.HALL_NAME}
               label="공연장"
               htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
@@ -450,6 +511,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 6. 관람시간 */}
             <FormInputField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.RUNNING_TIME}
               label="관람시간"
               htmlFor={SHOW_FORM_FIELDS.RUNNING_TIME}
@@ -461,6 +523,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 7. 출연진 */}
             <FormInputField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.CAST}
               label="출연진"
               htmlFor={SHOW_FORM_FIELDS.CAST}
@@ -472,6 +535,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 8. 일정(테이블) */}
             <FormField
+              isLoading={isLoading}
               label="일정"
               htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
               required={true}
@@ -488,6 +552,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 9. 예매 시작일 */}
             <FormInputField
+              isLoading={isLoading}
               name={SHOW_FORM_FIELDS.START_DATE}
               label="예매 시작일"
               htmlFor={SHOW_FORM_FIELDS.START_DATE}
@@ -502,6 +567,7 @@ export default function ShowUpsertForm(props: Props) {
 
             {/* 10. 메인 포스터 */}
             <FormFileField
+              isLoading={isLoading}
               label="메인 포스터"
               htmlFor="poster"
               required={true}
@@ -509,10 +575,12 @@ export default function ShowUpsertForm(props: Props) {
               maxSize={10}
               onFileChange={handlePosterChange}
               error={errors.root?.poster?.message}
+              previewImages={data?.posterUrl ? [data.posterUrl] : []}
             />
 
             {/* 11. 상세 이미지 */}
             <FormFileField
+              isLoading={isLoading}
               label="상세 이미지"
               htmlFor="detail-images"
               accept="image/*"
@@ -521,27 +589,37 @@ export default function ShowUpsertForm(props: Props) {
               maxSize={10}
               onFileChange={handleDetailImagesChange}
               error={errors.root?.details?.message}
+              previewImages={data?.detailImageUrls}
             />
 
             {/*footer*/}
             <div className="flex gap-4 border-t pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-12 flex-1 text-base"
-                onClick={router.back}
-              >
-                이전
-              </Button>
-              <Button
-                type="submit"
-                size="lg"
-                className="h-12 flex-1 text-base"
-                disabled={isSubmitting}
-              >
-                등록
-              </Button>
+              {isLoading ? (
+                <>
+                  <Skeleton className="h-12 flex-1" />
+                  <Skeleton className="h-12 flex-1" />
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-12 flex-1 text-base"
+                    onClick={router.back}
+                  >
+                    이전
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="h-12 flex-1 text-base"
+                    disabled={isSubmitting}
+                  >
+                    등록
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </form>

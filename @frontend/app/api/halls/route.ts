@@ -1,10 +1,10 @@
+import { BE_URL } from '@/constants/common/url';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     // 프로덕션 환경에서만 사용되므로 항상 실제 백엔드 API 호출
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
-    const response = await fetch(`${backendUrl}/api/admin/halls`, {
+    const response = await fetch(`${BE_URL}/api/admin/halls`, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -18,10 +18,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching halls:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch halls' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch halls' }, { status: 500 });
   }
 }
 
@@ -30,8 +27,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // 실제 백엔드 API 호출
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
-    const response = await fetch(`${backendUrl}/api/admin/halls`, {
+    const response = await fetch(`${BE_URL}/api/admin/halls`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,9 +43,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error('Error creating hall:', error);
-    return NextResponse.json(
-      { error: 'Failed to create hall' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create hall' }, { status: 500 });
   }
 }
