@@ -1,6 +1,8 @@
 import { axiosInstance } from '@/lib/api-client';
 import { UseMutationOptions } from '@tanstack/react-query';
 
+type ShowUpsert = { showId?: number; message?: string };
+
 const BASE_URL = '/api/v1/admin/shows' as const;
 
 // 공연 상세 조회
@@ -14,15 +16,23 @@ export const getShow = (id: number) => ({
 });
 
 // 공연 신규 등록
-type CreateResponse = { showId: number; message: string };
-export const createShow = (): UseMutationOptions<
-  Api.Response<CreateResponse>,
-  Error,
-  FormData
-> => ({
+export const createShow = (): UseMutationOptions<Api.Response<ShowUpsert>, Error, FormData> => ({
   mutationKey: ['admin', 'show', 'create'],
   mutationFn: async (requestBody: FormData) => {
     const response = await axiosInstance.post(BASE_URL, requestBody, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response?.data;
+  },
+});
+
+// 공연 수정
+export const updateShow = (
+  id: number,
+): UseMutationOptions<Api.Response<ShowUpsert>, Error, FormData> => ({
+  mutationKey: ['admin', 'show', 'update', id],
+  mutationFn: async (requestBody: FormData) => {
+    const response = await axiosInstance.patch(`${BASE_URL}/${id}`, requestBody, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response?.data;

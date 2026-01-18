@@ -1,7 +1,7 @@
 namespace Api {
   interface Response<T> {
     success: boolean;
-    data: T;
+    data: T | null;
     message: string;
   }
 }

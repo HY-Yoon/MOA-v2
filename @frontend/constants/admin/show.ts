@@ -11,6 +11,7 @@ export const SHOW_FORM_FIELDS = {
   START_DATE: 'startDate', // 예매 시작일
   END_DATE: 'endDate', // 예매 종료일
   SCHEDULES: 'schedules', // 공연 일정
+  SCHEDULE_ID: 'scheduleId', // 공연 일정 아이디
   SHOW_DATE: 'showDate', // 공연일
   SHOW_TIME: 'showTime', // 공연 시간
   TICKET_OPEN_TIME: 'ticketOpenTime', // 티켓 오픈 시간
