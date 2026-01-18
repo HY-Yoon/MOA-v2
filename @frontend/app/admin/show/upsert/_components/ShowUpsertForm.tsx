@@ -145,6 +145,7 @@ export default function ShowUpsertForm(props: Props) {
       [SHOW_FORM_FIELDS.SHOW_DATE]: '',
       [SHOW_FORM_FIELDS.SHOW_TIME]: '',
       [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: '',
+      [SHOW_FORM_FIELDS.RESERVATION_COUNT]: 0,
     };
   }
 
@@ -195,6 +196,7 @@ export default function ShowUpsertForm(props: Props) {
             [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dayjs(schedule.ticketOpenTime).format(
               DATE_FORMAT.FULL_NO_SEC,
             ),
+            [SHOW_FORM_FIELDS.RESERVATION_COUNT]: schedule.reservationCount,
           }))
         : [createEmptySchedule()];
 
@@ -540,6 +542,7 @@ export default function ShowUpsertForm(props: Props) {
               htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
               required={true}
               error={errors?.schedules?.message}
+              description={isUpdate ? '예매된 좌석이 있는 일정은 수정 및 삭제할 수 없습니다.' : ''}
             >
               <FormScheduleTableField<ShowFormData>
                 fields={fields}
