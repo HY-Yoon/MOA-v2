@@ -304,24 +304,24 @@ export default function ShowUpsertForm(props: Props) {
   }, [schedules, setValue]);
 
   // 메인 포스터 파일 변경 핸들러
-  const handlePosterChange = (files: File[]) => {
+  function handlePosterChange(files: File[]) {
     setPosterFile(files.length > 0 ? files[0] : null);
 
     // 파일이 첨부되면 에러 메시지 제거
     if (files.length > 0) {
       clearErrors('root.poster');
     }
-  };
+  }
 
   // 상세 이미지 파일 변경 핸들러
-  const handleDetailImagesChange = (files: File[]) => {
+  function handleDetailImagesChange(files: File[]) {
     setDetailFiles(files);
 
     // 파일이 첨부되면 에러 메시지 제거
     if (files.length > 0) {
       clearErrors('root.details');
     }
-  };
+  }
 
   // 이미지 파일 유효성 검사
   function validateImageFiles(): boolean {

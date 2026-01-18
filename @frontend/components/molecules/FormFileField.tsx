@@ -44,26 +44,19 @@ export function FormFileField({
     onFileChangeRef.current = onFileChange;
   }, [onFileChange]);
 
-  // previewImages 절대 경로 변환
-  const absoluteImageUrls = useMemo(() => {
-    if (!previewImages) return [];
-    return getAbsoluteImageUrls(previewImages);
-  }, [previewImages]);
-
-  // 수정 화면인 경우 previewImages prop previews 상태 업데이트
   useEffect(() => {
     // 사용자가 새 파일을 첨부한 경우 previewImages 무시
     if (files.length > 0) return;
 
-    // absoluteImageUrls가 변경되었을 때만 업데이트
+    // previewImages를 그대로 사용
     setPreviews((prevPreviews) => {
-      const currentUrls = JSON.stringify(absoluteImageUrls);
+      const images = [previewImages || []].flat();
+      const currentUrls = JSON.stringify(images);
       const previousUrls = JSON.stringify(prevPreviews);
 
-      // 값이 같으면 이전 상태 반환 (불필요한 리렌더링 방지)
-      return currentUrls === previousUrls ? prevPreviews : absoluteImageUrls;
+      return currentUrls === previousUrls ? prevPreviews : images;
     });
-  }, [absoluteImageUrls, files.length]);
+  }, [previewImages, files.length]);
 
   // 파일이 변경될 때 부모에게 알림
   useEffect(() => {
