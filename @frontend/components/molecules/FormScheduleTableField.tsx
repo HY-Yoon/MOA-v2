@@ -17,10 +17,13 @@ import classNames from 'classnames';
 import { Plus } from 'lucide-react';
 
 interface Props<T extends FieldValues> {
-  fields: (FieldArrayWithId<T, ArrayPath<T>, 'id'> & { reservationCount?: number })[];
+  fields: (FieldArrayWithId<T, ArrayPath<T>, 'id'> & {
+    scheduleId?: number;
+    reservationCount?: number;
+  })[];
   register: UseFormRegister<T>;
-  scheduleErrors?: FieldErrors<ShowUpsertType.Schedule[]>;
-  removeSchedule: (index: number) => void;
+  scheduleErrors?: FieldErrors<ShowUpsert.Schedule[]>;
+  removeSchedule: (index: number, id?: number) => void;
   addSchedule: () => void;
 }
 
@@ -49,7 +52,6 @@ const SCHEDULE_FIELDS: ScheduleFieldConfig[] = [
     fieldName: SHOW_FORM_FIELDS.TICKET_OPEN_TIME,
     header: '티켓 오픈일',
     inputType: 'datetime-local',
-    min: dayjs().format(DATE_FORMAT.FULL_NO_SEC),
   },
 ];
 
@@ -69,7 +71,7 @@ export function FormScheduleTableField<T extends FieldValues>({
 
   function renderScheduleCell(fieldConfig: ScheduleFieldConfig, index: number) {
     const fieldPath = `${SHOW_FORM_FIELDS.SCHEDULES}.${index}.${fieldConfig.fieldName}` as Path<T>;
-    const error = scheduleErrors?.[index]?.[fieldConfig.fieldName as keyof ShowUpsertType.Schedule];
+    const error = scheduleErrors?.[index]?.[fieldConfig.fieldName as keyof ShowUpsert.Schedule];
 
     return (
       <td key={fieldConfig.fieldName} className={CELL_CLASSNAME}>
@@ -127,7 +129,7 @@ export function FormScheduleTableField<T extends FieldValues>({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => removeSchedule(index)}
+                  onClick={() => removeSchedule(index, field?.scheduleId)}
                   disabled={fields.length === 1 || isReservedSchedule(index)}
                 >
                   X

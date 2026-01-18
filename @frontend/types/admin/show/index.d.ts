@@ -1,6 +1,8 @@
 namespace Show {
   type Genre = import('@shared/enums').Genre;
   type Region = import('@shared/enums').Region;
+  type ShowStatus = import('@shared/enums').ShowStatus;
+  type SaleStatus = import('@shared/enums').SaleStatus;
 
   // 공연 목록
   // interface List {
@@ -42,8 +44,8 @@ namespace Show {
     posterUrl: string;
     detailImageUrls: string[];
     cast: string;
-    status: string;
-    saleStatus: string;
+    status: ShowStatus;
+    saleStatus: SaleStatus;
     saleStartDate: string;
     saleEndDate: string;
     schedules: Schedules[];

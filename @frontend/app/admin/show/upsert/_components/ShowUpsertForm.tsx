@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/atoms';
+import { Badge } from '@/components/atoms/badge';
 import {
   FormField,
   FormFileField,
@@ -10,15 +11,20 @@ import {
 } from '@/components/molecules';
 import { useAlert } from '@/components/molecules/AlertContext';
 import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
-import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
+import {
+  GENRE_OPTIONS,
+  REGION_OPTIONS,
+  SHOW_STATUS_COLORS,
+  SHOW_STATUS_LABELS,
+} from '@/constants/common';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { getFirstShowDate } from '@/lib/admin/show';
-import { createShow, getShow } from '@/lib/api/admin/show';
+import { createShow, getShow, updateShow } from '@/lib/api/admin/show';
 import { stringToDate } from '@/lib/common/date';
 import dayjs from '@/plugins/dayjs';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Genre, Region } from '@shared/enums';
+import { Genre, Region, ShowStatus } from '@shared/enums';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -49,6 +55,7 @@ const scheduleSchema = z
     [SHOW_FORM_FIELDS.SHOW_DATE]: dateTimeSchema('공연일'),
     [SHOW_FORM_FIELDS.SHOW_TIME]: timeSchema('공연 시간'),
     [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dateTimeSchema('티켓 오픈일'),
+    [SHOW_FORM_FIELDS.SCHEDULE_ID]: z.number().optional(),
   })
   .refine(
     (s) => {
@@ -126,6 +133,7 @@ export default function ShowUpsertForm(props: Props) {
 
   const { data, isLoading } = useQuery(getShow(showId));
   const createShowMutation = useMutation(createShow());
+  const updateShowMutation = useMutation(updateShow(showId));
 
   // TODO: api 적용 예정
   const [venueOptions, setVenueOptions] = useState([
@@ -139,6 +147,7 @@ export default function ShowUpsertForm(props: Props) {
   ]);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [detailFiles, setDetailFiles] = useState<File[]>([]);
+  const [deletedScheduleIds, setDeletedScheduleIds] = useState<number[]>([]);
 
   function createEmptySchedule() {
     return {
@@ -191,6 +200,7 @@ export default function ShowUpsertForm(props: Props) {
     const formSchedules =
       data.schedules.length > 0
         ? data.schedules.map((schedule: Show.Schedules) => ({
+            [SHOW_FORM_FIELDS.SCHEDULE_ID]: schedule.scheduleId,
             [SHOW_FORM_FIELDS.SHOW_DATE]: schedule.showDate,
             [SHOW_FORM_FIELDS.SHOW_TIME]: schedule.showTime,
             [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dayjs(schedule.ticketOpenTime).format(
@@ -221,6 +231,21 @@ export default function ShowUpsertForm(props: Props) {
       });
     });
   }, [isUpdate, data, reset]);
+
+  // 수정일 때 상태 체크
+  // - WAITING: 모든 필드 수정 가능
+  // - ON_SALE 이후
+  //  1. 장르, 장소, 예매 시작일 수정 불가
+  //  1. 일정: 해당 회차 예매된 좌석 있는 경우 수정 불가
+  const isDisabledEdit = useMemo(() => {
+    // 생성인 경우 모두 수정 가능
+    if (!isUpdate) return false;
+
+    // 수정인 경우 데이터 불러오는 중인 경우 대기
+    if (!data) return true;
+
+    return data.status !== 'WAITING';
+  }, [isUpdate, data?.status]);
 
   // 일정 및 예매 시작일 변경 감지
   const [schedules, startDate] = useWatch({
@@ -323,16 +348,27 @@ export default function ShowUpsertForm(props: Props) {
     }
   }
 
+  // 공연 일정 삭제 핸들러
+  function handleScheduleRemove(index: number, id?: number) {
+    // 수정인 경우 request용 id 별도 저장
+    if (isUpdate && id) {
+      setDeletedScheduleIds((ids) => [...ids, id]);
+    }
+
+    // 폼 배열 데이터 삭제
+    remove(index);
+  }
+
   // 이미지 파일 유효성 검사
   function validateImageFiles(): boolean {
     const errors: Array<{ field: string; message: string }> = [];
 
     // 메인 포스터
-    if (!posterFile) {
+    if (!isUpdate && !posterFile) {
       errors.push({ field: 'poster', message: '메인 포스터를 첨부하세요.' });
     }
     // 상세 이미지
-    if (detailFiles.length === 0) {
+    if (!isUpdate && detailFiles.length === 0) {
       errors.push({ field: 'details', message: '상세 이미지를 하나 이상 첨부하세요.' });
     }
 
@@ -346,8 +382,47 @@ export default function ShowUpsertForm(props: Props) {
     return true;
   }
 
+  // create request
+  function createRequestForm(form: ShowFormData): ShowUpsert.CreateForm | ShowUpsert.UpdateForm {
+    const {
+      title,
+      genre,
+      region,
+      venueName,
+      hallName,
+      runningTime,
+      cast,
+      startDate,
+      endDate,
+      schedules,
+    } = form;
+
+    return {
+      title,
+      genre: genre as Genre,
+      location: {
+        region: region as Region,
+        venueName,
+        hallName,
+      },
+      runningTime,
+      cast,
+      salePeriod: {
+        startDate: stringToDate(startDate),
+        endDate: stringToDate(endDate),
+      },
+      schedules: schedules.map((schedule) => ({
+        showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
+        showTime: schedule.showTime, // HH:mm -> string
+        ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
+        ...(isUpdate && { scheduleId: schedule.scheduleId }), // 수정이면 공연 일정 아이디 추가
+      })),
+      ...(isUpdate && { deletedScheduleIds }), // 수정이면 공연 일정 삭제 아이디 추가
+    };
+  }
+
   // formData 생성
-  function createFormData(request: ShowUpsertType.ShowForm): FormData {
+  function createFormData(request: ShowUpsert.CreateForm): FormData {
     const formData = new FormData();
 
     // data 필드를 JSON 문자열로 추가
@@ -368,6 +443,7 @@ export default function ShowUpsertForm(props: Props) {
 
   // api request 설정
   async function onSubmit(formData: ShowFormData) {
+    // FIXME: 수정일 때 파일 삭제 로직 필요
     // 이미지 파일 유효성 검사
     if (!validateImageFiles()) return;
 
@@ -380,51 +456,17 @@ export default function ShowUpsertForm(props: Props) {
     });
     if (!confirmed) return; // 취소하면 중단
 
-    const {
-      title,
-      genre,
-      region,
-      venueName,
-      hallName,
-      runningTime,
-      cast,
-      startDate,
-      endDate,
-      schedules,
-    } = formData;
-
-    const request: ShowUpsertType.ShowForm = {
-      title,
-      genre: genre as Genre,
-      location: {
-        region: region as Region,
-        venueName,
-        hallName,
-      },
-      runningTime,
-      cast,
-      salePeriod: {
-        startDate: stringToDate(startDate),
-        endDate: stringToDate(endDate),
-      },
-      schedules: schedules.map((schedule) => ({
-        showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
-        showTime: schedule.showTime, // HH:mm -> string
-        ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
-      })),
-    };
-
-    // TODO: 수정인 경우
-    // if (isUpdate) {
-    //   await updateShow(props.id, formDataToSend);
-    // } else {
-    //   await createShow(formDataToSend);
-    // }
+    // request body
+    const request = createRequestForm(formData);
     const requestFormData = createFormData(request);
-    const response = await createShowMutation.mutateAsync(requestFormData);
 
-    // 등록 성공시 목록 화면으로 이동
-    if (response.success && response.data.showId > 0) {
+    // api
+    const response = isUpdate
+      ? await updateShowMutation.mutateAsync(requestFormData)
+      : await createShowMutation.mutateAsync(requestFormData);
+
+    // 성공시 목록 화면으로 이동
+    if (response.success && response?.data?.showId && response.data.showId > 0) {
       router.push(ADMIN_ROUTES.SHOW);
     }
   }
@@ -443,8 +485,21 @@ export default function ShowUpsertForm(props: Props) {
 
       {/*content*/}
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit, (errors) => console.log('통과안됨', errors))}>
+        <form
+          onSubmit={handleSubmit(onSubmit, (errors) => console.warn('유효성 검사 실패', errors))}
+        >
           <div className="space-y-6">
+            {
+              /* 0. 공연 상태 (수정화면에서만) */
+              isUpdate && (
+                <FormField isLoading={isLoading} label="상태" htmlFor="status">
+                  <Badge className={SHOW_STATUS_COLORS[data?.status as ShowStatus]}>
+                    {SHOW_STATUS_LABELS[data?.status as ShowStatus]}
+                  </Badge>
+                </FormField>
+              )
+            }
+
             {/* 1. 제목 */}
             <FormInputField
               isLoading={isLoading}
@@ -468,6 +523,7 @@ export default function ShowUpsertForm(props: Props) {
               options={GENRE_OPTIONS}
               placeholder="장르를 선택하세요."
               required={true}
+              disabled={isDisabledEdit}
             />
 
             {/* 3. 지역 */}
@@ -481,6 +537,7 @@ export default function ShowUpsertForm(props: Props) {
               options={REGION_OPTIONS}
               placeholder="지역을 선택하세요."
               required={true}
+              disabled={isDisabledEdit}
             />
 
             {/* 4. 장소 */}
@@ -495,6 +552,7 @@ export default function ShowUpsertForm(props: Props) {
               placeholder="장소를 선택하세요."
               required={true}
               className="xl:col-span-1"
+              disabled={isDisabledEdit}
             />
 
             {/* 5. 공연장 */}
@@ -509,6 +567,7 @@ export default function ShowUpsertForm(props: Props) {
               placeholder="공연장을 선택하세요."
               required={true}
               className="xl:col-span-1"
+              disabled={isDisabledEdit}
             />
 
             {/* 6. 관람시간 */}
@@ -547,8 +606,8 @@ export default function ShowUpsertForm(props: Props) {
               <FormScheduleTableField<ShowFormData>
                 fields={fields}
                 register={register}
-                scheduleErrors={errors?.schedules as FieldErrors<ShowUpsertType.Schedule[]>}
-                removeSchedule={remove}
+                scheduleErrors={errors?.schedules as FieldErrors<ShowUpsert.Schedule[]>}
+                removeSchedule={handleScheduleRemove}
                 addSchedule={() => append(createEmptySchedule())}
               />
             </FormField>
@@ -560,12 +619,12 @@ export default function ShowUpsertForm(props: Props) {
               label="예매 시작일"
               htmlFor={SHOW_FORM_FIELDS.START_DATE}
               type="date"
-              min={dayjs().format(DATE_FORMAT.DATE_ONLY)}
               register={register}
               errors={errors}
               placeholder="예매 시작일을 입력하세요."
               required={true}
               description="예매 종료일은 마지막 공연일로 자동 설정됩니다."
+              disabled={isDisabledEdit}
             />
 
             {/* 10. 메인 포스터 */}
@@ -619,7 +678,7 @@ export default function ShowUpsertForm(props: Props) {
                     className="h-12 flex-1 text-base"
                     disabled={isSubmitting}
                   >
-                    등록
+                    {flag}
                   </Button>
                 </>
               )}

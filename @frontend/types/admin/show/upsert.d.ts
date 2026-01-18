@@ -1,4 +1,4 @@
-namespace ShowUpsertType {
+namespace ShowUpsert {
   interface Location {
     region: import('@shared/enums').Region;
     venueName: string;
@@ -6,12 +6,13 @@ namespace ShowUpsertType {
   }
 
   interface Schedule {
+    scheduleId?: number;
     showDate: Date;
     showTime: string;
     ticketOpenTime: Date;
   }
 
-  interface ShowForm {
+  interface CreateForm {
     title: string;
     genre: import('@shared/enums').Genre;
     location: Location;
@@ -23,4 +24,6 @@ namespace ShowUpsertType {
     };
     schedules: Schedule[];
   }
+
+  type UpdateForm = CreateForm & { deletedScheduleIds: string[] };
 }
