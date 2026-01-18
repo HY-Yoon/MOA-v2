@@ -1,8 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/atoms";
 import { useRouter } from 'next/navigation';
 import { ReactNode, Children, isValidElement, cloneElement } from 'react';
 

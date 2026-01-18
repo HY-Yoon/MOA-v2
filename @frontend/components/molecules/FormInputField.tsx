@@ -18,6 +18,7 @@ interface InputFieldProps<T extends FieldValues> {
   className?: string;
   min?: string;
   description?: string;
+  disabled?: boolean;
 }
 
 export function FormInputField<T extends FieldValues>({
@@ -33,6 +34,7 @@ export function FormInputField<T extends FieldValues>({
   className,
   min,
   description,
+  disabled = false,
 }: InputFieldProps<T>) {
   const error = errors?.[name as keyof typeof errors]?.message as string | undefined;
   const hasError = !!error;
@@ -54,6 +56,7 @@ export function FormInputField<T extends FieldValues>({
         className={classNames({ 'border-red-500': hasError, 'w-64': type === 'date' })}
         placeholder={placeholder}
         min={min}
+        disabled={disabled}
       />
     </FormField>
   );
