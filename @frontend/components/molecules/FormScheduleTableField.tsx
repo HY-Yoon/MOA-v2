@@ -17,7 +17,7 @@ import classNames from 'classnames';
 import { Plus } from 'lucide-react';
 
 interface Props<T extends FieldValues> {
-  fields: FieldArrayWithId<T, ArrayPath<T>, 'id'>[];
+  fields: (FieldArrayWithId<T, ArrayPath<T>, 'id'> & { reservationCount?: number })[];
   register: UseFormRegister<T>;
   scheduleErrors?: FieldErrors<ShowUpsertType.Schedule[]>;
   removeSchedule: (index: number) => void;
@@ -62,6 +62,11 @@ export function FormScheduleTableField<T extends FieldValues>({
   removeSchedule,
   addSchedule,
 }: Props<T>) {
+  function isReservedSchedule(index: number) {
+    const reserved = fields[index].reservationCount || 0;
+    return reserved > 0;
+  }
+
   function renderScheduleCell(fieldConfig: ScheduleFieldConfig, index: number) {
     const fieldPath = `${SHOW_FORM_FIELDS.SCHEDULES}.${index}.${fieldConfig.fieldName}` as Path<T>;
     const error = scheduleErrors?.[index]?.[fieldConfig.fieldName as keyof ShowUpsertType.Schedule];
@@ -74,6 +79,7 @@ export function FormScheduleTableField<T extends FieldValues>({
           min={fieldConfig.min}
           {...register(fieldPath)}
           className={error ? 'border-red-500' : ''}
+          disabled={isReservedSchedule(index)}
         />
         {error && <p className="mt-1 text-xs text-red-500">{error.message}</p>}
       </td>
@@ -122,7 +128,7 @@ export function FormScheduleTableField<T extends FieldValues>({
                   variant="ghost"
                   size="icon"
                   onClick={() => removeSchedule(index)}
-                  disabled={fields.length === 1}
+                  disabled={fields.length === 1 || isReservedSchedule(index)}
                 >
                   X
                 </Button>

@@ -14,6 +14,7 @@ export const SHOW_FORM_FIELDS = {
   SHOW_DATE: 'showDate', // 공연일
   SHOW_TIME: 'showTime', // 공연 시간
   TICKET_OPEN_TIME: 'ticketOpenTime', // 티켓 오픈 시간
+  RESERVATION_COUNT: 'reservationCount', // 예매된 좌석수
 } as const;
 
 export const ERROR_MESSAGES = {
