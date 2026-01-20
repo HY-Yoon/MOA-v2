@@ -7,9 +7,9 @@ namespace ShowUpsert {
 
   interface Schedule {
     scheduleId?: number;
-    showDate: Date;
-    showTime: string;
-    ticketOpenTime: Date;
+    showDate: string; // YYYY-MM-DD
+    showTime: string; // HH:mm
+    ticketOpenTime: string; // YYYY-MM-DDTHH:mm
   }
 
   interface CreateForm {
@@ -19,8 +19,8 @@ namespace ShowUpsert {
     runningTime: string;
     cast: string;
     salePeriod: {
-      startDate: Date;
-      endDate: Date;
+      startDate: string; // YYYY-MM-DD
+      endDate: string; // YYYY-MM-DD
     };
     schedules: Schedule[];
   }
