@@ -148,6 +148,7 @@ export default function ShowUpsertForm(props: Props) {
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [detailFiles, setDetailFiles] = useState<File[]>([]);
   const [deletedScheduleIds, setDeletedScheduleIds] = useState<number[]>([]);
+  const [deletedDetailImageIds, setDeletedDetailImageIds] = useState<number[]>([]);
 
   function createEmptySchedule() {
     return {
@@ -337,8 +338,9 @@ export default function ShowUpsertForm(props: Props) {
   }
 
   // 상세 이미지 파일 변경 핸들러
-  function handleDetailImagesChange(files: File[]) {
+  function handleDetailImagesChange(files: File[], deletedIds: number[]) {
     setDetailFiles(files);
+    setDeletedDetailImageIds(deletedIds);
 
     // 파일이 첨부되면 에러 메시지 제거
     if (files.length > 0) {
@@ -415,7 +417,7 @@ export default function ShowUpsertForm(props: Props) {
         ticketOpenTime: stringToDate(schedule.ticketOpenTime),
         ...(isUpdate && { scheduleId: schedule.scheduleId }), // 수정이면 공연 일정 아이디 추가
       })),
-      ...(isUpdate && { deletedScheduleIds }), // 수정이면 공연 일정 삭제 아이디 추가
+      ...(isUpdate && { deletedScheduleIds, deletedDetailImageIds }), // 수정이면 공연 일정, 상세 이미지 삭제 아이디 추가
     };
   }
 
@@ -457,6 +459,8 @@ export default function ShowUpsertForm(props: Props) {
     // request body
     const request = createRequestForm(formData);
     const requestFormData = createFormData(request);
+
+    console.log('request', request);
 
     // api
     const response = isUpdate
@@ -631,11 +635,10 @@ export default function ShowUpsertForm(props: Props) {
               label="메인 포스터"
               htmlFor="poster"
               required={true}
-              accept="image/*"
               maxSize={10}
               onFileChange={handlePosterChange}
               error={errors.root?.poster?.message}
-              previewImages={data?.posterUrl ? [data.posterUrl] : []}
+              previewImages={data?.posterUrl || undefined}
             />
 
             {/* 11. 상세 이미지 */}
@@ -643,13 +646,12 @@ export default function ShowUpsertForm(props: Props) {
               isLoading={isLoading}
               label="상세 이미지"
               htmlFor="detail-images"
-              accept="image/*"
               required={true}
               multiple={true}
               maxSize={10}
               onFileChange={handleDetailImagesChange}
               error={errors.root?.details?.message}
-              previewImages={data?.detailImageUrls}
+              previewImages={data?.detailImages || []}
             />
 
             {/*footer*/}

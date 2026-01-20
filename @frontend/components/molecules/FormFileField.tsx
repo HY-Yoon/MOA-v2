@@ -2,10 +2,16 @@
 
 import { Button } from '@/components/atoms';
 import { Upload, X } from 'lucide-react';
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { FormField } from './FormField';
-import { getAbsoluteImageUrls } from '@/lib/common/image-url';
+
+// 다중 파일 수정 타입 (ex. 상세 이미지)
+type MultipleUpdate = { id: number; url: string };
+// 파일 아이템 타입 (새 파일 또는 기존 URL)
+export type FileItem =
+  | { type: 'file'; file: File; preview: string }
+  | ({ type: 'url' } & MultipleUpdate);
 
 interface FormFileFieldProps {
   isLoading?: boolean;
@@ -17,8 +23,9 @@ interface FormFileFieldProps {
   multiple?: boolean;
   maxSize?: number; // MB
   description?: string;
-  onFileChange: (files: File[]) => void;
-  previewImages?: string[] | string; // 단일 문자열 또는 배열
+  onFileChange: (newFiles: File[], deletedIds: number[]) => void;
+  // 단일 string, 다중 생성 string[], 다중 수정 MultipleUpdate[]
+  previewImages?: string | string[] | MultipleUpdate[];
 }
 
 export function FormFileField({
@@ -27,82 +34,117 @@ export function FormFileField({
   htmlFor,
   required = false,
   error,
-  accept = 'image/*',
   multiple = false,
   maxSize = 10,
   description,
   onFileChange,
   previewImages = [],
 }: FormFileFieldProps) {
+  const FILE_TYPE = { FILE: 'file', URL: 'url' } as const;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
   const onFileChangeRef = useRef(onFileChange);
+
+  const [fileItems, setFileItems] = useState<FileItem[]>([]);
+  const [deletedIds, setDeletedIds] = useState<number[]>([]);
 
   // 최신 onFileChange 함수 참조 유지
   useEffect(() => {
     onFileChangeRef.current = onFileChange;
   }, [onFileChange]);
 
+  // previewImages 초기화
   useEffect(() => {
-    // 사용자가 새 파일을 첨부한 경우 previewImages 무시
-    if (files.length > 0) return;
+    if (!previewImages) return;
 
-    // previewImages를 그대로 사용
-    setPreviews((prevPreviews) => {
-      const images = [previewImages || []].flat();
-      const currentUrls = JSON.stringify(images);
-      const previousUrls = JSON.stringify(prevPreviews);
+    // 1. {string} 단일 생성/수정 (포스터)
+    if (typeof previewImages === 'string') {
+      setFileItems([
+        {
+          type: FILE_TYPE.URL,
+          id: 0, // ID 없는 경우 0으로 표시
+          url: previewImages,
+        },
+      ]);
+    } else if (Array.isArray(previewImages)) {
+      // 배열인 경우 (상세 이미지)
+      const urlItems: FileItem[] = previewImages.map((img) => {
+        const isStringType = typeof img === 'string';
+        // 2. {string[]} 다중 생성 / {MultipleUpdate[]} 다중 수정
+        return {
+          type: FILE_TYPE.URL,
+          id: isStringType ? 0 : img.id,
+          url: isStringType ? img : img.url,
+        };
+      });
+      setFileItems(urlItems);
+    }
+  }, [previewImages]);
 
-      return currentUrls === previousUrls ? prevPreviews : images;
-    });
-  }, [previewImages, files.length]);
+  const isFileItem = (item: FileItem): item is Extract<FileItem, { type: 'file' }> =>
+    item.type === FILE_TYPE.FILE;
+  const isUrlItem = (item: FileItem): item is Extract<FileItem, { type: 'url' }> =>
+    item.type === FILE_TYPE.URL;
 
-  // 파일이 변경될 때 부모에게 알림
+  // 파일 삭제 ID 변경 시 부모에게 알림
   useEffect(() => {
-    onFileChangeRef.current(files);
-  }, [files]);
+    const newFiles = fileItems.filter(isFileItem).map((item) => item.file);
+
+    onFileChangeRef.current(newFiles, deletedIds);
+  }, [fileItems, deletedIds]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
-    if (selectedFiles && selectedFiles.length > 0) {
-      const fileArray = Array.from(selectedFiles);
+    if (!selectedFiles || selectedFiles.length === 0) return;
 
-      // 파일 크기 검증
-      const invalidFiles: string[] = [];
-      fileArray.forEach((file) => {
-        if (file.size > maxSize * 1024 * 1024) {
-          invalidFiles.push(file.name);
-        }
-      });
+    const fileArray = Array.from(selectedFiles);
 
-      if (invalidFiles.length > 0) {
-        alert(`파일 크기가 ${maxSize}MB를 초과합니다: ${invalidFiles.join(', ')}`);
-        return;
+    // 파일 크기 검증
+    const invalidFiles: string[] = [];
+    fileArray.forEach((file) => {
+      if (file.size > maxSize * 1024 * 1024) {
+        invalidFiles.push(file.name);
       }
+    });
 
-      if (multiple) {
-        // 다중 파일: 기존 파일에 추가
-        setFiles((prev) => [...prev, ...fileArray]);
-        fileArray.forEach((file) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setPreviews((prev) => [...prev, reader.result as string]);
-          };
-          reader.readAsDataURL(file);
-        });
-      } else {
-        // 단일 파일: 교체
-        setFiles([fileArray[0]]);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPreviews([reader.result as string]);
-        };
-        reader.readAsDataURL(fileArray[0]);
-      }
+    if (invalidFiles.length > 0) {
+      alert(`파일 크기가 ${maxSize}MB를 초과합니다: ${invalidFiles.join(', ')}`);
+      return;
     }
 
-    // 같은 파일을 다시 선택할 수 있도록 input 초기화
+    // 단일 파일: 기존 URL 삭제 처리
+    if (!multiple) {
+      setFileItems((prev) => {
+        const urlItem = prev.find(isUrlItem);
+        if (urlItem && urlItem.id > 0) {
+          setDeletedIds((ids) => [...ids, urlItem.id]);
+        }
+        return [];
+      });
+    }
+
+    // FileReader로 미리보기 생성
+    fileArray.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newItem: FileItem = {
+          type: 'file',
+          file,
+          preview: reader.result as string,
+        };
+
+        if (multiple) {
+          // 다중 파일: 추가
+          setFileItems((prev) => [...prev, newItem]);
+        } else {
+          // 단일 파일: 교체
+          setFileItems([newItem]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // input 초기화
     if (e.target) {
       e.target.value = '';
     }
@@ -113,9 +155,18 @@ export function FormFileField({
   };
 
   const handleRemove = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
+    const item = fileItems[index];
+
+    // URL 타입이고 ID가 있으면 삭제 목록에 추가
+    if (item.type === 'url' && item.id > 0) {
+      setDeletedIds((prev) => [...prev, item.id]);
+    }
+
+    setFileItems((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // 미리보기 URL 추출
+  const previews = fileItems.map((item) => (item.type === 'file' ? item.preview : item.url));
 
   return (
     <FormField
@@ -194,7 +245,7 @@ export function FormFileField({
                 ref={fileInputRef}
                 id={htmlFor}
                 type="file"
-                accept={accept}
+                accept="image/*"
                 multiple={multiple}
                 onChange={handleFileChange}
                 className="hidden"
@@ -207,7 +258,7 @@ export function FormFileField({
             ref={fileInputRef}
             id={`${htmlFor}-hidden`}
             type="file"
-            accept={accept}
+            accept="image/*"
             multiple={multiple}
             onChange={handleFileChange}
             className="hidden"
