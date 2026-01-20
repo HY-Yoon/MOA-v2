@@ -1,17 +1,17 @@
 package com.moa2.domain.show.entity;
 
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.SeatStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "seats")
-public class Seat {
+public class Seat extends BaseTimeEntity {
     
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,9 +29,6 @@ public class Seat {
     
     @Enumerated(EnumType.STRING)
     private SeatStatus status; // AVAILABLE, LOCKED, RESERVED, SOLD
-    
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
 
 

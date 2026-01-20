@@ -1,5 +1,6 @@
 package com.moa2.api.admin.seatmap.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +17,7 @@ public class SeatMapListResponse {
     private String region; // Region enum의 name() 값 (SEOUL, GYEONGGI 등)
     private String venueName;
     private String hallName;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

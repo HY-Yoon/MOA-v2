@@ -44,8 +44,8 @@ public class ShowDetailResponse {
     @Schema(description = "포스터 이미지 URL", example = "/images/posters/show1.jpg")
     private String posterUrl;
 
-    @Schema(description = "상세 이미지 URL 배열", example = "[\"/images/details/show1-1.jpg\", \"/images/details/show1-2.jpg\"]")
-    private String[] detailImageUrls;
+    @Schema(description = "상세 이미지 목록 (ID와 URL 포함)")
+    private List<DetailImageInfo> detailImages;
 
     @Schema(description = "출연진 정보", example = "김철수, 이영희, 박민수")
     private String cast;
@@ -57,10 +57,10 @@ public class ShowDetailResponse {
     @Schema(description = "판매 상태", example = "ALLOWED", allowableValues = { "ALLOWED", "NOT_ALLOWED" })
     private String saleStatus;
 
-    @Schema(description = "판매 시작일시", example = "2024-01-01T00:00:00")
+    @Schema(description = "판매 시작일시", example = "2026-01-01T00:00:00")
     private LocalDateTime saleStartDate;
 
-    @Schema(description = "판매 종료일시", example = "2024-01-31T23:59:59")
+    @Schema(description = "판매 종료일시", example = "2026-01-31T23:59:59")
     private LocalDateTime saleEndDate;
 
     @Schema(description = "공연 스케줄 목록")
@@ -69,10 +69,10 @@ public class ShowDetailResponse {
     @Schema(description = "좌석 가격 정보 목록")
     private List<SeatPriceInfo> seatPrices;
 
-    @Schema(description = "생성일시", example = "2024-01-01T00:00:00")
+    @Schema(description = "생성일시", example = "2026-01-01T00:00:00")
     private LocalDateTime createdAt;
 
-    @Schema(description = "수정일시", example = "2024-01-01T00:00:00")
+    @Schema(description = "수정일시", example = "2026-01-01T00:00:00")
     private LocalDateTime updatedAt;
 
     @Getter
@@ -84,7 +84,7 @@ public class ShowDetailResponse {
         @Schema(description = "스케줄 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
         private Long scheduleId;
 
-        @Schema(description = "공연일", example = "2024-01-15", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "공연일", example = "2026-01-15", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
         @JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate showDate;
 
@@ -92,8 +92,7 @@ public class ShowDetailResponse {
         @JsonFormat(pattern = "HH:mm")
         private LocalTime showTime;
 
-        @Schema(description = "티켓 오픈 시간", example = "2024-01-01T10:00:00", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "티켓 오픈 시간", example = "2026-01-01T10:00:00", type = "string", requiredMode = Schema.RequiredMode.REQUIRED)
         private LocalDateTime ticketOpenTime;
 
         @Schema(description = "남은 좌석 수", example = "50", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -120,5 +119,18 @@ public class ShowDetailResponse {
 
         @Schema(description = "가격", example = "150000", requiredMode = Schema.RequiredMode.REQUIRED)
         private Integer price;
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "상세 이미지 정보")
+    public static class DetailImageInfo {
+        @Schema(description = "이미지 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+        private Long id;
+
+        @Schema(description = "이미지 URL", example = "/images/details/show1-1.jpg", requiredMode = Schema.RequiredMode.REQUIRED)
+        private String url;
     }
 }

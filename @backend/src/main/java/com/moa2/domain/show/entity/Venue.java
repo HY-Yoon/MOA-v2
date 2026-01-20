@@ -1,5 +1,6 @@
 package com.moa2.domain.show.entity;
 
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.Region;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -8,7 +9,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
         @UniqueConstraint(name = "uk_venue_name_hall_region",
                 columnNames = {"name", "hall_name", "region"})
 })
-public class Venue {
+public class Venue extends BaseTimeEntity {
     
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -36,7 +36,4 @@ public class Venue {
     private Double latitude;
     private Double longitude;
     private Integer totalSeats;
-    
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

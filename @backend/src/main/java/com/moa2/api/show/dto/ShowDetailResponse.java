@@ -36,8 +36,8 @@ public class ShowDetailResponse {
     @Schema(description = "포스터 URL", example = "/images/posters/show1.jpg")
     private String posterUrl;
     
-    @Schema(description = "상세 이미지 URL 배열")
-    private String[] detailImageUrls;
+    @Schema(description = "상세 이미지 URL 목록")
+    private List<String> detailImageUrls;
     
     @Schema(description = "공연 장소 정보")
     private LocationInfo location;
@@ -86,11 +86,9 @@ public class ShowDetailResponse {
     @Schema(description = "판매 기간 정보")
     public static class SalePeriod {
         @Schema(description = "판매 시작일시", example = "2025-01-01T10:00:00")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime startDate;
         
         @Schema(description = "판매 종료일시", example = "2025-12-31T23:59:59")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime endDate;
     }
     
@@ -115,7 +113,6 @@ public class ShowDetailResponse {
         private LocalTime showTime;
         
         @Schema(description = "티켓 오픈 시간", example = "2025-01-10T10:00:00")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime ticketOpenTime;
         
         @Schema(description = "남은 좌석 수", example = "150")

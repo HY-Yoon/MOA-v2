@@ -35,6 +35,7 @@ public class AdminShowService {
     private final VenueRepository venueRepository;
     private final ReservationRepository reservationRepository;
     private final SeatRepository seatRepository;
+    private final DetailImageRepository detailImageRepository;
     private final FileService fileService;
 
     public Page<ShowListResponse> getShowList(ShowListRequest request, Pageable pageable) {
@@ -165,6 +166,14 @@ public class AdminShowService {
         // Venue에서 hallName 가져오기
         String hallName = show.getVenue() != null ? show.getVenue().getHallName() : null;
 
+        // 상세 이미지 정보 구성
+        List<ShowDetailResponse.DetailImageInfo> detailImageInfos = show.getDetailImages().stream()
+            .map(detailImage -> ShowDetailResponse.DetailImageInfo.builder()
+                .id(detailImage.getId())
+                .url(detailImage.getUrl())
+                .build())
+            .collect(Collectors.toList());
+
         return ShowDetailResponse.builder()
             .id(show.getId())
             .title(show.getTitle())
@@ -175,7 +184,7 @@ public class AdminShowService {
                 ? show.getVenue().getRegion().name() : null)
             .runningTime(show.getRunningTime())
             .posterUrl(show.getPosterUrl())
-            .detailImageUrls(show.getDetailImageUrls())
+            .detailImages(detailImageInfos)
             .cast(show.getCast())
             .status(show.getStatus() != null ? show.getStatus().name() : null)
             .saleStatus(show.getSaleStatus() != null ? show.getSaleStatus().name() : null)
@@ -198,11 +207,6 @@ public class AdminShowService {
             throw new IllegalArgumentException("포스터 이미지는 필수입니다");
         }
 
-        String[] detailImageUrls = null;
-        if (detailImages != null && !detailImages.isEmpty()) {
-            detailImageUrls = fileService.uploadFiles(detailImages, "details");
-        }
-
         // location 정보로 Venue 조회, 없으면 자동 생성
         Region region = request.getLocation().getRegion();
         String venueName = request.getLocation().getVenueName();
@@ -221,8 +225,6 @@ public class AdminShowService {
                 .name(venueName)
                 .hallName(hallName)
                 .region(region)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build();
             return venueRepository.save(newVenue);
         });
@@ -246,7 +248,6 @@ public class AdminShowService {
             .genre(Genre.valueOf(request.getGenre()))
             .runningTime(request.getRunningTime())
             .posterUrl(posterUrl)
-            .detailImageUrls(detailImageUrls)
             .cast(request.getCast())
             .status(ShowStatus.WAITING)
             .saleStatus(SaleStatus.ALLOWED)
@@ -258,6 +259,19 @@ public class AdminShowService {
             .build();
 
         show = showRepository.save(show);
+
+        // 상세 이미지 저장
+        if (detailImages != null && !detailImages.isEmpty()) {
+            String[] detailImageUrls = fileService.uploadFiles(detailImages, "details");
+            for (int i = 0; i < detailImageUrls.length; i++) {
+                DetailImage detailImage = DetailImage.builder()
+                    .show(show)
+                    .url(detailImageUrls[i])
+                    .displayOrder(i)
+                    .build();
+                detailImageRepository.save(detailImage);
+            }
+        }
 
         // Schedule 생성
         List<ShowSchedule> savedSchedules = new ArrayList<>();
@@ -354,8 +368,6 @@ public class AdminShowService {
                         .name(venueName)
                         .hallName(hallName)
                         .region(region)
-                        .createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now())
                         .build();
                     return venueRepository.save(newVenue);
                 });
@@ -380,15 +392,44 @@ public class AdminShowService {
             show.setPosterUrl(newPosterUrl);
         }
 
-        // 상세 이미지 업데이트
-        if (detailImages != null && !detailImages.isEmpty()) {
-            // 기존 상세 이미지 파일 삭제
-            if (show.getDetailImageUrls() != null) {
-                fileService.deleteFiles(show.getDetailImageUrls());
+        // 상세 이미지 삭제 처리
+        if (request.getDeletedDetailImageIds() != null && !request.getDeletedDetailImageIds().isEmpty()) {
+            for (Long imageIdToDelete : request.getDeletedDetailImageIds()) {
+                DetailImage imageToDelete = detailImageRepository.findById(imageIdToDelete)
+                    .orElseThrow(() -> new RuntimeException("삭제할 이미지를 찾을 수 없습니다: " + imageIdToDelete));
+                
+                // 해당 이미지가 이 공연에 속하는지 확인
+                if (!imageToDelete.getShow().getId().equals(id)) {
+                    throw new RuntimeException("이미지가 이 공연에 속하지 않습니다. 이미지 ID: " + imageIdToDelete);
+                }
+                
+                // 파일 시스템에서 삭제
+                fileService.deleteFile(imageToDelete.getUrl());
+                
+                // DB에서 삭제
+                detailImageRepository.delete(imageToDelete);
             }
-            // 새 상세 이미지 업로드
+        }
+
+        // 상세 이미지 추가 처리
+        if (detailImages != null && !detailImages.isEmpty()) {
+            // 현재 최대 display_order 조회
+            List<DetailImage> existingImages = detailImageRepository.findByShowIdOrderByDisplayOrderAsc(id);
+            int maxOrder = existingImages.stream()
+                .mapToInt(img -> img.getDisplayOrder() != null ? img.getDisplayOrder() : 0)
+                .max()
+                .orElse(-1);
+            
+            // 새 이미지 업로드 및 저장
             String[] newDetailImageUrls = fileService.uploadFiles(detailImages, "details");
-            show.setDetailImageUrls(newDetailImageUrls);
+            for (int i = 0; i < newDetailImageUrls.length; i++) {
+                DetailImage newDetailImage = DetailImage.builder()
+                    .show(show)
+                    .url(newDetailImageUrls[i])
+                    .displayOrder(maxOrder + 1 + i)
+                    .build();
+                detailImageRepository.save(newDetailImage);
+            }
         }
 
         // 스케줄 추가/수정/삭제 처리 (팝업에서 변경한 모든 일정을 최종 저장)
@@ -532,7 +573,22 @@ public class AdminShowService {
             log.info("연관된 좌석 가격 정보 삭제 완료: {}개", seatGrades.size());
         }
 
-        // 3. 공연 삭제 (물리 삭제)
+        // 3. 연관된 상세 이미지 파일 삭제
+        List<DetailImage> detailImages = show.getDetailImages();
+        if (detailImages != null && !detailImages.isEmpty()) {
+            for (DetailImage detailImage : detailImages) {
+                fileService.deleteFile(detailImage.getUrl());
+            }
+            log.info("연관된 상세 이미지 파일 삭제 완료: {}개", detailImages.size());
+        }
+
+        // 4. 포스터 이미지 파일 삭제
+        if (show.getPosterUrl() != null) {
+            fileService.deleteFile(show.getPosterUrl());
+            log.info("포스터 이미지 파일 삭제 완료");
+        }
+
+        // 5. 공연 삭제 (물리 삭제, orphanRemoval로 DetailImage도 자동 삭제됨)
         showRepository.delete(show);
         log.info("공연 물리 삭제 완료: showId={}", id);
 

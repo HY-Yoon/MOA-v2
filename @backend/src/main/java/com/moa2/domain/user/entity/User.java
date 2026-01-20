@@ -1,5 +1,6 @@
 package com.moa2.domain.user.entity;
 
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.*;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -15,7 +16,7 @@ import java.time.LocalDateTime;
 @Table(name = "users", uniqueConstraints = {
     @UniqueConstraint(name = "uq_user_email_provider", columnNames = {"email", "social_provider"})
 })
-public class User {
+public class User extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -54,8 +55,6 @@ public class User {
     private String suspensionReason;
     private LocalDateTime suspendedAt;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
 
     @Builder
@@ -72,15 +71,12 @@ public class User {
         this.role = UserRole.USER;
         this.status = UserStatus.ACTIVE;
         this.isVerified = false;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // OAuth2 로그인 시 프로필 정보 업데이트
     public void updateOAuth2Info(String name, String picture) {
         this.name = name;
         this.picture = picture;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // OAuth2 로그인 시 프로필 정보 업데이트 (전화번호 포함)
@@ -90,7 +86,6 @@ public class User {
         if (phone != null && !phone.trim().isEmpty()) {
             this.phone = phone;
         }
-        this.updatedAt = LocalDateTime.now();
     }
 
     // OAuth2 로그인 시 프로필 정보 업데이트 (전화번호, 성별, 생년월일, 연령대 포함)
@@ -109,7 +104,6 @@ public class User {
         if (ageRange != null && !ageRange.trim().isEmpty()) {
             this.ageRange = ageRange;
         }
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 본인 인증 성공 시 정보 업데이트 로직
@@ -119,14 +113,12 @@ public class User {
         this.birthDate = birthDate;
         this.gender = gender;
         this.isVerified = true;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 회원 탈퇴 (Soft Delete)
     public void withdraw() {
         this.status = UserStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 계정 정지
@@ -134,7 +126,6 @@ public class User {
         this.status = UserStatus.SUSPENDED;
         this.suspensionReason = reason;
         this.suspendedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 계정 활성화
@@ -143,7 +134,6 @@ public class User {
         this.suspensionReason = null;
         this.suspendedAt = null;
         this.deletedAt = null;
-        this.updatedAt = LocalDateTime.now();
     }
 }
 

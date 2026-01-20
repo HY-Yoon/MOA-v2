@@ -63,11 +63,11 @@ public class ShowCreateRequest {
     @Setter
     @Schema(description = "판매 기간")
     public static class SalePeriodRequest {
-        @Schema(description = "판매 시작일시", example = "2024-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "판매 시작일시", example = "2026-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "판매 시작일시는 필수입니다")
         private java.time.LocalDateTime startDate;
 
-        @Schema(description = "판매 종료일시", example = "2024-01-31T23:59:59", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "판매 종료일시", example = "2026-01-31T23:59:59", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "판매 종료일시는 필수입니다")
         private java.time.LocalDateTime endDate;
     }
@@ -76,7 +76,7 @@ public class ShowCreateRequest {
     @Setter
     @Schema(description = "공연 스케줄 정보")
     public static class ScheduleRequest {
-        @Schema(description = "공연일", example = "2024-01-15", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "공연일", example = "2026-01-15", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "공연일은 필수입니다")
         private java.time.LocalDate showDate;
 
@@ -84,7 +84,7 @@ public class ShowCreateRequest {
         @NotNull(message = "공연 시간은 필수입니다")
         private String showTime; // "19:00" 형식
 
-        @Schema(description = "티켓 오픈 시간", example = "2024-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "티켓 오픈 시간", example = "2026-01-01T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "티켓 오픈 시간은 필수입니다")
         private java.time.LocalDateTime ticketOpenTime;
     }

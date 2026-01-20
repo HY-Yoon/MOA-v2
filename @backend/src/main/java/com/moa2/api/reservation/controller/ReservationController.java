@@ -65,8 +65,8 @@ public class ReservationController {
                         "content": [
                           {
                             "reservationId": 1,
-                            "reservationNumber": "R20240115-001",
-                            "reservationDate": "2024-01-15T10:30:00",
+                            "reservationNumber": "R20260115-001",
+                            "reservationDate": "2026-01-15T10:30:00",
                             "reservationStatus": "CONFIRMED",
                             "paymentStatus": "COMPLETED",
                             "show": {
@@ -77,7 +77,7 @@ public class ReservationController {
                             },
                             "schedule": {
                               "scheduleId": 1,
-                              "showDate": "2024-02-20",
+                              "showDate": "2026-02-20",
                               "showTime": "19:00",
                               "location": {
                                 "region": "SEOUL",
@@ -151,8 +151,8 @@ public class ReservationController {
                       "success": true,
                       "data": {
                         "reservationId": 1,
-                        "reservationNumber": "R20240115-001",
-                        "reservationDate": "2024-01-15T10:30:00",
+                        "reservationNumber": "R20260115-001",
+                        "reservationDate": "2026-01-15T10:30:00",
                         "reservationStatus": "CONFIRMED",
                         "show": {
                           "showId": 1,
@@ -164,7 +164,7 @@ public class ReservationController {
                         },
                         "schedule": {
                           "scheduleId": 1,
-                          "showDate": "2024-02-20",
+                          "showDate": "2026-02-20",
                           "showTime": "19:00",
                           "location": {
                             "region": "SEOUL",
@@ -196,12 +196,12 @@ public class ReservationController {
                           "email": "todayda1006@gmail.com"
                         },
                         "payment": {
-                          "orderId": "ORD20240115-001",
-                          "paymentKey": "tviva20240115abc123",
+                          "orderId": "ORD20260115-001",
+                          "paymentKey": "tviva20260115abc123",
                           "totalAmount": 300000,
                           "paymentMethod": "CARD",
                           "paymentStatus": "COMPLETED",
-                          "paidAt": "2024-01-15T10:31:00"
+                          "paidAt": "2026-01-15T10:31:00"
                         },
                         "canCancel": true,
                         "cancelledAt": null
@@ -279,7 +279,7 @@ public class ReservationController {
                       "success": true,
                       "data": {
                         "reservationId": 1,
-                        "reservationNumber": "R20240115-001",
+                        "reservationNumber": "R20260115-001",
                         "message": "예매가 취소되었습니다."
                       },
                       "message": "예매가 취소되었습니다."

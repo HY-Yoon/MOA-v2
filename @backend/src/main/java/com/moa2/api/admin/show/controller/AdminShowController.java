@@ -45,34 +45,23 @@ public class AdminShowController {
     private final Validator validator;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        .configure(com.fasterxml.jackson.databind.DeserializationFeature.READ_ENUMS_USING_TO_STRING, false)
-        .configure(com.fasterxml.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true);
+            .registerModule(new JavaTimeModule())
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.READ_ENUMS_USING_TO_STRING, false)
+            .configure(com.fasterxml.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true);
 
-
-    @Operation(
-        summary = "공연 목록 조회"
-    )
+    @Operation(summary = "공연 목록 조회")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ShowListResponse>>> getShowList(
-            @Parameter(description = "공연 상태 (WAITING, ON_SALE, SOLD_OUT, ENDED, SUSPENDED)")
-            @RequestParam(required = false) String showStatus,
-            @Parameter(description = "판매 상태 (ALLOWED, SUSPENDED)")
-            @RequestParam(required = false) String saleStatus,
-            @Parameter(description = "검색 키워드 (공연 제목)")
-            @RequestParam(required = false) String keyword,
-            @Parameter(description = "공연 시작일 (YYYY-MM-DD 형식)")
-            @RequestParam(required = false) java.time.LocalDate startDate,
-            @Parameter(description = "공연 종료일 (YYYY-MM-DD 형식)")
-            @RequestParam(required = false) java.time.LocalDate endDate,
-            @Parameter(description = "정렬 기준 (필드명,방향 createdAt,desc)")
-            @RequestParam String sort,
-            @Parameter(description = "페이지 번호 (0부터 시작)")
-            @RequestParam int page,
-            @Parameter(description = "페이지 크기")
-            @RequestParam int size) {
-        
+            @Parameter(description = "공연 상태 (WAITING, ON_SALE, SOLD_OUT, ENDED, SUSPENDED)") @RequestParam(required = false) String showStatus,
+            @Parameter(description = "판매 상태 (ALLOWED, SUSPENDED)") @RequestParam(required = false) String saleStatus,
+            @Parameter(description = "검색 키워드 (공연 제목)") @RequestParam(required = false) String keyword,
+            @Parameter(description = "공연 시작일 (YYYY-MM-DD 형식)") @RequestParam(required = false) java.time.LocalDate startDate,
+            @Parameter(description = "공연 종료일 (YYYY-MM-DD 형식)") @RequestParam(required = false) java.time.LocalDate endDate,
+            @Parameter(description = "정렬 기준 (필드명,방향 createdAt,desc)") @RequestParam String sort,
+            @Parameter(description = "페이지 번호 (0부터 시작)") @RequestParam int page,
+            @Parameter(description = "페이지 크기") @RequestParam int size) {
+
         ShowListRequest request = new ShowListRequest();
         if (showStatus != null) {
             request.setShowStatus(com.moa2.global.model.ShowStatus.valueOf(showStatus));
@@ -91,14 +80,14 @@ public class AdminShowController {
         String[] sortParts = sort.split(",");
         String sortField = sortParts[0];
         Sort.Direction direction = sortParts.length > 1 && "desc".equalsIgnoreCase(sortParts[1])
-            ? Sort.Direction.DESC : Sort.Direction.ASC;
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
         Page<ShowListResponse> pageResult = adminShowService.getShowList(request, pageable);
         PageResponse<ShowListResponse> result = PageResponse.of(pageResult);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
-
 
     @Operation(summary = "공연 상세 조회", description = "관리자용 공연 상세 정보를 조회합니다.")
     @GetMapping("/{id}")
@@ -108,150 +97,91 @@ public class AdminShowController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    @Operation(
-        summary = "공연 등록", 
-        description = "새로운 공연을 등록합니다.\n\n" +
-                     "**요청 형식:** multipart/form-data\n\n" +
-                     "**필수 필드:**\n" +
-                     "- `data`: 공연 정보 (JSON)\n" +
-                     "- `poster`: 포스터 이미지 파일\n\n" +
-                     "**선택 필드:**\n" +
-                     "- `detailImages`: 상세 이미지 파일 목록 (여러 개 가능)\n\n" +
-                     "**장르 (genre):** MUSICAL, CONCERT, THEATER, CLASSIC, DANCE"
-    )
+    @Operation(summary = "공연 등록", description = "새로운 공연을 등록합니다.\n\n" +
+            "**요청 형식:** multipart/form-data\n\n" +
+            "**필수 필드:**\n" +
+            "- `data`: 공연 정보 (JSON)\n" +
+            "- `poster`: 포스터 이미지 파일\n\n" +
+            "**선택 필드:**\n" +
+            "- `detailImages`: 상세 이미지 파일 목록 (여러 개 가능)\n\n" +
+            "**장르 (genre):** MUSICAL, CONCERT, THEATER, CLASSIC, DANCE")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ShowCreateResponse>> createShow(
-            @Parameter(
-                description = "공연 정보 (JSON)",
-                required = true,
-                schema = @Schema(implementation = ShowCreateRequest.class)
-            )
-            @RequestPart(value = "data", required = true) @Valid ShowCreateRequest request,
-            @Parameter(
-                description = "포스터 이미지 파일 (jpg, jpeg, png, gif, webp, 최대 10MB)", 
-                required = true
-            )
-            @RequestPart("poster") MultipartFile poster,
-            @Parameter(description = "상세 이미지 파일 목록 (선택, 여러 개 가능)")
-            @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages) {
-        
+            @Parameter(description = "공연 정보 (JSON)", required = true, schema = @Schema(implementation = ShowCreateRequest.class)) @RequestPart(value = "data", required = true) @Valid ShowCreateRequest request,
+            @Parameter(description = "포스터 이미지 파일 (jpg, jpeg, png, gif, webp, 최대 10MB)", required = true) @RequestPart("poster") MultipartFile poster,
+            @Parameter(description = "상세 이미지 파일 목록 (선택, 여러 개 가능)") @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages) {
+
         ShowCreateResponse result = adminShowService.createShow(request, poster, detailImages);
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(result, result.getMessage()));
+                .body(ApiResponse.success(result, result.getMessage()));
     }
 
-    @Operation(
-        summary = "공연 수정", 
-        description = "공연 정보를 수정합니다.\n\n" +
-                     "**요청 형식:** multipart/form-data\n\n" +
-                     "**수정 규칙:**\n" +
-                     "- **WAITING 상태:** 모든 필드 수정 가능\n" +
-                     "- **ON_SALE 이후:** 제한된 필드만 수정 가능\n" +
-                     "  - 수정 가능: 제목, 상영시간, 출연진, 포스터, 상세이미지, **일정 수정**\n" +
-                     "  - 수정 불가: 장르, 장소, 예매 시작일\n\n" +
-                     "**일정 관련:**\n" +
-                     "- 일정 추가/수정/삭제: 모두 이 API에서 처리\n" +
-                     "- 팝업에서 변경한 모든 일정을 `schedules`에 포함하여 '완료' 버튼 클릭 시 최종 저장\n" +
-                     "- 추가: `scheduleId` 없음 (null)\n" +
-                     "- 수정: `scheduleId` 있음\n" +
-                     "- 삭제: `deletedScheduleIds`에 포함\n" +
-                     "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n" +
-                     "**주의:** 수정할 필드만 포함하면 됩니다."
-    )
+    @Operation(summary = "공연 수정", description = "공연 정보를 수정합니다.\n\n" +
+            "**요청 형식:** multipart/form-data\n\n" +
+            "**수정 규칙:**\n" +
+            "- **WAITING 상태:** 모든 필드 수정 가능\n" +
+            "- **ON_SALE 이후:** 제한된 필드만 수정 가능\n" +
+            "  - 수정 가능: 제목, 상영시간, 출연진, 포스터, 상세이미지, **일정 수정**\n" +
+            "  - 수정 불가: 장르, 장소, 예매 시작일\n\n" +
+            "**일정 관련:**\n" +
+            "- 일정 추가/수정/삭제: 모두 이 API에서 처리\n" +
+            "- 팝업에서 변경한 모든 일정을 `schedules`에 포함하여 '완료' 버튼 클릭 시 최종 저장\n" +
+            "- 추가: `scheduleId` 없음 (null)\n" +
+            "- 수정: `scheduleId` 있음\n" +
+            "- 삭제: `deletedScheduleIds`에 포함\n" +
+            "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n" +
+            "**상세 이미지 관련:**\n" +
+            "- 이미지 추가: `detailImages`에 새 파일 포함\n" +
+            "- 이미지 삭제: `deletedDetailImageIds`에 삭제할 이미지 ID 포함\n" +
+            "- 수정 폼에서 변경한 모든 이미지를 '완료' 버튼 클릭 시 최종 저장\n\n" +
+            "**주의:** 수정할 필드만 포함하면 됩니다.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "수정 성공",
-            content = @Content(
-                mediaType = "application/json",
-                examples = @ExampleObject(
-                    name = "성공 응답",
-                    value = "{\"success\":true,\"data\":{\"showId\":1,\"message\":\"공연이 수정되었습니다\"},\"message\":\"공연이 수정되었습니다\"}"
-                )
-            )
-        ),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "400",
-            description = "수정 실패 - ON_SALE 상태에서 제한된 필드 수정 시도",
-            content = @Content(
-                mediaType = "application/json",
-                examples = {
-                    @ExampleObject(
-                        name = "장르 수정 시도",
-                        value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 장르를 수정할 수 없습니다\"}"
-                    ),
-                    @ExampleObject(
-                        name = "장소 수정 시도",
-                        value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 장소를 수정할 수 없습니다\"}"
-                    ),
-                    @ExampleObject(
-                        name = "예매 시작일 수정 시도",
-                        value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 예매 시작일을 수정할 수 없습니다\"}"
-                    ),
-                    @ExampleObject(
-                        name = "예매된 좌석이 있는 일정 수정 시도",
-                        value = "{\"success\":false,\"data\":null,\"message\":\"예매된 좌석이 있는 스케줄은 수정할 수 없습니다. 스케줄 ID: 1\"}"
-                    )
-                }
-            )
-        )
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "성공 응답", value = "{\"success\":true,\"data\":{\"showId\":1,\"message\":\"공연이 수정되었습니다\"},\"message\":\"공연이 수정되었습니다\"}"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "수정 실패 - ON_SALE 상태에서 제한된 필드 수정 시도", content = @Content(mediaType = "application/json", examples = {
+                    @ExampleObject(name = "장르 수정 시도", value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 장르를 수정할 수 없습니다\"}"),
+                    @ExampleObject(name = "장소 수정 시도", value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 장소를 수정할 수 없습니다\"}"),
+                    @ExampleObject(name = "예매 시작일 수정 시도", value = "{\"success\":false,\"data\":null,\"message\":\"판매중인 공연은 예매 시작일을 수정할 수 없습니다\"}"),
+                    @ExampleObject(name = "예매된 좌석이 있는 일정 수정 시도", value = "{\"success\":false,\"data\":null,\"message\":\"예매된 좌석이 있는 스케줄은 수정할 수 없습니다. 스케줄 ID: 1\"}")
+            }))
     })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-        description = "multipart/form-data 요청",
-        required = true,
-        content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE)
-    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "multipart/form-data 요청", required = true, content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE))
     @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ShowUpdateResponse>> updateShow(
             @Parameter(description = "공연 ID", required = true) @PathVariable Long id,
-            @Parameter(
-                description = "공연 정보 (JSON 문자열, 수정할 필드만 포함)\n\n" +
-                            "**수정 가능 필드:**\n" +
-                            "- `title`: 공연 제목\n" +
-                            "- `runningTime`: 상영 시간 (문자열, 예: \"150분\")\n" +
-                            "- `cast`: 출연진 정보\n" +
-                            "- `genre`: 장르 (WAITING 상태에서만 수정 가능)\n" +
-                            "- `location`: 장소 정보 (WAITING 상태에서만 수정 가능)\n" +
-                            "  - `region`: 지역 (예: \"서울\")\n" +
-                            "  - `venueName`: 공연장명 (예: \"올림픽공원\")\n" +
-                            "  - `hallName`: 홀명 (예: \"KSPO DOME\")\n" +
-                            "- `saleStartDate`: 예매 시작일시 (WAITING 상태에서만 수정 가능)\n" +
-                            "- `schedules`: 일정 목록 (추가/수정 모두 포함)\n" +
-                            "- `deletedScheduleIds`: 삭제할 일정 ID 목록\n\n" +
-                            "**일정 처리:**\n" +
-                            "- 추가: `scheduleId` 없음\n" +
-                            "- 수정: `scheduleId` 있음\n" +
-                            "- 삭제: `deletedScheduleIds`에 포함\n" +
-                            "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n",
-                required = true,
-                schema = @Schema(implementation = ShowUpdateRequest.class),
-                examples = {
-                    @ExampleObject(
-                        name = "제목 및 출연진 수정",
-                        value = "{\"title\":\"레미제라블 (수정)\",\"cast\":\"김철수, 이영희, 박민수\"}"
-                    ),
-                    @ExampleObject(
-                        name = "상영시간 수정",
-                        value = "{\"runningTime\":\"160분\"}"
-                    ),
-                    @ExampleObject(
-                        name = "WAITING 상태 - 전체 수정",
-                        value = "{\"title\":\"레미제라블\",\"genre\":\"MUSICAL\",\"location\":{\"region\":\"서울\",\"venueName\":\"올림픽공원\",\"hallName\":\"KSPO DOME\"},\"saleStartDate\":\"2024-01-01T00:00:00\"}"
-                    ),
-                    @ExampleObject(
-                        name = "일정 추가/수정/삭제",
-                        value = "{\"schedules\":[{\"scheduleId\":1,\"showDate\":\"2024-01-20\",\"showTime\":\"19:00\",\"ticketOpenTime\":\"2024-01-01T10:00:00\"},{\"showDate\":\"2024-01-25\",\"showTime\":\"19:00\",\"ticketOpenTime\":\"2024-01-01T10:00:00\"}],\"deletedScheduleIds\":[2,3]}"
-                    )
-                }
-            )
-            @RequestPart("data") String dataJson,
-            @Parameter(description = "포스터 이미지 파일 (선택, 새 파일 업로드 시에만)")
-            @RequestPart(value = "poster", required = false) MultipartFile poster,
-            @Parameter(description = "상세 이미지 파일 목록 (선택, 새 파일 업로드 시에만)")
-            @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages) throws Exception {
+            @Parameter(description = "공연 정보 (JSON 문자열, 수정할 필드만 포함)\n\n" +
+                    "**수정 가능 필드:**\n" +
+                    "- `title`: 공연 제목\n" +
+                    "- `runningTime`: 상영 시간 (문자열, 예: \"150분\")\n" +
+                    "- `cast`: 출연진 정보\n" +
+                    "- `genre`: 장르 (WAITING 상태에서만 수정 가능)\n" +
+                    "- `location`: 장소 정보 (WAITING 상태에서만 수정 가능)\n" +
+                    "  - `region`: 지역 (예: \"서울\")\n" +
+                    "  - `venueName`: 공연장명 (예: \"올림픽공원\")\n" +
+                    "  - `hallName`: 홀명 (예: \"KSPO DOME\")\n" +
+                    "- `saleStartDate`: 예매 시작일시 (WAITING 상태에서만 수정 가능)\n" +
+                    "- `schedules`: 일정 목록 (추가/수정 모두 포함)\n" +
+                    "- `deletedScheduleIds`: 삭제할 일정 ID 목록\n" +
+                    "- `deletedDetailImageIds`: 삭제할 상세 이미지 ID 목록\n\n" +
+                    "**일정 처리:**\n" +
+                    "- 추가: `scheduleId` 없음\n" +
+                    "- 수정: `scheduleId` 있음\n" +
+                    "- 삭제: `deletedScheduleIds`에 포함\n" +
+                    "- ON_SALE 이후: 예매된 좌석이 없는 경우에만 수정/삭제 가능\n\n" +
+                    "**상세 이미지 처리:**\n" +
+                    "- 추가: `detailImages` 파일 업로드\n" +
+                    "- 삭제: `deletedDetailImageIds`에 포함\n\n", required = true, schema = @Schema(implementation = ShowUpdateRequest.class), examples = {
+                            @ExampleObject(name = "제목 및 출연진 수정", value = "{\"title\":\"레미제라블 (수정)\",\"cast\":\"김철수, 이영희, 박민수\"}"),
+                            @ExampleObject(name = "상영시간 수정", value = "{\"runningTime\":\"160분\"}"),
+                            @ExampleObject(name = "WAITING 상태 - 전체 수정", value = "{\"title\":\"레미제라블\",\"genre\":\"MUSICAL\",\"location\":{\"region\":\"서울\",\"venueName\":\"올림픽공원\",\"hallName\":\"KSPO DOME\"},\"saleStartDate\":\"2026-01-01T00:00:00\"}"),
+                            @ExampleObject(name = "일정 추가/수정/삭제", value = "{\"schedules\":[{\"scheduleId\":1,\"showDate\":\"2026-01-20\",\"showTime\":\"19:00\",\"ticketOpenTime\":\"2026-01-01T10:00:00\"},{\"showDate\":\"2026-01-25\",\"showTime\":\"19:00\",\"ticketOpenTime\":\"2026-01-01T10:00:00\"}],\"deletedScheduleIds\":[2,3]}"),
+                            @ExampleObject(name = "상세 이미지 삭제", value = "{\"deletedDetailImageIds\":[1,3,5]}")
+                    }) @RequestPart("data") String dataJson,
+            @Parameter(description = "포스터 이미지 파일 (선택, 포스터 교체 시에만 포함)") @RequestPart(value = "poster", required = false) MultipartFile poster,
+            @Parameter(description = "상세 이미지 파일 목록 (선택, 새 이미지 추가 시에만 포함. 삭제는 deletedDetailImageIds 사용)") @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages)
+            throws Exception {
 
         ShowUpdateRequest request = parseAndValidate(dataJson, ShowUpdateRequest.class);
-        
+
         ShowUpdateResponse result = adminShowService.updateShow(id, request, poster, detailImages);
         return ResponseEntity.ok(ApiResponse.success(result, result.getMessage()));
     }
@@ -267,52 +197,15 @@ public class AdminShowController {
     // 일정 추가/수정/삭제는 공연 수정 API(PATCH /{id})에서 함께 처리됩니다.
     // 팝업에서 변경한 모든 일정을 schedules와 deletedScheduleIds에 포함하여 '완료' 버튼 클릭 시 최종 저장됩니다.
 
-    @Operation(
-            summary = "공연 판매 상태 변경",
-            description = "공연의 판매 상태를 변경합니다."
-    )
+    @Operation(summary = "공연 판매 상태 변경", description = "공연의 판매 상태를 변경합니다.")
     @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "상태 변경 성공",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "성공 응답",
-                                    value = "{\"success\":true,\"data\":{\"showId\":2,\"saleStatus\":\"SUSPENDED\",\"message\":\"판매 상태가 변경되었습니다\"},\"message\":\"판매 상태가 변경되었습니다\"}"
-                            )
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "에러 응답",
-                                    value = "{\"success\":false,\"data\":null,\"message\":\"유효하지 않은 판매 상태입니다\"}"
-                            )
-                    )
-            )
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "상태 변경 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "성공 응답", value = "{\"success\":true,\"data\":{\"showId\":2,\"saleStatus\":\"SUSPENDED\",\"message\":\"판매 상태가 변경되었습니다\"},\"message\":\"판매 상태가 변경되었습니다\"}"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "에러 응답", value = "{\"success\":false,\"data\":null,\"message\":\"유효하지 않은 판매 상태입니다\"}")))
     })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            description = "판매 상태 변경 요청",
-            required = true,
-            content = @Content(
-                    mediaType = MediaType.APPLICATION_JSON_VALUE,
-                    schema = @Schema(implementation = ShowSaleStatusUpdateRequest.class),
-                    examples = {
-                            @ExampleObject(
-                                    name = "SUSPENDED 예시",
-                                    value = "{\"saleStatus\": \"SUSPENDED\"}"
-                            ),
-                            @ExampleObject(
-                                    name = "ALLOWED 예시",
-                                    value = "{\"saleStatus\": \"ALLOWED\"}"
-                            )
-                    }
-            )
-    )
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "판매 상태 변경 요청", required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ShowSaleStatusUpdateRequest.class), examples = {
+            @ExampleObject(name = "SUSPENDED 예시", value = "{\"saleStatus\": \"SUSPENDED\"}"),
+            @ExampleObject(name = "ALLOWED 예시", value = "{\"saleStatus\": \"ALLOWED\"}")
+    }))
     @PatchMapping(value = "/{id}/sale-status", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<ShowSaleStatusUpdateResponse>> updateSaleStatus(
             @Parameter(description = "공연 ID", required = true) @PathVariable Long id,
@@ -334,9 +227,6 @@ public class AdminShowController {
         }
     }
 
-
-
-
     /**
      * JSON 문자열을 파싱하고 유효성 검증을 수행하는 헬퍼 메서드
      */
@@ -344,17 +234,17 @@ public class AdminShowController {
         try {
             // JSON 파싱
             T dto = objectMapper.readValue(json, clazz);
-            
+
             // 유효성 검증
             Set<ConstraintViolation<T>> violations = validator.validate(dto);
             if (!violations.isEmpty()) {
                 String errorMessage = violations.stream()
-                    .map(v -> v.getPropertyPath() + ": " + v.getMessage())
-                    .collect(Collectors.joining(", "));
+                        .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                        .collect(Collectors.joining(", "));
                 log.error("Validation 실패: {}", errorMessage);
                 throw new IllegalArgumentException("Validation failed: " + errorMessage);
             }
-            
+
             return dto;
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             log.error("JSON 파싱 실패: {}", e.getMessage());
@@ -366,4 +256,3 @@ public class AdminShowController {
         }
     }
 }
-

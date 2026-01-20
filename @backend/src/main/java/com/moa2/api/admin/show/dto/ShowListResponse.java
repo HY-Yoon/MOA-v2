@@ -44,7 +44,7 @@ public class ShowListResponse {
         @Schema(description = "일정 ID", example = "1")
         private Long keyId;
         
-        @Schema(description = "공연일", example = "2024-01-20", type = "string")
+        @Schema(description = "공연일", example = "2026-01-20", type = "string")
         @JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate date;
         
@@ -65,12 +65,10 @@ public class ShowListResponse {
     @AllArgsConstructor
     @Schema(description = "판매 기간 정보")
     public static class SalePeriod {
-        @Schema(description = "판매 시작일시", example = "2024-01-01T10:00:00", type = "string")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "판매 시작일시", example = "2026-01-01T10:00:00", type = "string")
         private LocalDateTime startDate;
         
-        @Schema(description = "판매 종료일시", example = "2024-01-31T23:59:59", type = "string")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "판매 종료일시", example = "2026-01-31T23:59:59", type = "string")
         private LocalDateTime endDate;
     }
 }

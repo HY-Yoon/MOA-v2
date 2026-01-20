@@ -1,5 +1,6 @@
 package com.moa2.domain.show.entity;
 
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.Genre;
 import com.moa2.global.model.ShowStatus;
 import com.moa2.global.model.SaleStatus;
@@ -20,9 +21,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Table(name = "shows")
-public class Show {
-    
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+public class Show extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,19 +32,20 @@ public class Show {
     private Venue venue;
 
     private String title;
-    
+
     @Enumerated(EnumType.STRING)
     private Genre genre; // MUSICAL, CONCERT...
-    
+
     private String runningTime; // 상영 시간 (예: "150분", "2시간 30분")
     private String posterUrl;
-    
+
     @Column(name = "\"cast\"")
     private String cast; // 출연진 정보 (단순 문자열)
-    
-    // PostgreSQL Array 타입 처리
-    @Column(columnDefinition = "TEXT[]")
-    private String[] detailImageUrls;
+
+    @OneToMany(mappedBy = "show", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("displayOrder ASC")
+    @Builder.Default
+    private java.util.List<DetailImage> detailImages = new java.util.ArrayList<>();
 
     private LocalDate startDate;
     private LocalDate endDate;
@@ -52,23 +55,9 @@ public class Show {
 
     @Enumerated(EnumType.STRING)
     private SaleStatus saleStatus;
-    
+
     private LocalDateTime saleStartDate; // 판매 시작일시
     private LocalDateTime saleEndDate; // 판매 종료일시
-    
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     private Long viewCount;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }

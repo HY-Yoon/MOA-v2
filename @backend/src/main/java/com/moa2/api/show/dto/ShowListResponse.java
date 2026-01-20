@@ -74,11 +74,9 @@ public class ShowListResponse {
     @Schema(description = "판매 기간 정보")
     public static class SalePeriod {
         @Schema(description = "판매 시작일시", example = "2025-01-01T10:00:00")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime startDate;
         
         @Schema(description = "판매 종료일시", example = "2025-12-31T23:59:59")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime endDate;
     }
     

@@ -26,11 +26,10 @@ public class ReservationDetailResponse {
     @Schema(description = "예매 ID", example = "1")
     private Long reservationId;
     
-    @Schema(description = "예매 번호", example = "R20240115-001")
+    @Schema(description = "예매 번호", example = "R20260115-001")
     private String reservationNumber;
     
-    @Schema(description = "예매일시", example = "2024-01-15T10:30:00")
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @Schema(description = "예매일시", example = "2026-01-15T10:30:00")
     private LocalDateTime reservationDate;
     
     @Schema(description = "예매 상태", example = "CONFIRMED")
@@ -63,8 +62,7 @@ public class ReservationDetailResponse {
     @Schema(description = "취소 가능 여부", example = "true")
     private Boolean canCancel;
     
-    @Schema(description = "취소일시", example = "2024-01-18T09:00:00")
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    @Schema(description = "취소일시", example = "2026-01-18T09:00:00")
     private LocalDateTime cancelledAt;
     
     /**
@@ -107,7 +105,7 @@ public class ReservationDetailResponse {
         @Schema(description = "스케줄 ID", example = "1")
         private Long scheduleId;
         
-        @Schema(description = "공연일", example = "2024-02-20")
+        @Schema(description = "공연일", example = "2026-02-20")
         @JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate showDate;
         
@@ -194,10 +192,10 @@ public class ReservationDetailResponse {
     @AllArgsConstructor
     @Schema(description = "결제 정보")
     public static class PaymentInfo {
-        @Schema(description = "주문 ID", example = "ORD20240115-001")
+        @Schema(description = "주문 ID", example = "ORD20260115-001")
         private String orderId;
         
-        @Schema(description = "결제 키", example = "tviva20240115abc123")
+        @Schema(description = "결제 키", example = "tviva20260115abc123")
         private String paymentKey;
         
         @Schema(description = "총 결제 금액", example = "300000")
@@ -209,8 +207,7 @@ public class ReservationDetailResponse {
         @Schema(description = "결제 상태", example = "COMPLETED")
         private String paymentStatus;
         
-        @Schema(description = "결제 승인일시", example = "2024-01-15T10:31:00")
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "결제 승인일시", example = "2026-01-15T10:31:00")
         private LocalDateTime paidAt;
     }
 }

@@ -190,13 +190,18 @@ public class ShowService {
                 .build();
         }
 
+        // 상세 이미지 URL 목록 생성
+        List<String> detailImageUrls = show.getDetailImages().stream()
+            .map(DetailImage::getUrl)
+            .collect(Collectors.toList());
+
         return ShowDetailResponse.builder()
             .id(show.getId())
             .title(show.getTitle())
             .genre(show.getGenre() != null ? show.getGenre().name() : null)
             .status(show.getStatus() != null ? show.getStatus().name() : null)
             .posterUrl(show.getPosterUrl())
-            .detailImageUrls(show.getDetailImageUrls())
+            .detailImageUrls(detailImageUrls)
             .location(location)
             .runningTime(show.getRunningTime())
             .cast(show.getCast())

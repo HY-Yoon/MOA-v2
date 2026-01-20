@@ -1,5 +1,6 @@
 package com.moa2.domain.seatmap.entity;
 
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.Region;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -11,7 +12,6 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
@@ -23,7 +23,7 @@ import java.util.Map;
 @Table(name = "seat_maps", uniqueConstraints = {
     @UniqueConstraint(name = "uk_seat_map_region_venue_hall", columnNames = {"region", "venue_name", "hall_name"})
 })
-public class SeatMap {
+public class SeatMap extends BaseTimeEntity {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,19 +53,5 @@ public class SeatMap {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private java.util.List<Map<String, Object>> seats;
-    
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-    
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 }
 

@@ -2,6 +2,7 @@ package com.moa2.domain.reservation.entity;
 
 import com.moa2.domain.show.entity.ShowSchedule;
 import com.moa2.domain.user.entity.User;
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.ReservationStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -14,7 +15,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "reservations")
-public class Reservation {
+public class Reservation extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,8 +41,6 @@ public class Reservation {
     @Enumerated(EnumType.STRING)
     private ReservationStatus status; // PENDING, CONFIRMED, CANCELLED
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private LocalDateTime cancelledAt;
 
     @Builder
@@ -57,21 +56,17 @@ public class Reservation {
         this.bookerPhone = bookerPhone;
         this.bookerEmail = bookerEmail;
         this.status = ReservationStatus.PENDING; // 초기 상태
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 비즈니스 로직: 예매 확정
     public void confirm() {
         this.status = ReservationStatus.CONFIRMED;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 비즈니스 로직: 예매 취소
     public void cancel() {
         this.status = ReservationStatus.CANCELLED;
         this.cancelledAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 }
 

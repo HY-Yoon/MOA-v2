@@ -143,8 +143,6 @@ public class AdminSeatMapService {
                 .hallName(request.getHallName())
                 .region(request.getRegion())
                 .totalSeats(totalSeatsCount)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build();
             return venueRepository.save(newVenue);
         });
@@ -167,8 +165,6 @@ public class AdminSeatMapService {
                     .name(sectionReq.getName())
                     .displayOrder(displayOrder++)
                     .defaultPrice(sectionReq.getPrice())
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
                     .build();
                 venueSeatSectionRepository.save(venueSection);
                 log.info("VenueSeatSection 생성: venueId={}, name={}, price={}", 
@@ -178,7 +174,6 @@ public class AdminSeatMapService {
                 if (existingSection.getDefaultPrice() == null || 
                     !existingSection.getDefaultPrice().equals(sectionReq.getPrice())) {
                     existingSection.setDefaultPrice(sectionReq.getPrice());
-                    existingSection.setUpdatedAt(LocalDateTime.now());
                     venueSeatSectionRepository.save(existingSection);
                     log.info("VenueSeatSection 가격 업데이트: venueId={}, name={}, price={}", 
                         venue.getId(), sectionReq.getName(), sectionReq.getPrice());
@@ -194,8 +189,6 @@ public class AdminSeatMapService {
             .canvas(canvasMap)
             .sections(sectionsList)
             .seats(seatsList)
-            .createdAt(LocalDateTime.now())
-            .updatedAt(LocalDateTime.now())
             .build();
         
         seatMap = seatMapRepository.save(seatMap);

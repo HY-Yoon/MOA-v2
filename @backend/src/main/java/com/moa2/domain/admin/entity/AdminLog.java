@@ -1,6 +1,7 @@
 package com.moa2.domain.admin.entity;
 
 import com.moa2.domain.user.entity.User;
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.AdminAction;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "admin_logs")
-public class AdminLog {
+public class AdminLog extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -36,8 +37,6 @@ public class AdminLog {
     private String reason; // 사유
     private String clientIp; // IP 주소
 
-    private LocalDateTime createdAt;
-
     @Builder
     public AdminLog(User admin, String targetType, Long targetId, 
                     AdminAction action, String reason, String clientIp) {
@@ -47,7 +46,6 @@ public class AdminLog {
         this.action = action;
         this.reason = reason;
         this.clientIp = clientIp;
-        this.createdAt = LocalDateTime.now();
     }
 }
 

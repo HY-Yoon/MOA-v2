@@ -1,6 +1,7 @@
 package com.moa2.domain.auth.entity;
 
 import com.moa2.domain.auth.converter.RefreshTokenConverter;
+import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.SocialProvider;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -23,7 +24,7 @@ import java.time.LocalDateTime;
     @Index(name = "idx_refresh_token_token", columnList = "token"),
     @Index(name = "idx_refresh_token_email_provider", columnList = "user_email,social_provider")
 })
-public class RefreshToken {
+public class RefreshToken extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

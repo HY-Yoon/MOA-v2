@@ -1,5 +1,6 @@
 package com.moa2.api.admin.user.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.model.UserStatus;
 import lombok.AllArgsConstructor;
@@ -22,6 +23,7 @@ public class UserListResponse {
     private SocialProvider socialProvider;
     private UserStatus status;
     private Boolean isVerified;
+    
     private LocalDateTime createdAt;
 }
 
