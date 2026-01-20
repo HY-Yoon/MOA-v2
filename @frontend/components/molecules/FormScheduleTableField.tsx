@@ -32,7 +32,6 @@ type ScheduleFieldConfig = {
   header: string;
   inputType?: string;
   placeholder?: string;
-  min?: string;
 };
 
 const SCHEDULE_FIELDS: ScheduleFieldConfig[] = [
@@ -40,7 +39,6 @@ const SCHEDULE_FIELDS: ScheduleFieldConfig[] = [
     fieldName: SHOW_FORM_FIELDS.SHOW_DATE,
     header: '공연일',
     inputType: 'date',
-    min: dayjs().format(DATE_FORMAT.DATE_ONLY),
   },
   {
     fieldName: SHOW_FORM_FIELDS.SHOW_TIME,
@@ -78,7 +76,6 @@ export function FormScheduleTableField<T extends FieldValues>({
         <Input
           type={fieldConfig.inputType}
           placeholder={fieldConfig.placeholder}
-          min={fieldConfig.min}
           {...register(fieldPath)}
           className={error ? 'border-red-500' : ''}
           disabled={isReservedSchedule(index)}

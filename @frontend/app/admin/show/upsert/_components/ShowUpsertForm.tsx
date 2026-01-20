@@ -203,9 +203,7 @@ export default function ShowUpsertForm(props: Props) {
             [SHOW_FORM_FIELDS.SCHEDULE_ID]: schedule.scheduleId,
             [SHOW_FORM_FIELDS.SHOW_DATE]: schedule.showDate,
             [SHOW_FORM_FIELDS.SHOW_TIME]: schedule.showTime,
-            [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: dayjs(schedule.ticketOpenTime).format(
-              DATE_FORMAT.FULL_NO_SEC,
-            ),
+            [SHOW_FORM_FIELDS.TICKET_OPEN_TIME]: schedule.ticketOpenTime.slice(0, 16),
             [SHOW_FORM_FIELDS.RESERVATION_COUNT]: schedule.reservationCount,
           }))
         : [createEmptySchedule()];
@@ -218,7 +216,7 @@ export default function ShowUpsertForm(props: Props) {
       [SHOW_FORM_FIELDS.HALL_NAME]: data.hallName,
       [SHOW_FORM_FIELDS.RUNNING_TIME]: data.runningTime,
       [SHOW_FORM_FIELDS.CAST]: data.cast,
-      [SHOW_FORM_FIELDS.START_DATE]: dayjs(data.saleStartDate).format(DATE_FORMAT.DATE_ONLY),
+      [SHOW_FORM_FIELDS.START_DATE]: data.saleStartDate.split('T')[0],
       [SHOW_FORM_FIELDS.SCHEDULES]: formSchedules,
     };
 
@@ -412,9 +410,9 @@ export default function ShowUpsertForm(props: Props) {
         endDate: stringToDate(endDate),
       },
       schedules: schedules.map((schedule) => ({
-        showDate: stringToDate(schedule.showDate), // YYYY-MM-DD -> Date
-        showTime: schedule.showTime, // HH:mm -> string
-        ticketOpenTime: stringToDate(schedule.ticketOpenTime), // YYYY-MM-DDTHH:mm -> Date
+        showDate: stringToDate(schedule.showDate),
+        showTime: schedule.showTime,
+        ticketOpenTime: stringToDate(schedule.ticketOpenTime),
         ...(isUpdate && { scheduleId: schedule.scheduleId }), // 수정이면 공연 일정 아이디 추가
       })),
       ...(isUpdate && { deletedScheduleIds }), // 수정이면 공연 일정 삭제 아이디 추가
