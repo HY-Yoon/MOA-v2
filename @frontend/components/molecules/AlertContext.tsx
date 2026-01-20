@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/atoms/alert-dialog';
 
-interface AlertOptions {
+export interface AlertOptions {
   title: string;
   description?: string;
   confirmText?: string;
@@ -60,9 +60,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         ...options,
         cancelText: undefined,
       });
-      setResolver(() => () => {
-        resolve();
-      });
+      setResolver(() => resolve);
       setIsOpen(true);
     });
   }, []);
