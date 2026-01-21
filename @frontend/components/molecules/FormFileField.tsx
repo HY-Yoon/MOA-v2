@@ -66,7 +66,7 @@ export function FormFileField({
           url: previewImages,
         },
       ]);
-    } else if (Array.isArray(previewImages)) {
+    } else if (Array.isArray(previewImages) && previewImages.length > 0) {
       // 배열인 경우 (상세 이미지)
       const urlItems: FileItem[] = previewImages.map((img) => {
         const isStringType = typeof img === 'string';
