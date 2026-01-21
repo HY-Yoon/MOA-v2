@@ -18,6 +18,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 사용자용 공연 조회 컨트롤러
@@ -161,6 +162,31 @@ public class ShowController {
                 id, scheduleId, e.getMessage());
             return ResponseEntity.badRequest()
                 .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * 날짜별 회차 조회
+     */
+    @Operation(
+            summary = "날짜별 회차 조회",
+            description = "특정 공연(showId)의 회차 목록을 조회합니다.\n\n" +
+                    "- date 파라미터가 없으면 전체 회차 반환\n" +
+                    "- date 파라미터가 있으면 해당 날짜의 회차만 반환\n" +
+                    "- isSoldOut: 예약된 좌석 수 >= 전체 좌석 수 기준으로 계산"
+    )
+    @GetMapping("/{showId}/schedules")
+    public ResponseEntity<ApiResponse<List<ShowScheduleListResponse>>> getShowSchedules(
+            @Parameter(description = "공연 ID", required = true) @PathVariable Long showId,
+            @Parameter(description = "공연 날짜 (YYYY-MM-DD, 선택)")
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date
+    ) {
+        try {
+            List<ShowScheduleListResponse> result = showService.getShowSchedules(showId, date);
+            return ResponseEntity.ok(ApiResponse.success(result));
+        } catch (RuntimeException e) {
+            log.error("공연 회차 조회 실패: showId={}, date={}, error={}", showId, date, e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 }

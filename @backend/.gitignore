@@ -44,7 +44,7 @@ SECURITY_CONFIG_README.md
 src/main/resources/dummy-data.sql
 src/main/resources/README-DUMMY-DATA.md
 src/main/resources/clear_all_data.sql
-
+QUEUE_API_TEST_GUIDE.md
 
 .history
 .cursorrules

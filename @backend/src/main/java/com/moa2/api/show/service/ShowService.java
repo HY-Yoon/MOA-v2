@@ -8,13 +8,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -279,5 +277,43 @@ public class ShowService {
             .totalRemainingSeats(totalRemainingSeats)
             .totalAvailabilityRate(totalAvailabilityRate)
             .build();
+    }
+
+    /**
+     * 날짜별 회차 조회
+     * - date가 없으면 전체 회차 반환
+     * - isSoldOut: (예약된 좌석 수 >= 전체 좌석 수) 기준
+     */
+    @Transactional(readOnly = true)
+    public List<ShowScheduleListResponse> getShowSchedules(Long showId, LocalDate date) {
+        log.debug("공연 회차 조회 요청: showId={}, date={}", showId, date);
+
+        Show show = showRepository.findById(showId)
+                .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
+
+        List<ShowSchedule> schedules = showScheduleRepository.findByShowIdAndOptionalDate(showId, date);
+
+        // 공연장의 전체 물리 좌석 수
+        Long totalSeats = 0L;
+        if (show.getVenue() != null) {
+            totalSeats = seatRepository.countByVenueId(show.getVenue().getId());
+        }
+
+        final long finalTotalSeats = totalSeats != null ? totalSeats : 0L;
+
+        return schedules.stream()
+                .map(schedule -> {
+                    Long reservedCount = reservationRepository.countByScheduleId(schedule.getId());
+                    long reserved = reservedCount != null ? reservedCount : 0L;
+                    boolean soldOut = finalTotalSeats > 0 && reserved >= finalTotalSeats;
+
+                    return ShowScheduleListResponse.builder()
+                            .scheduleId(schedule.getId())
+                            .date(schedule.getShowDate())
+                            .time(schedule.getShowTime())
+                            .isSoldOut(soldOut)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 }
