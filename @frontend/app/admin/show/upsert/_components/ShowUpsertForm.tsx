@@ -460,8 +460,6 @@ export default function ShowUpsertForm(props: Props) {
     const request = createRequestForm(formData);
     const requestFormData = createFormData(request);
 
-    console.log('request', request);
-
     // api
     const response = isUpdate
       ? await updateShowMutation.mutateAsync(requestFormData)
@@ -472,6 +470,17 @@ export default function ShowUpsertForm(props: Props) {
       router.push(ADMIN_ROUTES.SHOW);
     }
   }
+
+  // 공연 상태 (수정화면에서만)
+  const statusField = (
+    <FormField isLoading={isLoading} label="상태" htmlFor="status">
+      {data?.status ? (
+        <Badge className={SHOW_STATUS_COLORS[data.status as ShowStatus]}>
+          {SHOW_STATUS_LABELS[data.status as ShowStatus]}
+        </Badge>
+      ) : null}
+    </FormField>
+  );
 
   return (
     <Card className="shadow-lg">
@@ -491,16 +500,8 @@ export default function ShowUpsertForm(props: Props) {
           onSubmit={handleSubmit(onSubmit, (errors) => console.warn('유효성 검사 실패', errors))}
         >
           <div className="space-y-6">
-            {
-              /* 0. 공연 상태 (수정화면에서만) */
-              isUpdate && (
-                <FormField isLoading={isLoading} label="상태" htmlFor="status">
-                  <Badge className={SHOW_STATUS_COLORS[data?.status as ShowStatus]}>
-                    {SHOW_STATUS_LABELS[data?.status as ShowStatus]}
-                  </Badge>
-                </FormField>
-              )
-            }
+            {/* 0. 공연 상태 */}
+            {isUpdate && statusField}
 
             {/* 1. 제목 */}
             <FormInputField
