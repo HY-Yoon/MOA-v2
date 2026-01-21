@@ -1,9 +1,11 @@
 import { BE_URL } from '@/constants/common/url';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+type Props = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, { params }: Props) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // 프로덕션 환경에서만 사용되므로 항상 실제 백엔드 API 호출
     const response = await fetch(`${BE_URL}/api/admin/shows/${id}`, {
@@ -27,9 +29,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: Props) {
   try {
-    const { id } = params;
+    const { id } = await params;
+
     const body = await request.json();
 
     // 실제 백엔드 API 호출
@@ -56,9 +59,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: Props) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // 실제 백엔드 API 호출
     const response = await fetch(`${BE_URL}/api/admin/shows/${id}`, {

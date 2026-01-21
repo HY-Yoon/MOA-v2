@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-interface Props {
-  params: {
-    id: string;
-  };
-}
+type Props = { params: Promise<{ id: string }> };
 
 // 좌석 상세 조회 API
 export async function GET(request: NextRequest, { params }: Props) {
   try {
-    const id = Number(params.id);
+    const { id } = await params;
 
     // TODO: 실제 DB 조회 로직 구현
     const seat: Seat.UpsertFormData | null = null;
@@ -43,7 +39,7 @@ export async function GET(request: NextRequest, { params }: Props) {
 // 좌석 수정 API
 export async function PUT(request: NextRequest, { params }: Props) {
   try {
-    const id = Number(params.id);
+    const { id } = await params;
     const body = await request.json();
 
     // TODO: 실제 DB 업데이트 로직 구현
@@ -67,7 +63,7 @@ export async function PUT(request: NextRequest, { params }: Props) {
 // 좌석 삭제 API
 export async function DELETE(request: NextRequest, { params }: Props) {
   try {
-    const id = Number(params.id);
+    const { id } = await params;
 
     // TODO: 실제 DB 삭제 로직 구현
 
