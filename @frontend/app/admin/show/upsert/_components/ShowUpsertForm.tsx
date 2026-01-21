@@ -145,6 +145,7 @@ export default function ShowUpsertForm(props: Props) {
     { label: '큰홀', value: 'big' },
     { label: '작은홀', value: 'small' },
   ]);
+  const [mounted, setMounted] = useState(false);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [detailFiles, setDetailFiles] = useState<File[]>([]);
   const [deletedScheduleIds, setDeletedScheduleIds] = useState<number[]>([]);
@@ -193,6 +194,11 @@ export default function ShowUpsertForm(props: Props) {
     control,
     name: SHOW_FORM_FIELDS.SCHEDULES,
   });
+
+  // 리액트 하이드레이션 무한 루프 방지용 마운트 플래그
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 수정인 경우 데이터 로드 후 폼 초기화
   useEffect(() => {
@@ -496,196 +502,207 @@ export default function ShowUpsertForm(props: Props) {
 
       {/*content*/}
       <CardContent>
-        <form
-          onSubmit={handleSubmit(onSubmit, (errors) => console.warn('유효성 검사 실패', errors))}
-        >
+        {!mounted ? (
+          // 서버 사이드에서 렌더링 중에 로딩 화면 표시
           <div className="space-y-6">
-            {/* 0. 공연 상태 */}
-            {isUpdate && statusField}
-
-            {/* 1. 제목 */}
-            <FormInputField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.TITLE}
-              label="제목"
-              htmlFor={SHOW_FORM_FIELDS.TITLE}
-              register={register}
-              errors={errors}
-              placeholder="제목을 입력하세요. (100자 이내)"
-              required={true}
-            />
-
-            {/* 2. 장르 */}
-            <FormSelectField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.GENRE}
-              label="장르"
-              htmlFor={SHOW_FORM_FIELDS.GENRE}
-              control={control}
-              errors={errors}
-              options={GENRE_OPTIONS}
-              placeholder="장르를 선택하세요."
-              required={true}
-              disabled={isDisabledEdit}
-            />
-
-            {/* 3. 지역 */}
-            <FormSelectField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.REGION}
-              label="지역"
-              htmlFor={SHOW_FORM_FIELDS.REGION}
-              control={control}
-              errors={errors}
-              options={REGION_OPTIONS}
-              placeholder="지역을 선택하세요."
-              required={true}
-              disabled={isDisabledEdit}
-            />
-
-            {/* 4. 장소 */}
-            <FormSelectField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.VENUE_NAME}
-              label="장소"
-              htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
-              control={control}
-              errors={errors}
-              options={venueOptions}
-              placeholder="장소를 선택하세요."
-              required={true}
-              className="xl:col-span-1"
-              disabled={isDisabledEdit}
-            />
-
-            {/* 5. 공연장 */}
-            <FormSelectField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.HALL_NAME}
-              label="공연장"
-              htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
-              control={control}
-              errors={errors}
-              options={hallOptions}
-              placeholder="공연장을 선택하세요."
-              required={true}
-              className="xl:col-span-1"
-              disabled={isDisabledEdit}
-            />
-
-            {/* 6. 관람시간 */}
-            <FormInputField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.RUNNING_TIME}
-              label="관람시간"
-              htmlFor={SHOW_FORM_FIELDS.RUNNING_TIME}
-              register={register}
-              errors={errors}
-              placeholder="관람시간을 입력하세요. (분 단위, ex. 100분)"
-              required={true}
-            />
-
-            {/* 7. 출연진 */}
-            <FormInputField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.CAST}
-              label="출연진"
-              htmlFor={SHOW_FORM_FIELDS.CAST}
-              register={register}
-              errors={errors}
-              placeholder="출연진을 입력하세요. (500자 이내)"
-              required={true}
-            />
-
-            {/* 8. 일정(테이블) */}
-            <FormField
-              isLoading={isLoading}
-              label="일정"
-              htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
-              required={true}
-              error={errors?.schedules?.message}
-              description={isUpdate ? '예매된 좌석이 있는 일정은 수정 및 삭제할 수 없습니다.' : ''}
-            >
-              <FormScheduleTableField<ShowFormData>
-                fields={fields}
-                register={register}
-                scheduleErrors={errors?.schedules as FieldErrors<ShowUpsert.Schedule[]>}
-                removeSchedule={handleScheduleRemove}
-                addSchedule={() => append(createEmptySchedule())}
-              />
-            </FormField>
-
-            {/* 9. 예매 시작일 */}
-            <FormInputField
-              isLoading={isLoading}
-              name={SHOW_FORM_FIELDS.START_DATE}
-              label="예매 시작일"
-              htmlFor={SHOW_FORM_FIELDS.START_DATE}
-              type="date"
-              register={register}
-              errors={errors}
-              placeholder="예매 시작일을 입력하세요."
-              required={true}
-              description="예매 종료일은 마지막 공연일로 자동 설정됩니다."
-              disabled={isDisabledEdit}
-            />
-
-            {/* 10. 메인 포스터 */}
-            <FormFileField
-              isLoading={isLoading}
-              label="메인 포스터"
-              htmlFor="poster"
-              required={true}
-              maxSize={10}
-              onFileChange={handlePosterChange}
-              error={errors.root?.poster?.message}
-              previewImages={data?.posterUrl || undefined}
-            />
-
-            {/* 11. 상세 이미지 */}
-            <FormFileField
-              isLoading={isLoading}
-              label="상세 이미지"
-              htmlFor="detail-images"
-              required={true}
-              multiple={true}
-              maxSize={10}
-              onFileChange={handleDetailImagesChange}
-              error={errors.root?.details?.message}
-              previewImages={data?.detailImages || []}
-            />
-
-            {/*footer*/}
-            <div className="flex gap-4 border-t pt-6">
-              {isLoading ? (
-                <>
-                  <Skeleton className="h-12 flex-1" />
-                  <Skeleton className="h-12 flex-1" />
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    className="h-12 flex-1 text-base"
-                    onClick={router.back}
-                  >
-                    이전
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="h-12 flex-1 text-base"
-                    disabled={isSubmitting}
-                  >
-                    {flag}
-                  </Button>
-                </>
-              )}
-            </div>
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-40 w-full" />
           </div>
-        </form>
+        ) : (
+          <form
+            onSubmit={handleSubmit(onSubmit, (errors) => console.warn('유효성 검사 실패', errors))}
+          >
+            <div className="space-y-6">
+              {/* 0. 공연 상태 */}
+              {isUpdate && statusField}
+
+              {/* 1. 제목 */}
+              <FormInputField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.TITLE}
+                label="제목"
+                htmlFor={SHOW_FORM_FIELDS.TITLE}
+                register={register}
+                errors={errors}
+                placeholder="제목을 입력하세요. (100자 이내)"
+                required={true}
+              />
+
+              {/* 2. 장르 */}
+              <FormSelectField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.GENRE}
+                label="장르"
+                htmlFor={SHOW_FORM_FIELDS.GENRE}
+                control={control}
+                errors={errors}
+                options={GENRE_OPTIONS}
+                placeholder="장르를 선택하세요."
+                required={true}
+                disabled={isDisabledEdit}
+              />
+
+              {/* 3. 지역 */}
+              <FormSelectField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.REGION}
+                label="지역"
+                htmlFor={SHOW_FORM_FIELDS.REGION}
+                control={control}
+                errors={errors}
+                options={REGION_OPTIONS}
+                placeholder="지역을 선택하세요."
+                required={true}
+                disabled={isDisabledEdit}
+              />
+
+              {/* 4. 장소 */}
+              <FormSelectField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.VENUE_NAME}
+                label="장소"
+                htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
+                control={control}
+                errors={errors}
+                options={venueOptions}
+                placeholder="장소를 선택하세요."
+                required={true}
+                className="xl:col-span-1"
+                disabled={isDisabledEdit}
+              />
+
+              {/* 5. 공연장 */}
+              <FormSelectField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.HALL_NAME}
+                label="공연장"
+                htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
+                control={control}
+                errors={errors}
+                options={hallOptions}
+                placeholder="공연장을 선택하세요."
+                required={true}
+                className="xl:col-span-1"
+                disabled={isDisabledEdit}
+              />
+
+              {/* 6. 관람시간 */}
+              <FormInputField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.RUNNING_TIME}
+                label="관람시간"
+                htmlFor={SHOW_FORM_FIELDS.RUNNING_TIME}
+                register={register}
+                errors={errors}
+                placeholder="관람시간을 입력하세요. (분 단위, ex. 100분)"
+                required={true}
+              />
+
+              {/* 7. 출연진 */}
+              <FormInputField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.CAST}
+                label="출연진"
+                htmlFor={SHOW_FORM_FIELDS.CAST}
+                register={register}
+                errors={errors}
+                placeholder="출연진을 입력하세요. (500자 이내)"
+                required={true}
+              />
+
+              {/* 8. 일정(테이블) */}
+              <FormField
+                isLoading={isLoading}
+                label="일정"
+                htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
+                required={true}
+                error={errors?.schedules?.message}
+                description={
+                  isUpdate ? '예매된 좌석이 있는 일정은 수정 및 삭제할 수 없습니다.' : ''
+                }
+              >
+                <FormScheduleTableField<ShowFormData>
+                  fields={fields}
+                  register={register}
+                  scheduleErrors={errors?.schedules as FieldErrors<ShowUpsert.Schedule[]>}
+                  removeSchedule={handleScheduleRemove}
+                  addSchedule={() => append(createEmptySchedule())}
+                />
+              </FormField>
+
+              {/* 9. 예매 시작일 */}
+              <FormInputField
+                isLoading={isLoading}
+                name={SHOW_FORM_FIELDS.START_DATE}
+                label="예매 시작일"
+                htmlFor={SHOW_FORM_FIELDS.START_DATE}
+                type="date"
+                register={register}
+                errors={errors}
+                placeholder="예매 시작일을 입력하세요."
+                required={true}
+                description="예매 종료일은 마지막 공연일로 자동 설정됩니다."
+                disabled={isDisabledEdit}
+              />
+
+              {/* 10. 메인 포스터 */}
+              <FormFileField
+                isLoading={isLoading}
+                label="메인 포스터"
+                htmlFor="poster"
+                required={true}
+                maxSize={10}
+                onFileChange={handlePosterChange}
+                error={errors.root?.poster?.message}
+                previewImages={data?.posterUrl || undefined}
+              />
+
+              {/* 11. 상세 이미지 */}
+              <FormFileField
+                isLoading={isLoading}
+                label="상세 이미지"
+                htmlFor="detail-images"
+                required={true}
+                multiple={true}
+                maxSize={10}
+                onFileChange={handleDetailImagesChange}
+                error={errors.root?.details?.message}
+                previewImages={data?.detailImages || []}
+              />
+
+              {/*footer*/}
+              <div className="flex gap-4 border-t pt-6">
+                {isLoading ? (
+                  <>
+                    <Skeleton className="h-12 flex-1" />
+                    <Skeleton className="h-12 flex-1" />
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="h-12 flex-1 text-base"
+                      onClick={router.back}
+                    >
+                      이전
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="h-12 flex-1 text-base"
+                      disabled={isSubmitting}
+                    >
+                      {flag}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </form>
+        )}
       </CardContent>
     </Card>
   );
