@@ -17,9 +17,13 @@ public class QueueInterceptorConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 좌석 배치도 조회 API는 READY 상태 사용자만 접근 가능
+        // 좌석 배치도 조회/선점 API는 READY 상태 사용자만 접근 가능
         registry.addInterceptor(queueReadyInterceptor)
-                .addPathPatterns("/api/v1/schedules/*/seats");
+                .addPathPatterns(
+                        "/api/v1/schedules/*/seats",
+                        "/api/v1/schedules/*/seats/lock",
+                        "/api/v1/schedules/*/seats/unlock"
+                );
     }
 }
 

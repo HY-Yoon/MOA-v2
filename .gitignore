@@ -16,3 +16,4 @@ uploads/
 package-lock.json
 
 .env
+k6/

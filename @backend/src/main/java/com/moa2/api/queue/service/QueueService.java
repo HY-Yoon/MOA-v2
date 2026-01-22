@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -46,7 +47,11 @@ public class QueueService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
 
         // 3. 이미 대기열에 등록되어 있는지 확인 (WAITING 또는 READY 상태)
-        Optional<Queue> existingQueue = queueRepository.findActiveQueueByUserAndSchedule(userId, request.getScheduleId());
+        Optional<Queue> existingQueue = queueRepository.findTopByUserIdAndScheduleIdAndStatusInOrderByCreatedAtDesc(
+                userId,
+                request.getScheduleId(),
+                List.of(QueueStatus.WAITING, QueueStatus.READY)
+        );
 
         Queue queue;
         if (existingQueue.isPresent()) {
@@ -72,23 +77,6 @@ public class QueueService {
     }
 
     /**
-     * 대기 상태 조회 (폴링)
-     * @param userId 사용자 ID
-     * @return 대기열 상태 정보
-     */
-    public QueueStatusResponse getQueueStatus(Long userId) {
-        log.debug("대기 상태 조회 - userId: {}", userId);
-
-        // 1. 사용자의 가장 최근 대기열 조회
-        // TODO: 현재는 단순 구현. 실제로는 특정 scheduleId를 파라미터로 받아야 함
-        // 임시로 userId로만 조회하는 방식 사용
-        
-        // 실제 구현 시에는 scheduleId를 함께 받아서 조회해야 함
-        // 여기서는 테스트를 위해 간단히 구현
-        throw new UnsupportedOperationException("scheduleId를 함께 전달해야 합니다. getQueueStatus(userId, scheduleId) 메서드를 사용하세요.");
-    }
-
-    /**
      * 대기 상태 조회 (scheduleId 포함)
      * @param userId 사용자 ID
      * @param scheduleId 스케줄 ID
@@ -97,8 +85,13 @@ public class QueueService {
     public QueueStatusResponse getQueueStatus(Long userId, Long scheduleId) {
         log.debug("대기 상태 조회 - userId: {}, scheduleId: {}", userId, scheduleId);
 
-        // 1. 대기열 조회
-        Queue queue = queueRepository.findByUserIdAndScheduleId(userId, scheduleId)
+        // 1. 대기열 조회 (활성 우선, 없으면 최신 1건)
+        Queue queue = queueRepository.findTopByUserIdAndScheduleIdAndStatusInOrderByCreatedAtDesc(
+                        userId,
+                        scheduleId,
+                        List.of(QueueStatus.WAITING, QueueStatus.READY)
+                )
+                .or(() -> queueRepository.findTopByUserIdAndScheduleIdOrderByCreatedAtDesc(userId, scheduleId))
                 .orElseThrow(() -> new IllegalArgumentException("대기열 정보를 찾을 수 없습니다. 먼저 대기열에 진입해주세요."));
 
         // 2. 상태별 응답 생성

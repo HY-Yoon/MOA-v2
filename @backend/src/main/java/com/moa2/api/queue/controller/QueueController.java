@@ -8,6 +8,7 @@ import com.moa2.domain.user.entity.User;
 import com.moa2.domain.user.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.model.SocialProvider;
+import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -173,8 +174,13 @@ public class QueueController {
             throw new IllegalStateException("인증이 필요합니다.");
         }
 
-        String email = (String) authentication.getPrincipal();
-        String provider = (String) authentication.getCredentials();
+        Object principalObj = authentication.getPrincipal();
+        if (!(principalObj instanceof UserPrincipal userPrincipal)) {
+            throw new IllegalStateException("인증 정보(principal)가 올바르지 않습니다. 다시 로그인해주세요.");
+        }
+
+        String email = userPrincipal.getEmail();
+        String provider = userPrincipal.getProvider();
         if (provider == null || provider.isBlank()) {
             // 과거 토큰( provider claim 없음 ) 또는 비정상 인증 상태
             throw new IllegalStateException("인증 정보(provider)가 없습니다. 다시 로그인해주세요.");

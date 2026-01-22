@@ -8,6 +8,7 @@ import com.moa2.domain.user.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.JwtTokenProvider;
+import com.moa2.global.security.UserPrincipal;
 import com.moa2.global.service.RefreshTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -146,7 +147,12 @@ public class AuthController {
             
             if (authentication != null && authentication.isAuthenticated() 
                     && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
-                email = (String) authentication.getPrincipal();
+                Object principalObj = authentication.getPrincipal();
+                if (principalObj instanceof UserPrincipal userPrincipal) {
+                    email = userPrincipal.getEmail();
+                } else {
+                    email = (String) principalObj;
+                }
                 log.debug("JWT 인증 (Cookie): {}", email);
             }
         }

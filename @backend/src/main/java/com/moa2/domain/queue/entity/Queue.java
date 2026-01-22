@@ -23,7 +23,9 @@ import java.time.LocalDateTime;
     name = "queues",
     indexes = {
         @Index(name = "idx_schedule_status_created", columnList = "schedule_id, status, created_at"),
-        @Index(name = "idx_user_schedule", columnList = "user_id, schedule_id")
+        @Index(name = "idx_schedule_status_id", columnList = "schedule_id, status, id"),
+        @Index(name = "idx_user_schedule", columnList = "user_id, schedule_id"),
+        @Index(name = "idx_user_schedule_status_created", columnList = "user_id, schedule_id, status, created_at")
     }
 )
 public class Queue extends BaseTimeEntity {

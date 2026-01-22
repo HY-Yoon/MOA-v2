@@ -3,10 +3,8 @@ package com.moa2.domain.show.repository;
 import com.moa2.domain.show.entity.ScheduleSeat;
 import com.moa2.global.model.SeatStatus;
 import jakarta.persistence.LockModeType;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
+import jakarta.persistence.QueryHint;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -37,9 +35,14 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
      * 좌석 선점 시 동시성 제어용
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({
+            // 👇 [핵심] "락을 얻으려고 3초(3000ms) 이상 기다리지 마라"
+            @QueryHint(name = "javax.persistence.lock.timeout", value = "3000")
+    })
     @Query("SELECT ss FROM ScheduleSeat ss " +
            "WHERE ss.schedule.id = :scheduleId " +
-           "AND ss.seat.id IN :seatIds")
+           "AND ss.seat.id IN :seatIds " +
+           "ORDER BY ss.seat.id ASC")
     List<ScheduleSeat> findByScheduleIdAndSeatIdInForUpdate(
         @Param("scheduleId") Long scheduleId,
         @Param("seatIds") List<Long> seatIds

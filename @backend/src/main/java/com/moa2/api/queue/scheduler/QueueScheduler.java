@@ -30,13 +30,13 @@ public class QueueScheduler {
     /**
      * 스케줄(회차) 당 동시에 입장 가능한 최대 READY 인원
      */
-    @Value("${queue.max-ready-users:100}")
+    @Value("${queue.max-ready-users:3}")
     private int maxReadyUsers;
 
     /**
      * 1회 스케줄러 실행 시, WAITING → READY로 승격할 최대 인원
      */
-    @Value("${queue.activate-batch-size:10}")
+    @Value("${queue.activate-batch-size:5}")
     private int activateBatchSize;
 
     /**

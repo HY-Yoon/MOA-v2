@@ -15,6 +15,7 @@ import com.moa2.global.model.SaleStatus;
 import com.moa2.global.model.ScheduleStatus;
 import com.moa2.global.model.ShowStatus;
 import com.moa2.global.model.SocialProvider;
+import com.moa2.global.security.UserPrincipal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,8 +105,8 @@ class QueueGateFlowTest {
                 .build());
 
         Authentication auth = new UsernamePasswordAuthenticationToken(
-                user.getEmail(),
-                user.getSocialProvider().name(),
+                new UserPrincipal(user.getEmail(), user.getSocialProvider().name()),
+                null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
 
@@ -120,7 +121,7 @@ class QueueGateFlowTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.queueId").isNumber());
 
-        Queue queueAfterEnter = queueRepository.findByUserIdAndScheduleId(user.getId(), schedule.getId())
+        Queue queueAfterEnter = queueRepository.findTopByUserIdAndScheduleIdOrderByCreatedAtDesc(user.getId(), schedule.getId())
                 .orElseThrow();
         assertThat(queueAfterEnter.getStatus()).isEqualTo(QueueStatus.WAITING);
 
@@ -135,7 +136,7 @@ class QueueGateFlowTest {
         // 3) 승격: 스케줄러(processQueue)를 강제로 돌리면 READY로 변하는가?
         queueScheduler.processQueue();
 
-        Queue queueAfterScheduler = queueRepository.findByUserIdAndScheduleId(user.getId(), schedule.getId())
+        Queue queueAfterScheduler = queueRepository.findTopByUserIdAndScheduleIdOrderByCreatedAtDesc(user.getId(), schedule.getId())
                 .orElseThrow();
         assertThat(queueAfterScheduler.getStatus()).isEqualTo(QueueStatus.READY);
         assertThat(queueAfterScheduler.getActiveUntil()).isNotNull();

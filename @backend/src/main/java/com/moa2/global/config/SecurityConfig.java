@@ -184,7 +184,8 @@ public class SecurityConfig {
                                 "/api/v1/admin/**",
                                 "/actuator/**",
                                 "/actuator/health",
-                                "/api/v1/shows/**")
+                                "/api/v1/shows/**",
+                                "/api/test/**")
                         .permitAll()
 
                         // 마이페이지 - 인증 필요

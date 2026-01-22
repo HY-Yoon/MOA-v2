@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,22 +18,20 @@ import java.util.Optional;
 public interface QueueRepository extends JpaRepository<Queue, Long> {
 
     /**
-     * 특정 사용자와 스케줄에 대한 대기열 조회
-     * (중복 진입 방지용)
+     * 특정 사용자와 스케줄에 대한 "활성" 대기열 조회 (최신 1건)
+     * - WAITING/READY 중 가장 최근(createdAt desc) 1건을 반환
      */
-    @Query("SELECT q FROM Queue q " +
-           "WHERE q.user.id = :userId " +
-           "AND q.schedule.id = :scheduleId " +
-           "AND q.status IN ('WAITING', 'READY')")
-    Optional<Queue> findActiveQueueByUserAndSchedule(
-        @Param("userId") Long userId,
-        @Param("scheduleId") Long scheduleId
+    Optional<Queue> findTopByUserIdAndScheduleIdAndStatusInOrderByCreatedAtDesc(
+            Long userId,
+            Long scheduleId,
+            Collection<QueueStatus> statuses
     );
 
     /**
-     * 특정 사용자와 스케줄에 대한 대기열 조회 (모든 상태)
+     * 특정 사용자와 스케줄에 대한 대기열 조회 (모든 상태 중 최신 1건)
+     * - 데이터가 누적되어도 NonUniqueResultException 방지
      */
-    Optional<Queue> findByUserIdAndScheduleId(Long userId, Long scheduleId);
+    Optional<Queue> findTopByUserIdAndScheduleIdOrderByCreatedAtDesc(Long userId, Long scheduleId);
 
     /**
      * 내 앞 대기 인원 수 계산

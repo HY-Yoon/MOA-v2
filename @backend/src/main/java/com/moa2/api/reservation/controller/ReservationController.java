@@ -6,6 +6,7 @@ import com.moa2.api.reservation.dto.ReservationListResponse;
 import com.moa2.api.reservation.service.ReservationService;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.dto.PageResponse;
+import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -372,6 +373,10 @@ public class ReservationController {
             throw new IllegalStateException("인증이 필요합니다.");
         }
         
-        return (String) authentication.getPrincipal();
+        Object principalObj = authentication.getPrincipal();
+        if (principalObj instanceof UserPrincipal userPrincipal) {
+            return userPrincipal.getEmail();
+        }
+        return (String) principalObj;
     }
 }

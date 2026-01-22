@@ -36,15 +36,14 @@ out/
 ### VS Code ###
 .vscode/
 
-SAMPLE_DATA.md
-SEATS_INFO.md
-SOCIAL_LOGIN.md
-GOOGLE_OAUTH_IMPLEMENTATION_REVIEW.md
-SECURITY_CONFIG_README.md
+docs/*
+src/main/java/com/moa2/api/test/
+
+
 src/main/resources/dummy-data.sql
 src/main/resources/README-DUMMY-DATA.md
 src/main/resources/clear_all_data.sql
-QUEUE_API_TEST_GUIDE.md
+src/main/resources/k6_dummy_data.sql
 
 .history
 .cursorrules

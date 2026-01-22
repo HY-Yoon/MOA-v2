@@ -37,13 +37,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validateAccessToken(token)) {
             String email = jwtTokenProvider.getEmailFromAccessToken(token);
             String provider = jwtTokenProvider.getProviderFromAccessToken(token);
-            
+
             // 인증 객체 생성 (권한은 기본적으로 USER로 설정)
+            UserPrincipal userPrincipal = new UserPrincipal(email, provider);
             Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    email,
-                    provider,
-                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
-            );
+                    userPrincipal,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             log.debug("JWT 인증 성공: {}", LogMaskingUtil.maskEmail(email));
@@ -54,6 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * HTTP 요청에서 JWT 토큰 추출 (Cookie에서만)
+     * 
      * @param request HTTP 요청
      * @return JWT 토큰 문자열 (없으면 null)
      */
@@ -69,4 +70,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 }
-
