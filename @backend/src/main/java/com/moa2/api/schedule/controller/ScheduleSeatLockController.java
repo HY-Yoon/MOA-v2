@@ -47,10 +47,10 @@ public class ScheduleSeatLockController {
 
     @Operation(
             summary = "좌석 선점",
-            description = "특정 회차(scheduleId)의 좌석을 5분간 선점(LOCK)합니다.\n\n" +
-                    "- **동시성 제어:** schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
-                    "- **규칙:** 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경\n" +
-                    "- **권한:** 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
+            description = "'결제하기'를 누르는 순간 특정 회차(scheduleId)의 좌석을 5분간 선점(LOCK)합니다.\n\n" +
+                    "- 동시성 제어: schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
+                    "- 규칙: 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경\n" +
+                    "- 권한: 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
     )
     @PostMapping("/{scheduleId}/seats/lock")
     public ResponseEntity<ApiResponse<SeatLockResponse>> lockSeats(

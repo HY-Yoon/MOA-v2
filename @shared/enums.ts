@@ -6,7 +6,7 @@ export type Gender = "MALE" | "FEMALE" | "OTHER";
 
 export type Genre = "MUSICAL" | "CONCERT" | "THEATER" | "CLASSIC" | "DANCE";
 
-export type PaymentMethod = "CARD" | "VIRTUAL_ACCOUNT" | "EASY_PAY" | "TRANSFER" | "TOSS";
+export type PaymentMethod = "CARD" | "VIRTUAL_ACCOUNT" | "EASY_PAY" | "TRANSFER" | "MOBILE" | "TOSS" | "ETC";
 
 export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
 

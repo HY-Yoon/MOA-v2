@@ -8,7 +8,9 @@ public enum PaymentMethod {
     VIRTUAL_ACCOUNT, // 가상계좌
     EASY_PAY,        // 간편결제
     TRANSFER,        // 계좌이체
-    TOSS             // 토스페이
+    MOBILE,          // 휴대폰
+    TOSS,            // 토스페이
+    ETC              // 기타
 }
 
 

@@ -23,7 +23,7 @@ public class ReservationSeat {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seat_id", nullable = false)
-    private Seat seat; // 공연 도메인의 물리적 좌석
+    private Seat seat; // 공연 도메인`의 물리적 좌석
 
     private Integer price;
 

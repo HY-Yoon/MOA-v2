@@ -73,7 +73,7 @@ public class QueueController {
     public ResponseEntity<ApiResponse<QueueEnterResponse>> enterQueue(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "대기열 진입 요청", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = QueueEnterRequest.class), examples = @ExampleObject(name = "요청 예시", value = """
                     {
-                      "scheduleId": 100
+                      "scheduleId": 7
                     }
                     """))) @Valid @RequestBody QueueEnterRequest request) {
 

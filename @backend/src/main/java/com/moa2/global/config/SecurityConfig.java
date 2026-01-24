@@ -120,10 +120,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // CustomOAuth2AuthorizationRequestResolver 생성
         // 기존 회원은 동의 화면 건너뛰고, 신규 회원만 동의 화면 표시
-        DefaultOAuth2AuthorizationRequestResolver defaultResolver = 
-            new DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository, "/oauth2/authorization");
-        CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver = 
-            new CustomOAuth2AuthorizationRequestResolver(defaultResolver, jwtTokenProvider, userRepository, refreshTokenRepository);
+        DefaultOAuth2AuthorizationRequestResolver defaultResolver = new DefaultOAuth2AuthorizationRequestResolver(
+                clientRegistrationRepository, "/oauth2/authorization");
+        CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver = new CustomOAuth2AuthorizationRequestResolver(
+                defaultResolver, jwtTokenProvider, userRepository, refreshTokenRepository);
         http
                 // CORS 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -185,7 +185,8 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/actuator/health",
                                 "/api/v1/shows/**",
-                                "/api/test/**")
+                                "/api/test/**",
+                                "/api/v1/payment/**")
                         .permitAll()
 
                         // 마이페이지 - 인증 필요
