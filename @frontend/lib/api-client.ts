@@ -10,7 +10,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // axios 인스턴스 설정
 export const axiosInstance: AxiosInstance = axios.create({
-  baseURL: BE_URL, // isProduction ? '' : BE_URL, // 개발: 백엔드 직접, 프로덕션: 상대경로
+  baseURL: isProduction ? '' : BE_URL, // 개발: 백엔드 직접, 프로덕션: 상대경로
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
