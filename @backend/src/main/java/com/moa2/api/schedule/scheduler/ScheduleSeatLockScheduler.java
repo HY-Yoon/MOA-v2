@@ -1,6 +1,6 @@
 package com.moa2.api.schedule.scheduler;
 
-import com.moa2.domain.show.repository.ScheduleSeatRepository;
+import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -1,9 +1,9 @@
 package com.moa2.api.schedule.service;
 
 import com.moa2.api.schedule.exception.SeatLockConflictException;
-import com.moa2.domain.show.entity.ScheduleSeat;
-import com.moa2.domain.show.repository.ScheduleSeatRepository;
-import com.moa2.domain.show.repository.ShowScheduleRepository;
+import com.moa2.api.show.domain.entity.ScheduleSeat;
+import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
+import com.moa2.api.show.domain.repository.ShowScheduleRepository;
 import com.moa2.global.model.SeatStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

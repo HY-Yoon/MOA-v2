@@ -1,19 +1,17 @@
 package com.moa2.api.reservation.service;
 
-import com.moa2.api.reservation.dto.ReservationCancelResponse;
-import com.moa2.api.reservation.dto.ReservationDetailResponse;
-import com.moa2.api.reservation.dto.ReservationListResponse;
-import com.moa2.domain.reservation.entity.Payment;
-import com.moa2.domain.reservation.entity.Reservation;
-import com.moa2.domain.reservation.entity.ReservationSeat;
-import com.moa2.domain.reservation.repository.PaymentRepository;
-import com.moa2.domain.reservation.repository.ReservationRepository;
-import com.moa2.domain.reservation.repository.ReservationSeatRepository;
-import com.moa2.domain.show.entity.Show;
-import com.moa2.domain.show.entity.ShowSchedule;
-import com.moa2.domain.show.entity.Venue;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.reservation.dto.ReservationDto;
+import com.moa2.api.reservation.domain.entity.Payment;
+import com.moa2.api.reservation.domain.entity.Reservation;
+import com.moa2.api.reservation.domain.entity.ReservationSeat;
+import com.moa2.api.reservation.domain.repository.PaymentRepository;
+import com.moa2.api.reservation.domain.repository.ReservationRepository;
+import com.moa2.api.reservation.domain.repository.ReservationSeatRepository;
+import com.moa2.api.show.domain.entity.Show;
+import com.moa2.api.show.domain.entity.ShowSchedule;
+import com.moa2.api.show.domain.entity.Venue;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.PageResponse;
 import com.moa2.global.model.ReservationStatus;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +42,7 @@ public class ReservationService {
      * 내 예매 내역 목록 조회
      */
     @Transactional(readOnly = true)
-    public PageResponse<ReservationListResponse> getMyReservations(String email, String status, Pageable pageable) {
+    public PageResponse<ReservationDto.ListResponse> getMyReservations(String email, String status, Pageable pageable) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
         
@@ -59,7 +57,7 @@ public class ReservationService {
             reservations = reservationRepository.findByUser(user, pageable);
         }
         
-        Page<ReservationListResponse> responseList = reservations.map(reservation -> {
+        Page<ReservationDto.ListResponse> responseList = reservations.map(reservation -> {
             ShowSchedule schedule = reservation.getShowSchedule();
             Show show = schedule.getShow();
             Venue venue = show.getVenue();
@@ -71,23 +69,23 @@ public class ReservationService {
             boolean canCancel = reservation.getStatus() == ReservationStatus.CONFIRMED 
                     && schedule.getShowDate().minusDays(2).atStartOfDay().isAfter(LocalDateTime.now());
             
-            return ReservationListResponse.builder()
+            return ReservationDto.ListResponse.builder()
                     .reservationId(reservation.getId())
                     .reservationNumber(reservation.getReservationNumber())
                     .reservationDate(reservation.getCreatedAt())
                     .reservationStatus(reservation.getStatus().name())
                     .paymentStatus(payment != null ? payment.getStatus().name() : null)
-                    .show(ReservationListResponse.ShowInfo.builder()
+                    .show(ReservationDto.ShowInfo.builder()
                             .showId(show.getId())
                             .title(show.getTitle())
                             .posterUrl(show.getPosterUrl())
                             .genre(show.getGenre().name())
                             .build())
-                    .schedule(ReservationListResponse.ScheduleInfo.builder()
+                    .schedule(ReservationDto.ScheduleInfo.builder()
                             .scheduleId(schedule.getId())
                             .showDate(schedule.getShowDate())
                             .showTime(schedule.getShowTime())
-                            .location(ReservationListResponse.LocationInfo.builder()
+                            .location(ReservationDto.LocationInfo.builder()
                                     .region(venue.getRegion().name())
                                     .venue(venue.getName())
                                     .hallName(venue.getHallName())
@@ -106,7 +104,7 @@ public class ReservationService {
      * 예매 상세 조회
      */
     @Transactional(readOnly = true)
-    public ReservationDetailResponse getReservationDetail(String email, Long reservationId) {
+    public ReservationDto.DetailResponse getReservationDetail(String email, Long reservationId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
         
@@ -120,8 +118,8 @@ public class ReservationService {
         
         // 좌석 정보 조회
         List<ReservationSeat> reservationSeats = reservationSeatRepository.findByReservationWithSeat(reservation);
-        List<ReservationDetailResponse.SeatInfo> seatInfos = reservationSeats.stream()
-                .map(rs -> ReservationDetailResponse.SeatInfo.builder()
+        List<ReservationDto.SeatInfo> seatInfos = reservationSeats.stream()
+                .map(rs -> ReservationDto.SeatInfo.builder()
                         .seatId(rs.getSeat().getId())
                         .section(rs.getSeat().getSection().getName())
                         .row(rs.getSeat().getSeatRow())
@@ -137,12 +135,12 @@ public class ReservationService {
         boolean canCancel = reservation.getStatus() == ReservationStatus.CONFIRMED 
                 && schedule.getShowDate().minusDays(2).atStartOfDay().isAfter(LocalDateTime.now());
         
-        return ReservationDetailResponse.builder()
+        return ReservationDto.DetailResponse.builder()
                 .reservationId(reservation.getId())
                 .reservationNumber(reservation.getReservationNumber())
                 .reservationDate(reservation.getCreatedAt())
                 .reservationStatus(reservation.getStatus().name())
-                .show(ReservationDetailResponse.ShowInfo.builder()
+                .show(ReservationDto.ShowInfo.builder()
                         .showId(show.getId())
                         .title(show.getTitle())
                         .posterUrl(show.getPosterUrl())
@@ -150,11 +148,11 @@ public class ReservationService {
                         .runningTime(show.getRunningTime())
                         .cast(show.getCast())
                         .build())
-                .schedule(ReservationDetailResponse.ScheduleInfo.builder()
+                .schedule(ReservationDto.ScheduleInfo.builder()
                         .scheduleId(schedule.getId())
                         .showDate(schedule.getShowDate())
                         .showTime(schedule.getShowTime())
-                        .location(ReservationDetailResponse.LocationInfo.builder()
+                        .location(ReservationDto.LocationInfo.builder()
                                 .region(venue.getRegion().name())
                                 .venue(venue.getName())
                                 .hallName(venue.getHallName())
@@ -163,12 +161,12 @@ public class ReservationService {
                         .build())
                 .seats(seatInfos)
                 .seatCount(reservation.getSeatCount())
-                .booker(ReservationDetailResponse.BookerInfo.builder()
+                .booker(ReservationDto.BookerInfo.builder()
                         .name(reservation.getBookerName())
                         .phone(reservation.getBookerPhone())
                         .email(reservation.getBookerEmail())
                         .build())
-                .payment(payment != null ? ReservationDetailResponse.PaymentInfo.builder()
+                .payment(payment != null ? ReservationDto.PaymentInfo.builder()
                         .orderId(payment.getOrderId())
                         .paymentKey(payment.getPaymentKey())
                         .totalAmount(payment.getAmount())
@@ -185,7 +183,7 @@ public class ReservationService {
      * 예매 취소
      */
     @Transactional
-    public ReservationCancelResponse cancelReservation(String email, Long reservationId) {
+    public ReservationDto.CancelResponse cancelReservation(String email, Long reservationId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
         
@@ -224,7 +222,7 @@ public class ReservationService {
         
         log.info("예매 취소 완료: {} (예매번호: {})", email, reservation.getReservationNumber());
         
-        return ReservationCancelResponse.builder()
+        return ReservationDto.CancelResponse.builder()
                 .reservationId(reservation.getId())
                 .reservationNumber(reservation.getReservationNumber())
                 .message("예매가 취소되었습니다.")

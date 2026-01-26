@@ -1,7 +1,7 @@
 package com.moa2.api.user.controller;
 
-import com.moa2.api.auth.dto.UserInfoResponse;
-import com.moa2.api.user.dto.UserDeleteResponse;
+import com.moa2.api.auth.dto.AuthDto;
+import com.moa2.api.user.dto.UserDto;
 import com.moa2.api.user.service.UserService;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.security.UserPrincipal;
@@ -87,11 +87,11 @@ public class UserController {
         )
     })
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo() {
+    public ResponseEntity<ApiResponse<AuthDto.UserInfoResponse>> getMyInfo() {
         // SecurityContext에서 인증된 사용자 이메일 가져오기
         String email = getAuthenticatedUserEmail();
         
-        UserInfoResponse response = userService.getMyInfo(email);
+        AuthDto.UserInfoResponse response = userService.getMyInfo(email);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -167,13 +167,12 @@ public class UserController {
         )
     })
     @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<UserDeleteResponse>> deleteMyAccount() {
+    public ResponseEntity<ApiResponse<UserDto.UserDeleteResponse>> deleteMyAccount() {
         try {
-            // SecurityContext에서 인증된 사용자 이메일 가져오기
             String email = getAuthenticatedUserEmail();
             
-            UserDeleteResponse response = userService.deleteMyAccount(email);
-            return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
+            UserDto.UserDeleteResponse response = userService.deleteMyAccount(email);
+            return ResponseEntity.ok(ApiResponse.success(response, response.message()));
             
         } catch (IllegalStateException e) {
             // 진행중인 예매가 있는 경우

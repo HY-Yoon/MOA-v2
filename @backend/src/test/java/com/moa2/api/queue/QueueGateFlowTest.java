@@ -1,14 +1,14 @@
 package com.moa2.api.queue;
 
 import com.moa2.api.queue.scheduler.QueueScheduler;
-import com.moa2.domain.queue.entity.Queue;
-import com.moa2.domain.queue.repository.QueueRepository;
+import com.moa2.api.queue.queue.entity.Queue;
+import com.moa2.api.queue.queue.repository.QueueRepository;
 import com.moa2.domain.show.entity.Show;
 import com.moa2.domain.show.entity.ShowSchedule;
 import com.moa2.domain.show.repository.ShowRepository;
 import com.moa2.domain.show.repository.ShowScheduleRepository;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.model.Genre;
 import com.moa2.global.model.QueueStatus;
 import com.moa2.global.model.SaleStatus;

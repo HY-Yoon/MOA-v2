@@ -1,10 +1,10 @@
 package com.moa2.global.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.moa2.domain.queue.entity.Queue;
-import com.moa2.domain.queue.repository.QueueRepository;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.queue.queue.entity.Queue;
+import com.moa2.api.queue.queue.repository.QueueRepository;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.model.QueueStatus;
 import com.moa2.global.model.SocialProvider;

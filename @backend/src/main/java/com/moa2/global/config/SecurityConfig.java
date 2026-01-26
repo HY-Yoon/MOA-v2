@@ -1,12 +1,12 @@
 package com.moa2.global.config;
 
-import com.moa2.domain.auth.repository.RefreshTokenRepository;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.handler.OAuth2FailureHandler;
 import com.moa2.global.handler.OAuth2SuccessHandler;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.security.JwtAuthenticationFilter;
-import com.moa2.global.service.CustomOAuth2UserService;
+import com.moa2.api.auth.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;

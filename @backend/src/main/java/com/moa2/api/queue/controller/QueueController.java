@@ -1,11 +1,9 @@
 package com.moa2.api.queue.controller;
 
-import com.moa2.api.queue.dto.QueueEnterRequest;
-import com.moa2.api.queue.dto.QueueEnterResponse;
-import com.moa2.api.queue.dto.QueueStatusResponse;
+import com.moa2.api.queue.dto.QueueDto;
 import com.moa2.api.queue.service.QueueService;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
@@ -70,18 +68,18 @@ public class QueueController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패 - 로그인 필요")
     })
     @PostMapping("/tokens")
-    public ResponseEntity<ApiResponse<QueueEnterResponse>> enterQueue(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "대기열 진입 요청", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = QueueEnterRequest.class), examples = @ExampleObject(name = "요청 예시", value = """
+    public ResponseEntity<ApiResponse<QueueDto.EnterResponse>> enterQueue(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "대기열 진입 요청", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = QueueDto.EnterRequest.class), examples = @ExampleObject(name = "요청 예시", value = """
                     {
                       "scheduleId": 7
                     }
-                    """))) @Valid @RequestBody QueueEnterRequest request) {
+                    """))) @Valid @RequestBody QueueDto.EnterRequest request) {
 
         try {
             // 현재 로그인한 사용자 ID 가져오기
             Long userId = getAuthenticatedUserId();
 
-            QueueEnterResponse response = queueService.enterQueue(userId, request);
+            QueueDto.EnterResponse response = queueService.enterQueue(userId, request);
             return ResponseEntity.ok(ApiResponse.success(response));
 
         } catch (IllegalArgumentException e) {
@@ -146,14 +144,14 @@ public class QueueController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패 - 로그인 필요")
     })
     @GetMapping("/tokens/status")
-    public ResponseEntity<ApiResponse<QueueStatusResponse>> getQueueStatus(
+    public ResponseEntity<ApiResponse<QueueDto.StatusResponse>> getQueueStatus(
             @Parameter(description = "스케줄 ID", required = true, example = "100") @RequestParam Long scheduleId) {
 
         try {
             // 현재 로그인한 사용자 ID 가져오기
             Long userId = getAuthenticatedUserId();
 
-            QueueStatusResponse response = queueService.getQueueStatus(userId, scheduleId);
+            QueueDto.StatusResponse response = queueService.getQueueStatus(userId, scheduleId);
             return ResponseEntity.ok(ApiResponse.success(response));
 
         } catch (IllegalArgumentException e) {

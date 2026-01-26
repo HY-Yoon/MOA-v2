@@ -1,5 +1,6 @@
 package com.moa2.api.payment.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moa2.api.payment.exception.TossPaymentException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,13 +25,16 @@ public class TossPaymentClient {
 
     private final RestTemplate restTemplate;
     private final String secretKey;
+    private final ObjectMapper objectMapper;
 
     public TossPaymentClient(
             RestTemplate restTemplate,
-            @Value("${toss.secret-key}") String secretKey
+            @Value("${toss.secret-key}") String secretKey,
+            ObjectMapper objectMapper
     ) {
         this.restTemplate = restTemplate;
         this.secretKey = secretKey;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -107,9 +111,12 @@ public class TossPaymentClient {
      */
     private TossPaymentException handleTossError(HttpClientErrorException e, String operation) {
         try {
-            TossErrorResponse errorResponse = e.getResponseBodyAs(TossErrorResponse.class);
-            if (errorResponse != null) {
-                return new TossPaymentException(errorResponse.code(), errorResponse.message());
+            String responseBody = e.getResponseBodyAsString();
+            if (responseBody != null && !responseBody.isEmpty()) {
+                TossErrorResponse errorResponse = objectMapper.readValue(responseBody, TossErrorResponse.class);
+                if (errorResponse != null) {
+                    return new TossPaymentException(errorResponse.code(), errorResponse.message());
+                }
             }
         } catch (Exception parseException) {
             log.warn("토스 에러 응답 파싱 실패", parseException);

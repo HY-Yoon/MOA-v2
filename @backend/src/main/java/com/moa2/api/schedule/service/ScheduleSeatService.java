@@ -1,9 +1,9 @@
 package com.moa2.api.schedule.service;
 
-import com.moa2.api.schedule.dto.ScheduleSeatsResponse;
-import com.moa2.domain.show.entity.ScheduleSeat;
-import com.moa2.domain.show.repository.ScheduleSeatRepository;
-import com.moa2.domain.show.repository.ShowScheduleRepository;
+import com.moa2.api.schedule.dto.ScheduleDto;
+import com.moa2.api.show.domain.entity.ScheduleSeat;
+import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
+import com.moa2.api.show.domain.repository.ShowScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,15 +27,15 @@ public class ScheduleSeatService {
     /**
      * 회차 좌석 배치도 조회
      */
-    public ScheduleSeatsResponse getScheduleSeats(Long scheduleId) {
+    public ScheduleDto.SeatsResponse getScheduleSeats(Long scheduleId) {
         // 스케줄 존재 여부 확인
         showScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
 
         List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findSeatMapByScheduleId(scheduleId);
 
-        List<ScheduleSeatsResponse.SeatInfo> seats = scheduleSeats.stream()
-                .map(ss -> ScheduleSeatsResponse.SeatInfo.builder()
+        List<ScheduleDto.SeatInfo> seats = scheduleSeats.stream()
+                .map(ss -> ScheduleDto.SeatInfo.builder()
                         .seatId(ss.getSeat().getId())
                         .row(ss.getSeat().getSeatRow())
                         .col(ss.getSeat().getSeatNumber())
@@ -45,7 +45,7 @@ public class ScheduleSeatService {
                         .build())
                 .collect(Collectors.toList());
 
-        return ScheduleSeatsResponse.builder()
+        return ScheduleDto.SeatsResponse.builder()
                 .scheduleId(scheduleId)
                 .seats(seats)
                 .build();

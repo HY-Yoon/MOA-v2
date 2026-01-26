@@ -1,13 +1,12 @@
 package com.moa2.api.queue.scheduler;
 
-import com.moa2.domain.queue.entity.Queue;
-import com.moa2.domain.queue.repository.QueueRepository;
+import com.moa2.api.queue.queue.entity.Queue;
+import com.moa2.api.queue.queue.repository.QueueRepository;
 import com.moa2.global.model.QueueStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 

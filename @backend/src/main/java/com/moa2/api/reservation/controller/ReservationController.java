@@ -1,8 +1,6 @@
 package com.moa2.api.reservation.controller;
 
-import com.moa2.api.reservation.dto.ReservationCancelResponse;
-import com.moa2.api.reservation.dto.ReservationDetailResponse;
-import com.moa2.api.reservation.dto.ReservationListResponse;
+import com.moa2.api.reservation.dto.ReservationDto;
 import com.moa2.api.reservation.service.ReservationService;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.dto.PageResponse;
@@ -104,7 +102,7 @@ public class ReservationController {
         )
     })
     @GetMapping
-    public ResponseEntity<ApiResponse<PageResponse<ReservationListResponse>>> getMyReservations(
+    public ResponseEntity<ApiResponse<PageResponse<ReservationDto.ListResponse>>> getMyReservations(
             @Parameter(description = "예매 상태 필터 (CONFIRMED, CANCELLED)")
             @RequestParam(required = false) String status,
             @Parameter(description = "페이지 번호 (0부터 시작)")
@@ -118,7 +116,7 @@ public class ReservationController {
         // 최신순 정렬
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         
-        PageResponse<ReservationListResponse> response = reservationService.getMyReservations(email, status, pageable);
+        PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(email, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -232,7 +230,7 @@ public class ReservationController {
         )
     })
     @GetMapping("/{reservationId}")
-    public ResponseEntity<ApiResponse<ReservationDetailResponse>> getReservationDetail(
+    public ResponseEntity<ApiResponse<ReservationDto.DetailResponse>> getReservationDetail(
             @Parameter(description = "예매 ID", required = true)
             @PathVariable Long reservationId) {
         
@@ -240,7 +238,7 @@ public class ReservationController {
             // SecurityContext에서 인증된 사용자 이메일 가져오기
             String email = getAuthenticatedUserEmail();
             
-            ReservationDetailResponse response = reservationService.getReservationDetail(email, reservationId);
+            ReservationDto.DetailResponse response = reservationService.getReservationDetail(email, reservationId);
             return ResponseEntity.ok(ApiResponse.success(response));
             
         } catch (IllegalArgumentException e) {
@@ -337,7 +335,7 @@ public class ReservationController {
         )
     })
     @DeleteMapping("/{reservationId}")
-    public ResponseEntity<ApiResponse<ReservationCancelResponse>> cancelReservation(
+    public ResponseEntity<ApiResponse<ReservationDto.CancelResponse>> cancelReservation(
             @Parameter(description = "예매 ID", required = true)
             @PathVariable Long reservationId) {
         
@@ -345,8 +343,8 @@ public class ReservationController {
             // SecurityContext에서 인증된 사용자 이메일 가져오기
             String email = getAuthenticatedUserEmail();
             
-            ReservationCancelResponse response = reservationService.cancelReservation(email, reservationId);
-            return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
+            ReservationDto.CancelResponse response = reservationService.cancelReservation(email, reservationId);
+            return ResponseEntity.ok(ApiResponse.success(response, response.message()));
             
         } catch (IllegalStateException e) {
             // 취소 불가능한 상태

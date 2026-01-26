@@ -1,10 +1,10 @@
 package com.moa2.global.handler;
 
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
-import com.moa2.global.dto.OAuthAttributes;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
+import com.moa2.api.auth.dto.OAuthAttributes;
 import com.moa2.global.security.JwtTokenProvider;
-import com.moa2.global.service.RefreshTokenService;
+import com.moa2.api.auth.service.RefreshTokenService;
 import com.moa2.global.util.LogMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

@@ -1,6 +1,6 @@
 package com.moa2.api.schedule.controller;
 
-import com.moa2.api.schedule.dto.ScheduleSeatsResponse;
+import com.moa2.api.schedule.dto.ScheduleDto;
 import com.moa2.api.schedule.service.ScheduleSeatService;
 import com.moa2.global.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,11 +33,11 @@ public class ScheduleSeatController {
                     "**주의:** 대기열 상태가 READY인 사용자만 조회 가능하며, 만료되면 403을 반환합니다."
     )
     @GetMapping("/{scheduleId}/seats")
-    public ResponseEntity<ApiResponse<ScheduleSeatsResponse>> getScheduleSeats(
+    public ResponseEntity<ApiResponse<ScheduleDto.SeatsResponse>> getScheduleSeats(
             @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId
     ) {
         try {
-            ScheduleSeatsResponse result = scheduleSeatService.getScheduleSeats(scheduleId);
+            ScheduleDto.SeatsResponse result = scheduleSeatService.getScheduleSeats(scheduleId);
             return ResponseEntity.ok(ApiResponse.success(result));
         } catch (IllegalArgumentException e) {
             log.warn("좌석 배치도 조회 실패: scheduleId={}, error={}", scheduleId, e.getMessage());

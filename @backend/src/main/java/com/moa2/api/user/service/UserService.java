@@ -1,13 +1,13 @@
 package com.moa2.api.user.service;
 
-import com.moa2.api.auth.dto.UserInfoResponse;
-import com.moa2.api.user.dto.UserDeleteResponse;
-import com.moa2.domain.reservation.entity.Reservation;
-import com.moa2.domain.reservation.repository.ReservationRepository;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.auth.dto.AuthDto;
+import com.moa2.api.user.dto.UserDto;
+import com.moa2.api.reservation.domain.entity.Reservation;
+import com.moa2.api.reservation.domain.repository.ReservationRepository;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.model.ReservationStatus;
-import com.moa2.global.service.RefreshTokenService;
+import com.moa2.api.auth.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,11 +31,11 @@ public class UserService {
      * 내 정보 조회
      */
     @Transactional(readOnly = true)
-    public UserInfoResponse getMyInfo(String email) {
+    public AuthDto.UserInfoResponse getMyInfo(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
         
-        return UserInfoResponse.from(user);
+        return AuthDto.UserInfoResponse.from(user);
     }
 
     /**
@@ -45,7 +45,7 @@ public class UserService {
      * - Soft Delete 처리
      */
     @Transactional
-    public UserDeleteResponse deleteMyAccount(String email) {
+    public UserDto.UserDeleteResponse deleteMyAccount(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
         
@@ -73,10 +73,10 @@ public class UserService {
         userRepository.save(user);
         
         log.info("회원 탈퇴 완료: {}", email);
-        
-        return UserDeleteResponse.builder()
-                .email(email)
-                .message("회원 탈퇴가 완료되었습니다.")
-                .build();
+
+        return new UserDto.UserDeleteResponse(
+                email,
+                "회원 탈퇴가 완료되었습니다."
+        );
     }
 }

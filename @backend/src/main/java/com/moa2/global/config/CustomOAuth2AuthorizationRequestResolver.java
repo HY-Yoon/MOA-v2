@@ -1,17 +1,13 @@
 package com.moa2.global.config;
 
-import com.moa2.domain.auth.repository.RefreshTokenRepository;
-import com.moa2.domain.user.repository.UserRepository;
-import com.moa2.global.model.SocialProvider;
+import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * OAuth2 인증 요청에 추가 파라미터를 설정하는 리졸버

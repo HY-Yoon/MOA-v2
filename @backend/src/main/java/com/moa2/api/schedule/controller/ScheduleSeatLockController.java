@@ -1,14 +1,11 @@
 package com.moa2.api.schedule.controller;
 
-import com.moa2.api.schedule.dto.SeatLockRequest;
-import com.moa2.api.schedule.dto.SeatLockResponse;
-import com.moa2.api.schedule.dto.SeatUnlockRequest;
-import com.moa2.api.schedule.dto.SeatUnlockResponse;
+import com.moa2.api.schedule.dto.ScheduleDto;
 import com.moa2.api.schedule.exception.SeatLockConflictException;
 import com.moa2.api.schedule.service.ScheduleSeatLockService;
 import com.moa2.api.schedule.service.ScheduleSeatUnlockService;
-import com.moa2.domain.user.entity.User;
-import com.moa2.domain.user.repository.UserRepository;
+import com.moa2.api.user.domain.entity.User;
+import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
@@ -53,15 +50,15 @@ public class ScheduleSeatLockController {
                     "- 권한: 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
     )
     @PostMapping("/{scheduleId}/seats/lock")
-    public ResponseEntity<ApiResponse<SeatLockResponse>> lockSeats(
+    public ResponseEntity<ApiResponse<ScheduleDto.SeatLockResponse>> lockSeats(
             @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId,
-            @Valid @RequestBody SeatLockRequest request
+            @Valid @RequestBody ScheduleDto.SeatLockRequest request
     ) {
         try {
             Long userId = getAuthenticatedUserId();
             LocalDateTime expiresAt = scheduleSeatLockService.lockSeats(scheduleId, request.getSeatIds(), userId);
 
-            SeatLockResponse response = SeatLockResponse.builder()
+            ScheduleDto.SeatLockResponse response = ScheduleDto.SeatLockResponse.builder()
                     .isSuccess(true)
                     .expiresAt(expiresAt)
                     .build();
@@ -90,15 +87,15 @@ public class ScheduleSeatLockController {
                     "- **권한:** 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
     )
     @PostMapping("/{scheduleId}/seats/unlock")
-    public ResponseEntity<ApiResponse<SeatUnlockResponse>> unlockSeats(
+    public ResponseEntity<ApiResponse<ScheduleDto.SeatUnlockResponse>> unlockSeats(
             @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId,
-            @Valid @RequestBody SeatUnlockRequest request
+            @Valid @RequestBody ScheduleDto.SeatUnlockRequest request
     ) {
         try {
             Long userId = getAuthenticatedUserId();
             scheduleSeatUnlockService.unlockSeats(scheduleId, request.getSeatIds(), userId);
 
-            SeatUnlockResponse response = SeatUnlockResponse.builder()
+            ScheduleDto.SeatUnlockResponse response = ScheduleDto.SeatUnlockResponse.builder()
                     .isSuccess(true)
                     .build();
 
