@@ -5,3 +5,4 @@
 
 export * from './AdminSidebar';
 export * from './AdminBreadcrumb';
+export * from './AdminTable';

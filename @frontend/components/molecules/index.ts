@@ -7,3 +7,5 @@ export * from './FormInputField';
 export * from './FormSelectField';
 export * from './FormScheduleTableField';
 export * from './FormFileField';
+export * from './Pagination';
+export * from './SearchBar';
