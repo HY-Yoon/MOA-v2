@@ -1,5 +1,5 @@
 import ShowUpsertForm from './_components/ShowUpsertForm';
 
-export default function ShowUpsert() {
+export default function ShowCreatePage() {
   return <ShowUpsertForm />;
-} 
+}
