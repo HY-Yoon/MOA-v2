@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/atoms';
+import { Button, Skeleton } from '@/components/atoms';
 import { Badge } from '@/components/atoms/badge';
 import {
   FormField,
@@ -26,11 +26,11 @@ import dayjs from '@/plugins/dayjs';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Genre, Region, ShowStatus } from '@shared/enums';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
+import { PageCard } from '@/components/molecules/PageCard';
 
 interface Props {
   id?: string;
@@ -449,7 +449,6 @@ export default function ShowUpsertForm(props: Props) {
 
   // api request 설정
   async function onSubmit(formData: ShowFormData) {
-    // FIXME: 수정일 때 파일 삭제 로직 필요
     // 이미지 파일 유효성 검사
     if (!validateImageFiles()) return;
 
@@ -489,19 +488,9 @@ export default function ShowUpsertForm(props: Props) {
   );
 
   return (
-    <Card className="shadow-lg">
-      {/*header*/}
-      <CardHeader>
-        <div className="flex items-center">
-          <Button type="button" variant="ghost" onClick={router.back}>
-            <ArrowLeft className="!size-6" />
-          </Button>
-          <CardTitle className="text-2xl font-bold">공연 {flag}</CardTitle>
-        </div>
-      </CardHeader>
-
-      {/*content*/}
-      <CardContent>
+    <PageCard>
+      <PageCard.Title useRouteBack={true}>공연 {flag}</PageCard.Title>
+      <PageCard.Content>
         {!mounted ? (
           // 서버 사이드에서 렌더링 중에 로딩 화면 표시
           <div className="space-y-6">
@@ -703,7 +692,7 @@ export default function ShowUpsertForm(props: Props) {
             </div>
           </form>
         )}
-      </CardContent>
-    </Card>
+      </PageCard.Content>
+    </PageCard>
   );
 }
