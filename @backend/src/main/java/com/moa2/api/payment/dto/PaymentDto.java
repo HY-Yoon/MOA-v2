@@ -136,4 +136,14 @@ public class PaymentDto {
         ) {}
     }
 
+    /**
+     * 예매자 확인 정보 응답 DTO
+     * 결제 과정 중 예매자 확인 단계에서 사용
+     */
+    public record BuyerInfoResponse(
+            String name,      // 예매자 이름
+            String email,     // 예매자 이메일
+            String phone      // 예매자 연락처 (nullable)
+    ) {}
+
 }

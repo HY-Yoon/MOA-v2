@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,48 @@ public class PaymentController {
         private final PaymentService paymentService;
         private final com.moa2.api.payment.facade.PaymentFacade paymentFacade;
         private final UserRepository userRepository;
+
+        /**
+         * 예매자 확인 정보 조회
+         * 결제 과정 중 예매자 확인 단계에서 사용자 정보를 조회합니다.
+         * 
+         * 쿠키 기반 인증을 통해 현재 로그인한 사용자의 이름, 이메일, 연락처를 반환합니다.
+         * 연락처는 없는 경우 null로 반환될 수 있습니다.
+         */
+        @Operation(summary = "예매자 확인 정보 조회", description = """
+                        결제 과정 중 예매자 확인 단계에서 호출합니다.
+
+                        **반환 정보:**
+                        - 이름 (name): 로그인 정보에 등록된 이름
+                        - 이메일 (email): 로그인 정보에 등록된 이메일
+                        - 연락처 (phone): 로그인 정보에 등록된 연락처 (없을 수 있음)
+
+                        **권한:** 인증된 사용자만 가능 (쿠키 기반 인증)
+                        """)
+        @GetMapping("/buyer-info")
+        public ResponseEntity<ApiResponse<PaymentDto.BuyerInfoResponse>> getBuyerInfo() {
+                try {
+                        Long userId = getAuthenticatedUserId();
+                        User user = userRepository.findById(userId)
+                                        .orElseThrow(() -> new PaymentException(
+                                                        org.springframework.http.HttpStatus.NOT_FOUND,
+                                                        "USER_NOT_FOUND",
+                                                        "사용자를 찾을 수 없습니다."));
+
+                        PaymentDto.BuyerInfoResponse response = new PaymentDto.BuyerInfoResponse(
+                                        user.getName(),
+                                        user.getEmail(),
+                                        user.getPhone() // nullable
+                        );
+
+                        return ResponseEntity.ok(ApiResponse.success(response));
+
+                } catch (PaymentException e) {
+                        log.warn("예매자 정보 조회 실패: code={}, message={}", e.getCode(), e.getMessage());
+                        return ResponseEntity.status(e.getStatus())
+                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
+                }
+        }
 
         /**
          * Step 5-1: 결제 요청
@@ -63,7 +106,7 @@ public class PaymentController {
                 } catch (PaymentException e) {
                         log.warn("결제 요청 실패: code={}, message={}", e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
-                                        .body(ApiResponse.error(e.getMessage()));
+                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
                 }
         }
 
@@ -97,7 +140,7 @@ public class PaymentController {
                         log.warn("결제 승인 실패: orderId={}, code={}, message={}",
                                         request.orderId(), e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
-                                        .body(ApiResponse.error(e.getMessage()));
+                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
                 }
         }
 

@@ -56,13 +56,13 @@ public class ScheduleSeatService {
                 List<ScheduleDto.SeatInfo> seats = scheduleSeats.stream()
                                 .map(ss -> {
                                         // seatId를 "구역-번호" 형식으로 생성 (예: "A-1")
-                                        String sectionName = ss.getGrade().getSection().getName();
+                                        String sectionName = ss.getGrade().getSection().getName().replace("구역", "");
                                         String seatIdStr = sectionName + "-" + ss.getSeat().getSeatNumber();
 
                                         return ScheduleDto.SeatInfo.builder()
                                                         .scheduleSeatId(ss.getId())
                                                         .seatId(seatIdStr)
-                                                        .sectionId(ss.getGrade().getSection().getId().toString())
+                                                        .sectionId(sectionName)
                                                         .row(ss.getSeat().getSeatRow())
                                                         .number(ss.getSeat().getSeatNumber())
                                                         .x(ss.getSeat().getX())
