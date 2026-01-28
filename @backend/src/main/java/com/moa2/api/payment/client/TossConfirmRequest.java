@@ -6,5 +6,5 @@ package com.moa2.api.payment.client;
 public record TossConfirmRequest(
     String paymentKey,
     String orderId,
-    Integer amount
+    Long amount
 ) {}

@@ -146,31 +146,31 @@ public class ShowController {
         }
     }
 
-    /**
-     * 스케줄별 잔여석 조회
-     */
-    @Operation(
-            summary = "스케줄별 잔여석 조회",
-            description = "특정 스케줄의 구역별 잔여석 정보를 조회합니다.\n\n" +
-                    "**응답 정보:**\n" +
-                    "- 구역별 전체 좌석 수, 잔여석 수, 가용률\n" +
-                    "- 전체 통계 (전체 좌석 수, 잔여석 수, 가용률)"
-    )
-    @GetMapping("/{id}/schedules/{scheduleId}/seats")
-    public ResponseEntity<ApiResponse<ShowDto.SeatAvailabilityResponse>> getScheduleSeatAvailability(
-            @Parameter(description = "공연 ID", required = true) @PathVariable Long id,
-            @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId) {
-
-        try {
-            ShowDto.SeatAvailabilityResponse result = showService.getScheduleSeatAvailability(id, scheduleId);
-            return ResponseEntity.ok(ApiResponse.success(result));
-        } catch (RuntimeException e) {
-            log.error("스케줄별 잔여석 조회 실패: showId={}, scheduleId={}, error={}",
-                    id, scheduleId, e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(e.getMessage()));
-        }
-    }
+//    /**
+//     * 스케줄별 잔여석 조회
+//     */
+//    @Operation(
+//            summary = "스케줄별 잔여석 조회",
+//            description = "특정 스케줄의 구역별 잔여석 정보를 조회합니다.\n\n" +
+//                    "**응답 정보:**\n" +
+//                    "- 구역별 전체 좌석 수, 잔여석 수, 가용률\n" +
+//                    "- 전체 통계 (전체 좌석 수, 잔여석 수, 가용률)"
+//    )
+//    @GetMapping("/{id}/schedules/{scheduleId}/seats")
+//    public ResponseEntity<ApiResponse<ShowDto.SeatAvailabilityResponse>> getScheduleSeatAvailability(
+//            @Parameter(description = "공연 ID", required = true) @PathVariable Long id,
+//            @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId) {
+//
+//        try {
+//            ShowDto.SeatAvailabilityResponse result = showService.getScheduleSeatAvailability(id, scheduleId);
+//            return ResponseEntity.ok(ApiResponse.success(result));
+//        } catch (RuntimeException e) {
+//            log.error("스케줄별 잔여석 조회 실패: showId={}, scheduleId={}, error={}",
+//                    id, scheduleId, e.getMessage());
+//            return ResponseEntity.badRequest()
+//                    .body(ApiResponse.error(e.getMessage()));
+//        }
+//    }
 
     /**
      * 날짜별 회차 조회

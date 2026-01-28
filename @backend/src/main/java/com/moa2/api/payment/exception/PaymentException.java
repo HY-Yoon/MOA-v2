@@ -18,6 +18,12 @@ public class PaymentException extends RuntimeException {
         this.code = code;
     }
 
+    public PaymentException(String code, String message) {
+        super(message);
+        this.status = HttpStatus.BAD_REQUEST;
+        this.code = code;
+    }
+
     // 자주 사용되는 예외 팩토리 메서드들
     public static PaymentException notFound(String message) {
         return new PaymentException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", message);

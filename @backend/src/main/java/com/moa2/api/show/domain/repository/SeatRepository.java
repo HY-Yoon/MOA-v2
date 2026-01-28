@@ -10,11 +10,13 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SeatRepository extends JpaRepository<Seat, Long> {
-    
+
     @Query("SELECT COUNT(s) FROM Seat s WHERE s.venue.id = :venueId")
     Long countByVenueId(@Param("venueId") Long venueId);
-    
+
     @Query("SELECT COUNT(s) FROM Seat s WHERE s.venue.id = :venueId AND s.status = :status")
     Long countByVenueIdAndStatus(@Param("venueId") Long venueId, @Param("status") SeatStatus status);
-}
 
+    @Query("SELECT s FROM Seat s WHERE s.venue.id = :venueId")
+    java.util.List<Seat> findByVenueId(@Param("venueId") Long venueId);
+}

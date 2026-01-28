@@ -40,10 +40,9 @@ docs/*
 src/main/java/com/moa2/api/test/
 
 
-src/main/resources/dummy-data.sql
-src/main/resources/README-DUMMY-DATA.md
-src/main/resources/clear_all_data.sql
-src/main/resources/k6_dummy_data.sql
+
+src/main/resources/*.sql
+
 
 .history
 .cursorrules

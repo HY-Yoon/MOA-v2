@@ -69,7 +69,9 @@ public class SeatmapDto {
         public record CanvasRequest(
                 @NotNull(message = "너비는 필수입니다") Integer width,
                 @NotNull(message = "높이는 필수입니다") Integer height,
-                @NotNull(message = "좌석 반지름은 필수입니다") Integer seatRadius
+                @NotNull(message = "좌석 반지름은 필수입니다") Integer seatRadius,
+                @NotNull(message = "행 간격은 필수입니다") Integer rowGap,
+                @NotNull(message = "열 간격은 필수입니다") Integer columnGap
         ) {}
 
         @Builder

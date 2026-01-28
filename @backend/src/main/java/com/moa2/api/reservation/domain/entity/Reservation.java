@@ -68,6 +68,13 @@ public class Reservation extends BaseTimeEntity {
         this.status = ReservationStatus.CANCELLED;
         this.cancelledAt = LocalDateTime.now();
     }
+
+    /**
+     * 예매 상태 변경 (Dirty Checking 활용)
+     */
+    public void updateStatus(ReservationStatus status) {
+        this.status = status;
+    }
 }
 
 

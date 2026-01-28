@@ -107,8 +107,11 @@ public class QueueController {
                               "success": true,
                               "data": {
                                 "status": "WAITING",
-                                "position": 42,
-                                "estimatedWaitTime": 84
+                                "position": 0,
+                                "estimatedWaitTime": 0,
+                                "totalWaiting": 1,
+                                "retryAfter": 3,
+                                "activeUntil": null
                               },
                               "message": null
                             }
@@ -119,7 +122,10 @@ public class QueueController {
                               "data": {
                                 "status": "READY",
                                 "position": 0,
-                                "activeUntil": "2026-01-20T10:10:00"
+                                "estimatedWaitTime": null,
+                                "totalWaiting": null,
+                                "retryAfter": null,
+                                "activeUntil": "2026-01-28T09:43:49"
                               },
                               "message": null
                             }

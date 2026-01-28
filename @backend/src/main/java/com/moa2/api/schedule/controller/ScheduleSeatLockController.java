@@ -42,21 +42,17 @@ public class ScheduleSeatLockController {
     private final ScheduleSeatUnlockService scheduleSeatUnlockService;
     private final UserRepository userRepository;
 
-    @Operation(
-            summary = "좌석 선점",
-            description = "'결제하기'를 누르는 순간 특정 회차(scheduleId)의 좌석을 5분간 선점(LOCK)합니다.\n\n" +
-                    "- 동시성 제어: schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
-                    "- 규칙: 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경\n" +
-                    "- 권한: 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
-    )
+    @Operation(summary = "좌석 선점", description = "'선택하기'를 누르는 순간 특정 회차(scheduleId)의 좌석을 5분간 선점(LOCK)합니다.\n\n" +
+            "- 동시성 제어: schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
+            "- 규칙: 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경\n" +
+            "- 권한: 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)")
     @PostMapping("/{scheduleId}/seats/lock")
-    public ResponseEntity<ApiResponse<ScheduleDto.SeatLockResponse>> lockSeats(
+    public ResponseEntity<ApiResponse<?>> lockSeats(
             @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId,
-            @Valid @RequestBody ScheduleDto.SeatLockRequest request
-    ) {
+            @Valid @RequestBody ScheduleDto.SeatLockRequest request) {
         try {
             Long userId = getAuthenticatedUserId();
-            LocalDateTime expiresAt = scheduleSeatLockService.lockSeats(scheduleId, request.getSeatIds(), userId);
+            LocalDateTime expiresAt = scheduleSeatLockService.lockSeats(scheduleId, request.seatIds(), userId);
 
             ScheduleDto.SeatLockResponse response = ScheduleDto.SeatLockResponse.builder()
                     .isSuccess(true)
@@ -69,31 +65,32 @@ public class ScheduleSeatLockController {
             // 하나라도 AVAILABLE이 아니면 409 Conflict
             log.info("좌석 선점 충돌: scheduleId={}, error={}", scheduleId, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error(e.getMessage()));
+                    .body(ApiResponse.error("이미 선택된 좌석입니다.", "SEAT_CONFLICT", e.getConflictSeatIds()));
+
+        } catch (com.moa2.api.schedule.exception.SeatNotFoundException e) {
+            log.warn("좌석 선점 실패: scheduleId={}, error={}", scheduleId, e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", e.getNotFoundSeatIds()));
 
         } catch (IllegalArgumentException e) {
             log.warn("좌석 선점 요청 오류: scheduleId={}, error={}", scheduleId, e.getMessage());
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(e.getMessage()));
+                    .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", null));
         }
     }
 
-    @Operation(
-            summary = "좌석 선점 해제",
-            description = "특정 회차(scheduleId)에서 사용자가 선점한 좌석을 즉시 해제(UNLOCK)합니다.\n\n" +
-                    "- **사용 시점:** 결제 취소/뒤로가기/결제 실패 등\n" +
-                    "- **동시성 제어:** schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
-                    "- **규칙:** 내 좌석(LOCKED + lockedByUserId 일치)만 해제 가능\n" +
-                    "- **권한:** 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)"
-    )
+    @Operation(summary = "좌석 선점 해제", description = "특정 회차(scheduleId)에서 사용자가 선점한 좌석을 즉시 해제(UNLOCK)합니다.\n\n" +
+            "- **사용 시점:** 결제 취소/뒤로가기/결제 실패 등\n" +
+            "- **동시성 제어:** schedule_seats를 SELECT ... FOR UPDATE로 잠금\n" +
+            "- **규칙:** 내 좌석(LOCKED + lockedByUserId 일치)만 해제 가능\n" +
+            "- **권한:** 대기열 READY + 만료 전 사용자만 가능(Interceptor에서 검증)")
     @PostMapping("/{scheduleId}/seats/unlock")
-    public ResponseEntity<ApiResponse<ScheduleDto.SeatUnlockResponse>> unlockSeats(
+    public ResponseEntity<ApiResponse<?>> unlockSeats(
             @Parameter(description = "스케줄 ID", required = true) @PathVariable Long scheduleId,
-            @Valid @RequestBody ScheduleDto.SeatUnlockRequest request
-    ) {
+            @Valid @RequestBody ScheduleDto.SeatUnlockRequest request) {
         try {
             Long userId = getAuthenticatedUserId();
-            scheduleSeatUnlockService.unlockSeats(scheduleId, request.getSeatIds(), userId);
+            scheduleSeatUnlockService.unlockSeats(scheduleId, request.seatIds(), userId);
 
             ScheduleDto.SeatUnlockResponse response = ScheduleDto.SeatUnlockResponse.builder()
                     .isSuccess(true)
@@ -104,12 +101,17 @@ public class ScheduleSeatLockController {
         } catch (SeatLockConflictException e) {
             log.info("좌석 선점 해제 충돌: scheduleId={}, error={}", scheduleId, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error(e.getMessage()));
+                    .body(ApiResponse.error(e.getMessage(), "SEAT_CONFLICT", e.getConflictSeatIds()));
+
+        } catch (com.moa2.api.schedule.exception.SeatNotFoundException e) {
+            log.warn("좌석 선점 해제 실패: scheduleId={}, error={}", scheduleId, e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", e.getNotFoundSeatIds()));
 
         } catch (IllegalArgumentException e) {
             log.warn("좌석 선점 해제 요청 오류: scheduleId={}, error={}", scheduleId, e.getMessage());
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.error(e.getMessage()));
+                    .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", null));
         }
     }
 
@@ -144,4 +146,3 @@ public class ScheduleSeatLockController {
         return user.getId();
     }
 }
-

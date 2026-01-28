@@ -14,55 +14,59 @@ import java.util.List;
 @Repository
 public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long> {
 
-    /**
-     * 회차별 좌석 목록 조회
-     */
-    List<ScheduleSeat> findByScheduleId(Long scheduleId);
+       /**
+        * 회차별 좌석 목록 조회
+        */
+       List<ScheduleSeat> findByScheduleId(Long scheduleId);
 
-    /**
-     * 회차별 좌석 배치도 조회 (좌석/등급/구역까지 fetch join)
-     * - 좌석 배치도 API에서 N+1 방지용
-     */
-    @Query("SELECT ss FROM ScheduleSeat ss " +
-           "JOIN FETCH ss.seat s " +
-           "JOIN FETCH ss.grade g " +
-           "JOIN FETCH g.section sec " +
-           "WHERE ss.schedule.id = :scheduleId")
-    List<ScheduleSeat> findSeatMapByScheduleId(@Param("scheduleId") Long scheduleId);
+       /**
+        * 회차별 좌석 배치도 조회 (좌석/등급/구역까지 fetch join)
+        * - 좌석 배치도 API에서 N+1 방지용
+        */
+       @Query("SELECT ss FROM ScheduleSeat ss " +
+                     "JOIN FETCH ss.seat s " +
+                     "LEFT JOIN FETCH ss.grade g " +
+                     "LEFT JOIN FETCH g.section sec " +
+                     "WHERE ss.schedule.id = :scheduleId")
+       List<ScheduleSeat> findSeatMapByScheduleId(@Param("scheduleId") Long scheduleId);
 
-    /**
-     * 회차별 특정 좌석 조회 (비관적 락)
-     * 좌석 선점 시 동시성 제어용
-     */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints({
-            // 👇 [핵심] "락을 얻으려고 3초(3000ms) 이상 기다리지 마라"
-            @QueryHint(name = "javax.persistence.lock.timeout", value = "3000")
-    })
-    @Query("SELECT ss FROM ScheduleSeat ss " +
-           "WHERE ss.schedule.id = :scheduleId " +
-           "AND ss.seat.id IN :seatIds " +
-           "ORDER BY ss.seat.id ASC")
-    List<ScheduleSeat> findByScheduleIdAndSeatIdInForUpdate(
-        @Param("scheduleId") Long scheduleId,
-        @Param("seatIds") List<Long> seatIds
-    );
+       /**
+        * 회차별 특정 좌석 조회 (비관적 락)
+        * 좌석 선점 시 동시성 제어용
+        */
+       @Lock(LockModeType.PESSIMISTIC_WRITE)
+       @QueryHints({
+                     // 👇 [핵심] "락을 얻으려고 3초(3000ms) 이상 기다리지 마라"
+                     @QueryHint(name = "javax.persistence.lock.timeout", value = "3000")
+       })
+       @Query("SELECT ss FROM ScheduleSeat ss " +
+                     "WHERE ss.schedule.id = :scheduleId " +
+                     "AND ss.id IN :seatIds " +
+                     "ORDER BY ss.id ASC")
+       List<ScheduleSeat> findByScheduleIdAndSeatIdInForUpdate(
+                     @Param("scheduleId") Long scheduleId,
+                     @Param("seatIds") List<Long> seatIds);
 
-    /**
-     * 만료된 좌석 선점 해제
-     * (LOCKED 상태이면서 lockedUntil이 지난 좌석들)
-     */
-    @Modifying
-    @Query("UPDATE ScheduleSeat ss " +
-           "SET ss.status = 'AVAILABLE', " +
-           "ss.lockedByUserId = null, " +
-           "ss.lockedUntil = null " +
-           "WHERE ss.status = 'LOCKED' " +
-           "AND ss.lockedUntil < :now")
-    int releaseExpiredLocks(@Param("now") LocalDateTime now);
+       /**
+        * 만료된 좌석 선점 해제
+        * (LOCKED 상태이면서 lockedUntil이 지난 좌석들)
+        */
+       @Modifying
+       @Query("UPDATE ScheduleSeat ss " +
+                     "SET ss.status = 'AVAILABLE', " +
+                     "ss.lockedByUserId = null, " +
+                     "ss.lockedUntil = null " +
+                     "WHERE ss.status = 'LOCKED' " +
+                     "AND ss.lockedUntil < :now")
+       int releaseExpiredLocks(@Param("now") LocalDateTime now);
 
-    /**
-     * 특정 회차의 상태별 좌석 수 조회
-     */
-    Long countByScheduleIdAndStatus(Long scheduleId, SeatStatus status);
+       /**
+        * 특정 회차의 상태별 좌석 수 조회
+        */
+       Long countByScheduleIdAndStatus(Long scheduleId, SeatStatus status);
+
+       /**
+        * 특정 회차의 전체 좌석 수 조회
+        */
+       Long countByScheduleId(Long scheduleId);
 }

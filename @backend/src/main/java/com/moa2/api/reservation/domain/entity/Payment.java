@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
 @Table(name = "payments")
 public class Payment {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // [단방향] 결제가 예약을 참조 (1:1)
@@ -28,10 +29,10 @@ public class Payment {
 
     private String paymentKey;
     private Integer amount;
-    
+
     @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
-    
+
     @Enumerated(EnumType.STRING)
     private PaymentStatus status; // PENDING, COMPLETED, FAILED
 
@@ -49,6 +50,15 @@ public class Payment {
         this.requestedAt = LocalDateTime.now();
     }
 
+    // 결제 진행 중 처리
+    public void markAsInProgress() {
+        // 방어 로직: 이미 끝난 건을 또 건드리면 에러
+        if (this.status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("이미 처리 중이거나 완료된 결제입니다.");
+        }
+        this.status = PaymentStatus.IN_PROGRESS;
+    }
+
     // 결제 승인 처리
     public void approve(String paymentKey, PaymentMethod method) {
         this.paymentKey = paymentKey;
@@ -62,22 +72,10 @@ public class Payment {
         this.status = PaymentStatus.FAILED;
         this.failureReason = reason;
     }
-    
+
     // 결제 취소 처리
     public void cancel(String reason) {
         this.status = PaymentStatus.CANCELLED;
         this.failureReason = reason; // 취소 사유 저장 용도
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

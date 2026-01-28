@@ -33,19 +33,19 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class QueueReadyInterceptor implements HandlerInterceptor {
 
-    private static final Pattern SCHEDULE_SEATS_URI_PATTERN =
-            Pattern.compile("^/api/v1/schedules/(\\d+)/seats$");
-    private static final Pattern SCHEDULE_SEATS_LOCK_URI_PATTERN =
-            Pattern.compile("^/api/v1/schedules/(\\d+)/seats/lock$");
-    private static final Pattern SCHEDULE_SEATS_UNLOCK_URI_PATTERN =
-            Pattern.compile("^/api/v1/schedules/(\\d+)/seats/unlock$");
+    private static final Pattern SCHEDULE_SEATS_URI_PATTERN = Pattern.compile("^/api/v1/schedules/(\\d+)/seats$");
+    private static final Pattern SCHEDULE_SEATS_LOCK_URI_PATTERN = Pattern
+            .compile("^/api/v1/schedules/(\\d+)/seats/lock$");
+    private static final Pattern SCHEDULE_SEATS_UNLOCK_URI_PATTERN = Pattern
+            .compile("^/api/v1/schedules/(\\d+)/seats/unlock$");
 
     private final QueueRepository queueRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
         String uri = request.getRequestURI();
         Long scheduleId = extractScheduleId(uri);
         if (scheduleId == null) {
@@ -57,21 +57,21 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
-            writeError(response, HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+            writeError(response, HttpStatus.UNAUTHORIZED, "인증이 필요합니다.", "UNAUTHORIZED");
             return false;
         }
 
         // 2) JWT에서 email + provider 기반으로 사용자 조회
         Object principalObj = authentication.getPrincipal();
         if (!(principalObj instanceof UserPrincipal userPrincipal)) {
-            writeError(response, HttpStatus.UNAUTHORIZED, "인증 정보(principal)가 올바르지 않습니다. 다시 로그인해주세요.");
+            writeError(response, HttpStatus.UNAUTHORIZED, "인증 정보(principal)가 올바르지 않습니다. 다시 로그인해주세요.", "UNAUTHORIZED");
             return false;
         }
 
         String email = userPrincipal.getEmail();
         String provider = userPrincipal.getProvider();
         if (provider == null || provider.isBlank()) {
-            writeError(response, HttpStatus.UNAUTHORIZED, "인증 정보(provider)가 없습니다. 다시 로그인해주세요.");
+            writeError(response, HttpStatus.UNAUTHORIZED, "인증 정보(provider)가 없습니다. 다시 로그인해주세요.", "UNAUTHORIZED");
             return false;
         }
 
@@ -79,14 +79,14 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
         try {
             socialProvider = SocialProvider.valueOf(provider);
         } catch (IllegalArgumentException e) {
-            writeError(response, HttpStatus.UNAUTHORIZED, "유효하지 않은 provider 입니다. 다시 로그인해주세요.");
+            writeError(response, HttpStatus.UNAUTHORIZED, "유효하지 않은 provider 입니다. 다시 로그인해주세요.", "UNAUTHORIZED");
             return false;
         }
 
         User user = userRepository.findByEmailAndSocialProvider(email, socialProvider)
                 .orElse(null);
         if (user == null) {
-            writeError(response, HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다. 다시 로그인해주세요.");
+            writeError(response, HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다. 다시 로그인해주세요.", "UNAUTHORIZED");
             return false;
         }
 
@@ -94,16 +94,16 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
         Optional<Queue> queueOpt = queueRepository.findTopByUserIdAndScheduleIdAndStatusInOrderByCreatedAtDesc(
                 user.getId(),
                 scheduleId,
-                List.of(QueueStatus.WAITING, QueueStatus.READY)
-        );
+                List.of(QueueStatus.WAITING, QueueStatus.READY));
         if (queueOpt.isEmpty()) {
-            writeError(response, HttpStatus.FORBIDDEN, "대기열을 통과한 사용자만 접근할 수 있습니다. 먼저 대기열에 진입해주세요.");
+            writeError(response, HttpStatus.FORBIDDEN, "대기열을 통과한 사용자만 접근할 수 있습니다. 먼저 대기열에 진입해주세요.", "QUEUE_REQUIRED");
             return false;
         }
 
         Queue queue = queueOpt.get();
         if (queue.getStatus() != QueueStatus.READY) {
-            writeError(response, HttpStatus.FORBIDDEN, "대기열 READY 상태가 아닙니다. 현재 상태: " + queue.getStatus());
+            writeError(response, HttpStatus.FORBIDDEN, "대기열 READY 상태가 아닙니다. 현재 상태: " + queue.getStatus(),
+                    "QUEUE_NOT_READY");
             return false;
         }
 
@@ -111,7 +111,7 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
             // READY 만료 → EXPIRED 처리
             queue.expire();
             queueRepository.save(queue);
-            writeError(response, HttpStatus.FORBIDDEN, "대기열 세션이 만료되었습니다. 다시 대기열에 진입해주세요.");
+            writeError(response, HttpStatus.FORBIDDEN, "대기열 세션이 만료되었습니다. 다시 대기열에 진입해주세요.", "QUEUE_EXPIRED");
             return false;
         }
 
@@ -139,11 +139,11 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
         return null;
     }
 
-    private void writeError(HttpServletResponse response, HttpStatus status, String message) throws Exception {
+    private void writeError(HttpServletResponse response, HttpStatus status, String message, String code)
+            throws Exception {
         response.setStatus(status.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message)));
+        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message, code, null)));
     }
 }
-

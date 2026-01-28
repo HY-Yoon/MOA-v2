@@ -20,8 +20,9 @@ import java.time.LocalTime;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Table(name = "show_schedules")
 public class ShowSchedule {
-    
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // [단방향] 스케줄 -> 공연
@@ -32,19 +33,7 @@ public class ShowSchedule {
     private LocalDate showDate;
     private LocalTime showTime;
     private LocalDateTime ticketOpenTime;
-    
+
     @Enumerated(EnumType.STRING)
     private ScheduleStatus status;
 }
-
-
-
-
-
-
-
-
-
-
-
-

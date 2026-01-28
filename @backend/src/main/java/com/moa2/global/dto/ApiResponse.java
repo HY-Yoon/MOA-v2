@@ -8,22 +8,30 @@ public class ApiResponse<T> {
     private T data;
     private String message;
 
-    private ApiResponse(boolean success, T data, String message) {
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private String code;
+
+    private ApiResponse(boolean success, T data, String message, String code) {
         this.success = success;
         this.data = data;
         this.message = message;
+        this.code = code;
     }
 
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, data, null);
+        return new ApiResponse<>(true, data, null, null);
     }
 
     public static <T> ApiResponse<T> success(T data, String message) {
-        return new ApiResponse<>(true, data, message);
+        return new ApiResponse<>(true, data, message, null);
     }
 
     public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, null, message);
+        return new ApiResponse<>(false, null, message, "ERROR");
+    }
+
+    public static <T> ApiResponse<T> error(String message, String code, T data) {
+        return new ApiResponse<>(false, data, message, code);
     }
 
     public boolean isSuccess() {
@@ -37,16 +45,8 @@ public class ApiResponse<T> {
     public String getMessage() {
         return message;
     }
+
+    public String getCode() {
+        return code;
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-

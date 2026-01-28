@@ -1,6 +1,7 @@
 package com.moa2.api.schedule.service;
 
 import com.moa2.api.schedule.exception.SeatLockConflictException;
+import com.moa2.api.schedule.exception.SeatNotFoundException;
 import com.moa2.api.show.domain.entity.ScheduleSeat;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
 import com.moa2.api.show.domain.repository.ShowScheduleRepository;
@@ -18,7 +19,8 @@ import java.util.List;
 
 /**
  * 좌석 선점(LOCK) 서비스
- * - 동시성 제어: SELECT ... FOR UPDATE(PESSIMISTIC_WRITE)로 schedule_seats를 잠근 뒤 상태 변경
+ * - 동시성 제어: SELECT ... FOR UPDATE(PESSIMISTIC_WRITE)로 schedule_seats를 잠근 뒤 상태
+ * 변경
  * - 규칙: 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경
  */
 @Slf4j
@@ -33,8 +35,8 @@ public class ScheduleSeatLockService {
      * 좌석 선점 (5분)
      *
      * @param scheduleId 스케줄 ID
-     * @param seatIds 선점할 좌석 ID 목록 (서비스에서 오름차순 정렬 후 락 획득)
-     * @param userId 선점 사용자 ID
+     * @param seatIds    선점할 좌석 ID 목록 (서비스에서 오름차순 정렬 후 락 획득)
+     * @param userId     선점 사용자 ID
      * @return 선점 만료 시각
      */
     @Transactional
@@ -65,24 +67,33 @@ public class ScheduleSeatLockService {
         LocalDateTime expiresAt = now.plusMinutes(5);
 
         // SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
-        List<ScheduleSeat> scheduleSeats =
-                scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId, sortedSeatIds);
+        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId,
+                sortedSeatIds);
 
         if (scheduleSeats.size() != sortedSeatIds.size()) {
-            log.warn("좌석 선점 실패(존재하지 않는 좌석 포함): scheduleId={}, userId={}, requestedSeatIds={}, fetchedCount={}",
-                    scheduleId, userId, sortedSeatIds, scheduleSeats.size());
-            throw new IllegalArgumentException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.");
+            List<Long> foundIds = scheduleSeats.stream().map(ScheduleSeat::getId).toList();
+            List<Long> missingIds = sortedSeatIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+
+            log.warn("좌석 선점 실패(존재하지 않는 좌석 포함): scheduleId={}, userId={}, missingIds={}",
+                    scheduleId, userId, missingIds);
+            throw new SeatNotFoundException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.", missingIds);
         }
 
         // 모두 AVAILABLE일 때만 LOCKED로 변경
-        boolean allAvailable = scheduleSeats.stream().allMatch(ss -> ss.getStatus() == SeatStatus.AVAILABLE);
-        if (!allAvailable) {
-            log.info("좌석 선점 충돌(409): scheduleId={}, userId={}, seatIds={}, statuses={}",
+        List<Long> conflictSeatIds = scheduleSeats.stream()
+                .filter(ss -> ss.getStatus() != SeatStatus.AVAILABLE)
+                .map(ScheduleSeat::getId)
+                .toList();
+
+        if (!conflictSeatIds.isEmpty()) {
+            log.info("좌석 선점 충돌(409): scheduleId={}, userId={}, conflictSeatIds={}, statuses={}",
                     scheduleId,
                     userId,
-                    sortedSeatIds,
+                    conflictSeatIds,
                     scheduleSeats.stream().map(ScheduleSeat::getStatus).toList());
-            throw new SeatLockConflictException("선점할 수 없는 좌석이 포함되어 있습니다. (이미 선점/예약/판매됨)");
+            throw new SeatLockConflictException("선점할 수 없는 좌석이 포함되어 있습니다. (이미 선점/예약/판매됨)", conflictSeatIds);
         }
 
         for (ScheduleSeat ss : scheduleSeats) {
@@ -96,4 +107,3 @@ public class ScheduleSeatLockService {
         return expiresAt;
     }
 }
-

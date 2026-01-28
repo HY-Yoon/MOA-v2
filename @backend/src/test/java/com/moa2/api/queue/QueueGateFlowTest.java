@@ -3,10 +3,10 @@ package com.moa2.api.queue;
 import com.moa2.api.queue.scheduler.QueueScheduler;
 import com.moa2.api.queue.queue.entity.Queue;
 import com.moa2.api.queue.queue.repository.QueueRepository;
-import com.moa2.domain.show.entity.Show;
-import com.moa2.domain.show.entity.ShowSchedule;
-import com.moa2.domain.show.repository.ShowRepository;
-import com.moa2.domain.show.repository.ShowScheduleRepository;
+import com.moa2.api.show.domain.entity.Show;
+import com.moa2.api.show.domain.entity.ShowSchedule;
+import com.moa2.api.show.domain.repository.ShowRepository;
+import com.moa2.api.show.domain.repository.ShowScheduleRepository;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.model.Genre;
@@ -115,7 +115,7 @@ class QueueGateFlowTest {
                         post("/api/v1/queue/tokens")
                                 .with(withAuth(auth))
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"scheduleId\":" + schedule.getId() + "}")
+                                .content("{\"scheduleId\":\"" + schedule.getId() + "\"}")
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))

@@ -41,7 +41,7 @@ public class TossPaymentClient {
      * 결제 승인 API 호출
      * POST https://api.tosspayments.com/v1/payments/confirm
      */
-    public TossPaymentResponse confirmPayment(String paymentKey, String orderId, Integer amount) {
+    public TossPaymentResponse confirmPayment(String paymentKey, String orderId, Long amount) {
         String url = TOSS_API_BASE_URL + "/confirm";
         TossConfirmRequest request = new TossConfirmRequest(paymentKey, orderId, amount);
 

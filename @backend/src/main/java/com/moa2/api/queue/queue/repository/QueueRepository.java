@@ -47,6 +47,14 @@ public interface QueueRepository extends JpaRepository<Queue, Long> {
     );
 
     /**
+     * 특정 스케줄의 전체 WAITING 상태 인원 수 계산
+     */
+    @Query("SELECT COUNT(q) FROM Queue q " +
+           "WHERE q.schedule.id = :scheduleId " +
+           "AND q.status = 'WAITING'")
+    Long countTotalWaitingByScheduleId(@Param("scheduleId") Long scheduleId);
+
+    /**
      * 특정 스케줄의 READY 상태 인원 수
      */
     Long countByScheduleIdAndStatus(Long scheduleId, QueueStatus status);

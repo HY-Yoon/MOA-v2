@@ -13,6 +13,16 @@ import java.util.List;
 public class PaymentDto {
 
     /**
+     * 결제 정보 (결제 완료 응답에 포함)
+     * method, amount, paidAt
+     */
+    public record PaymentInfo(
+            String method,
+            Long amount,
+            LocalDateTime paidAt
+    ) {}
+
+    /**
      * 결제 요청 DTO
      * 프론트가 토스 위젯을 띄우기 전, 사전 데이터를 생성하기 위한 요청
      */
@@ -59,7 +69,7 @@ public class PaymentDto {
         String orderId,
 
         @NotNull(message = "amount는 필수입니다")
-        Integer amount
+        Long amount
     ) {}
 
     /**
@@ -85,4 +95,45 @@ public class PaymentDto {
         String code,       // 에러 코드
         String message     // 에러 메시지
     ) {}
+
+    /**
+     * 결제 완료 시 내려줄 최종 응답 DTO (Record 방식)
+     */
+    public record PaymentSuccessResponse(
+            String reservationId,
+            PerformanceInfo performance, // 내부 record 참조
+            List<SeatInfo> seats,        // 내부 record 참조
+            BookerInfo orderName,        // 내부 record 참조 (변수명 orderName 확인!)
+            PaymentInfo payment
+    ) {
+        public PaymentSuccessResponse {
+            seats = seats == null ? List.of() : List.copyOf(seats);
+        }
+
+        /**
+         * 공연 정보
+         */
+        public record PerformanceInfo(
+                String title,
+                LocalDateTime date,
+                Integer round
+        ) {}
+
+        /**
+         * 좌석 정보
+         */
+        public record SeatInfo(
+                String section,
+                String seatNumber
+        ) {}
+
+        /**
+         * 예매자 정보
+         */
+        public record BookerInfo(
+                String name,
+                String phoneNumber
+        ) {}
+    }
+
 }

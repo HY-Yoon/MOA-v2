@@ -48,69 +48,69 @@ public class AdminShowService {
 
         LocalDate startDate = request.startDate();
         LocalDate endDate = request.endDate();
-        
+
         Page<Show> shows = showRepository.findShowsWithFilters(
-            request.showStatus(),
-            request.saleStatus(),
-            keywordPattern,
-            startDate,  // null이면 쿼리에서 IS NULL 체크
-            endDate,    // null이면 쿼리에서 IS NULL 체크
-            pageable
-        );
+                request.showStatus(),
+                request.saleStatus(),
+                keywordPattern,
+                startDate, // null이면 쿼리에서 IS NULL 체크
+                endDate, // null이면 쿼리에서 IS NULL 체크
+                pageable);
 
         List<ShowDto.ListResponse> content = shows.getContent().stream()
-            .map(show -> {
-                // 모든 일정 조회
-                List<ShowSchedule> allSchedules = showScheduleRepository
-                    .findByShowIdOrderByDateAndTime(show.getId());
+                .map(show -> {
+                    // 모든 일정 조회
+                    List<ShowSchedule> allSchedules = showScheduleRepository
+                            .findByShowIdOrderByDateAndTime(show.getId());
 
-                // 일정 목록 생성 (회차 자동 계산)
-                Map<LocalDate, Integer> sessionCountByDate = new HashMap<>();
-                List<ShowDto.ListResponse.ScheduleInfo> scheduleInfos = allSchedules.stream()
-                    .map(schedule -> {
-                        // 같은 날짜의 회차 계산
-                        LocalDate date = schedule.getShowDate();
-                        int session = sessionCountByDate.getOrDefault(date, 0) + 1;
-                        sessionCountByDate.put(date, session);
+                    // 일정 목록 생성 (회차 자동 계산)
+                    Map<LocalDate, Integer> sessionCountByDate = new HashMap<>();
+                    List<ShowDto.ListResponse.ScheduleInfo> scheduleInfos = allSchedules.stream()
+                            .map(schedule -> {
+                                // 같은 날짜의 회차 계산
+                                LocalDate date = schedule.getShowDate();
+                                int session = sessionCountByDate.getOrDefault(date, 0) + 1;
+                                sessionCountByDate.put(date, session);
 
-                        return ShowDto.ListResponse.ScheduleInfo.builder()
-                            .keyId(schedule.getId())
-                            .date(schedule.getShowDate())
-                            .time(schedule.getShowTime())
-                            .session(session)
+                                return ShowDto.ListResponse.ScheduleInfo.builder()
+                                        .keyId(schedule.getId())
+                                        .date(schedule.getShowDate())
+                                        .time(schedule.getShowTime())
+                                        .session(session)
+                                        .build();
+                            })
+                            .collect(Collectors.toList());
+
+                    // 판매 기간 생성
+                    ShowDto.ListResponse.SalePeriod salePeriod = null;
+                    if (show.getSaleStartDate() != null || show.getSaleEndDate() != null) {
+                        salePeriod = ShowDto.ListResponse.SalePeriod.builder()
+                                .startDate(show.getSaleStartDate())
+                                .endDate(show.getSaleEndDate())
+                                .build();
+                    }
+
+                    ShowDto.ListResponse.LocationInfo locationInfo = show.getVenue() != null
+                            ? ShowDto.ListResponse.LocationInfo.builder()
+                                    .region(show.getVenue().getRegion() != null ? show.getVenue().getRegion().name()
+                                            : null)
+                                    .venue(show.getVenue().getName())
+                                    .hallName(show.getVenue().getHallName())
+                                    .build()
+                            : null;
+
+                    return ShowDto.ListResponse.builder()
+                            .id(show.getId())
+                            .title(show.getTitle())
+                            .genre(show.getGenre() != null ? show.getGenre().name() : null)
+                            .status(show.getStatus() != null ? show.getStatus().name() : null)
+                            .posterUrl(show.getPosterUrl())
+                            .location(locationInfo)
+                            .salePeriod(salePeriod)
+                            .schedules(scheduleInfos)
                             .build();
-                    })
-                    .collect(Collectors.toList());
-
-                // 판매 기간 생성
-                ShowDto.ListResponse.SalePeriod salePeriod = null;
-                if (show.getSaleStartDate() != null || show.getSaleEndDate() != null) {
-                    salePeriod = ShowDto.ListResponse.SalePeriod.builder()
-                        .startDate(show.getSaleStartDate())
-                        .endDate(show.getSaleEndDate())
-                        .build();
-                }
-
-                ShowDto.ListResponse.LocationInfo locationInfo = show.getVenue() != null
-                    ? ShowDto.ListResponse.LocationInfo.builder()
-                        .region(show.getVenue().getRegion() != null ? show.getVenue().getRegion().name() : null)
-                        .venue(show.getVenue().getName())
-                        .hallName(show.getVenue().getHallName())
-                        .build()
-                    : null;
-
-                return ShowDto.ListResponse.builder()
-                    .id(show.getId())
-                    .title(show.getTitle())
-                    .genre(show.getGenre() != null ? show.getGenre().name() : null)
-                    .status(show.getStatus() != null ? show.getStatus().name() : null)
-                    .posterUrl(show.getPosterUrl())
-                    .location(locationInfo)
-                    .salePeriod(salePeriod)
-                    .schedules(scheduleInfos)
-                    .build();
-            })
-            .collect(Collectors.toList());
+                })
+                .collect(Collectors.toList());
 
         return new PageImpl<>(content, pageable, shows.getTotalElements());
     }
@@ -126,70 +126,72 @@ public class AdminShowService {
 
         // 스케줄 정보 구성
         List<ShowDto.AdminDetailResponse.AdminScheduleInfo> scheduleInfos = schedules.stream()
-            .map(schedule -> {
-                Long totalSeats = show.getVenue() != null 
-                    ? seatRepository.countByVenueId(show.getVenue().getId()) 
-                    : 0L;
-                Long reservationCount = reservationRepository.countByScheduleId(schedule.getId());
-                Long remainingSeats = totalSeats - reservationCount;
+                .map(schedule -> {
+                    Long totalSeats = show.getVenue() != null
+                            ? seatRepository.countByVenueId(show.getVenue().getId())
+                            : 0L;
+                    Long reservationCount = reservationRepository.countByScheduleId(schedule.getId());
+                    Long remainingSeats = totalSeats - reservationCount;
 
-                return ShowDto.AdminDetailResponse.AdminScheduleInfo.builder()
-                    .scheduleId(schedule.getId())
-                    .showDate(schedule.getShowDate())
-                    .showTime(schedule.getShowTime())
-                    .ticketOpenTime(schedule.getTicketOpenTime())
-                    .remainingSeats(remainingSeats.intValue())
-                    .totalSeats(totalSeats.intValue())
-                    .reservationCount(reservationCount.intValue())
-                    .build();
-            })
-            .collect(Collectors.toList());
+                    return ShowDto.AdminDetailResponse.AdminScheduleInfo.builder()
+                            .scheduleId(schedule.getId())
+                            .showDate(schedule.getShowDate())
+                            .showTime(schedule.getShowTime())
+                            .ticketOpenTime(schedule.getTicketOpenTime())
+                            .remainingSeats(remainingSeats.intValue())
+                            .totalSeats(totalSeats.intValue())
+                            .reservationCount(reservationCount.intValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
 
         // 좌석 가격 정보 구성
         List<ShowDto.AdminDetailResponse.SeatPriceInfo> seatPriceInfos = seatGrades.stream()
-            .map(grade -> ShowDto.AdminDetailResponse.SeatPriceInfo.builder()
-                .sectionId(grade.getSection().getId().toString())
-                .sectionName(grade.getSection().getName())
-                .price(grade.getPrice())
-                .build())
-            .collect(Collectors.toList());
+                .map(grade -> ShowDto.AdminDetailResponse.SeatPriceInfo.builder()
+                        .sectionId(grade.getSection().getId().toString())
+                        .sectionName(grade.getSection().getName())
+                        .price(grade.getPrice())
+                        .build())
+                .collect(Collectors.toList());
 
         // Venue에서 hallName 가져오기
         String hallName = show.getVenue() != null ? show.getVenue().getHallName() : null;
 
         // 상세 이미지 정보 구성
         List<ShowDto.AdminDetailResponse.DetailImageInfo> detailImageInfos = show.getDetailImages().stream()
-            .map(detailImage -> ShowDto.AdminDetailResponse.DetailImageInfo.builder()
-                .id(detailImage.getId())
-                .url(detailImage.getUrl())
-                .build())
-            .collect(Collectors.toList());
+                .map(detailImage -> ShowDto.AdminDetailResponse.DetailImageInfo.builder()
+                        .id(detailImage.getId())
+                        .url(detailImage.getUrl())
+                        .build())
+                .collect(Collectors.toList());
 
         return ShowDto.AdminDetailResponse.builder()
-            .id(show.getId())
-            .title(show.getTitle())
-            .genre(show.getGenre() != null ? show.getGenre().name() : null)
-            .venueName(show.getVenue() != null ? show.getVenue().getName() : null)
-            .hallName(hallName)
-            .region(show.getVenue() != null && show.getVenue().getRegion() != null 
-                ? show.getVenue().getRegion().name() : null)
-            .runningTime(show.getRunningTime())
-            .posterUrl(show.getPosterUrl())
-            .detailImages(detailImageInfos)
-            .cast(show.getCast())
-            .status(show.getStatus() != null ? show.getStatus().name() : null)
-            .saleStatus(show.getSaleStatus() != null ? show.getSaleStatus().name() : null)
-            .saleStartDate(show.getSaleStartDate())
-            .saleEndDate(show.getSaleEndDate())
-            .schedules(scheduleInfos)
-            .seatPrices(seatPriceInfos)
-            .createdAt(show.getCreatedAt())
-            .updatedAt(show.getUpdatedAt())
-            .build();
+                .id(show.getId())
+                .title(show.getTitle())
+                .genre(show.getGenre() != null ? show.getGenre().name() : null)
+                .venueName(show.getVenue() != null ? show.getVenue().getName() : null)
+                .hallName(hallName)
+                .region(show.getVenue() != null && show.getVenue().getRegion() != null
+                        ? show.getVenue().getRegion().name()
+                        : null)
+                .runningTime(show.getRunningTime())
+                .posterUrl(show.getPosterUrl())
+                .detailImages(detailImageInfos)
+                .cast(show.getCast())
+                .status(show.getStatus() != null ? show.getStatus().name() : null)
+                .saleStatus(show.getSaleStatus() != null ? show.getSaleStatus().name() : null)
+                .saleStartDate(show.getSaleStartDate())
+                .saleEndDate(show.getSaleEndDate())
+                .schedules(scheduleInfos)
+                .seatPrices(seatPriceInfos)
+                .createdAt(show.getCreatedAt())
+                .updatedAt(show.getUpdatedAt())
+                .build();
     }
 
     @Transactional
-    public ShowDto.CreateResponse createShow(ShowDto.CreateRequest request, MultipartFile poster, List<MultipartFile> detailImages) {
+    public ShowDto.CreateResponse createShow(ShowDto.CreateRequest request, MultipartFile poster,
+            List<MultipartFile> detailImages) {
         // 파일 업로드 처리
         String posterUrl = null;
         if (poster != null && !poster.isEmpty()) {
@@ -202,52 +204,52 @@ public class AdminShowService {
         Region region = request.location().region();
         String venueName = request.location().venueName();
         String hallName = request.location().hallName();
-        
+
         log.debug("Venue 조회 시도: name={}, hallName={}, region={}", venueName, hallName, region);
-        
+
         Venue venue = venueRepository.findByNameAndHallNameAndRegion(
-            venueName,
-            hallName,
-            region
-        ).orElseGet(() -> {
-            // Venue가 없으면 자동 생성
-            log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", venueName, hallName, region);
-            Venue newVenue = Venue.builder()
-                .name(venueName)
-                .hallName(hallName)
-                .region(region)
-                .build();
-            return venueRepository.save(newVenue);
-        });
-        
-        log.debug("사용할 Venue: id={}, name={}, hallName={}, region={}", venue.getId(), venue.getName(), venue.getHallName(), venue.getRegion());
+                venueName,
+                hallName,
+                region).orElseGet(() -> {
+                    // Venue가 없으면 자동 생성
+                    log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", venueName, hallName, region);
+                    Venue newVenue = Venue.builder()
+                            .name(venueName)
+                            .hallName(hallName)
+                            .region(region)
+                            .build();
+                    return venueRepository.save(newVenue);
+                });
+
+        log.debug("사용할 Venue: id={}, name={}, hallName={}, region={}", venue.getId(), venue.getName(),
+                venue.getHallName(), venue.getRegion());
 
         // 마지막 공연일 계산
         LocalDate lastShowDate = request.schedules().stream()
-            .map(ShowDto.CreateRequest.ScheduleRequest::showDate)
-            .max(LocalDate::compareTo)
-            .orElse(LocalDate.now());
+                .map(ShowDto.CreateRequest.ScheduleRequest::showDate)
+                .max(LocalDate::compareTo)
+                .orElse(LocalDate.now());
         LocalDate firstShowDate = request.schedules().stream()
-            .map(ShowDto.CreateRequest.ScheduleRequest::showDate)
-            .min(LocalDate::compareTo)
-            .orElse(LocalDate.now());
-        
+                .map(ShowDto.CreateRequest.ScheduleRequest::showDate)
+                .min(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+
         // Show 생성 (createdAt, updatedAt은 @PrePersist/@PreUpdate로 자동 설정)
         Show show = Show.builder()
-            .venue(venue)
-            .title(request.title())
-            .genre(Genre.valueOf(request.genre()))
-            .runningTime(request.runningTime())
-            .posterUrl(posterUrl)
-            .cast(request.cast())
-            .status(ShowStatus.WAITING)
-            .saleStatus(SaleStatus.ALLOWED)
-            .saleStartDate(request.salePeriod().startDate())
-            .saleEndDate(request.salePeriod().endDate())
-            .startDate(firstShowDate)
-            .endDate(lastShowDate)
-            .viewCount(0L)
-            .build();
+                .venue(venue)
+                .title(request.title())
+                .genre(Genre.valueOf(request.genre()))
+                .runningTime(request.runningTime())
+                .posterUrl(posterUrl)
+                .cast(request.cast())
+                .status(ShowStatus.WAITING)
+                .saleStatus(SaleStatus.ALLOWED)
+                .saleStartDate(request.salePeriod().startDate())
+                .saleEndDate(request.salePeriod().endDate())
+                .startDate(firstShowDate)
+                .endDate(lastShowDate)
+                .viewCount(0L)
+                .build();
 
         show = showRepository.save(show);
 
@@ -256,10 +258,10 @@ public class AdminShowService {
             String[] detailImageUrls = fileService.uploadFiles(detailImages, "details");
             for (int i = 0; i < detailImageUrls.length; i++) {
                 DetailImage detailImage = DetailImage.builder()
-                    .show(show)
-                    .url(detailImageUrls[i])
-                    .displayOrder(i)
-                    .build();
+                        .show(show)
+                        .url(detailImageUrls[i])
+                        .displayOrder(i)
+                        .build();
                 detailImageRepository.save(detailImage);
             }
         }
@@ -269,16 +271,16 @@ public class AdminShowService {
         for (ShowDto.CreateRequest.ScheduleRequest scheduleReq : request.schedules()) {
             // showTime 파싱 ("19:00" -> LocalTime)
             LocalTime showTime = LocalTime.parse(scheduleReq.showTime(),
-                DateTimeFormatter.ofPattern("HH:mm"));
-            
+                    DateTimeFormatter.ofPattern("HH:mm"));
+
             ShowSchedule schedule = ShowSchedule.builder()
-                .show(show)
-                .showDate(scheduleReq.showDate())
-                .showTime(showTime)
-                .ticketOpenTime(scheduleReq.ticketOpenTime())
-                .status(ScheduleStatus.BEFORE_OPEN)
-                .build();
-            
+                    .show(show)
+                    .showDate(scheduleReq.showDate())
+                    .showTime(showTime)
+                    .ticketOpenTime(scheduleReq.ticketOpenTime())
+                    .status(ScheduleStatus.BEFORE_OPEN)
+                    .build();
+
             savedSchedules.add(showScheduleRepository.save(schedule));
         }
 
@@ -287,10 +289,10 @@ public class AdminShowService {
         for (VenueSeatSection section : venueSections) {
             if (section.getDefaultPrice() != null) {
                 ShowSeatGrade grade = ShowSeatGrade.builder()
-                    .show(show)
-                    .section(section)
-                    .price(section.getDefaultPrice())
-                    .build();
+                        .show(show)
+                        .section(section)
+                        .price(section.getDefaultPrice())
+                        .build();
                 showSeatGradeRepository.save(grade);
             }
         }
@@ -299,7 +301,8 @@ public class AdminShowService {
     }
 
     @Transactional
-    public ShowDto.UpdateResponse updateShow(Long id, ShowDto.UpdateRequest request, MultipartFile poster, List<MultipartFile> detailImages) {
+    public ShowDto.UpdateResponse updateShow(Long id, ShowDto.UpdateRequest request, MultipartFile poster,
+            List<MultipartFile> detailImages) {
         Show show = showRepository.findByIdAndNotDeleted(id);
         if (show == null) {
             throw new RuntimeException("공연을 찾을 수 없습니다");
@@ -342,25 +345,26 @@ public class AdminShowService {
                 Region region = request.location().region();
                 String venueName = request.location().venueName();
                 String hallName = request.location().hallName();
-                
+
                 log.debug("Venue 조회 시도: name={}, hallName={}, region={}", venueName, hallName, region);
-                
+
                 Venue venue = venueRepository.findByNameAndHallNameAndRegion(
-                    venueName,
-                    hallName,
-                    region
-                ).orElseGet(() -> {
-                    // Venue가 없으면 자동 생성
-                    log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", venueName, hallName, region);
-                    Venue newVenue = Venue.builder()
-                        .name(venueName)
-                        .hallName(hallName)
-                        .region(region)
-                        .build();
-                    return venueRepository.save(newVenue);
-                });
-                
-                log.debug("사용할 Venue: id={}, name={}, hallName={}, region={}", venue.getId(), venue.getName(), venue.getHallName(), venue.getRegion());
+                        venueName,
+                        hallName,
+                        region).orElseGet(() -> {
+                            // Venue가 없으면 자동 생성
+                            log.info("Venue를 찾을 수 없어 새로 생성: name={}, hallName={}, region={}", venueName, hallName,
+                                    region);
+                            Venue newVenue = Venue.builder()
+                                    .name(venueName)
+                                    .hallName(hallName)
+                                    .region(region)
+                                    .build();
+                            return venueRepository.save(newVenue);
+                        });
+
+                log.debug("사용할 Venue: id={}, name={}, hallName={}, region={}", venue.getId(), venue.getName(),
+                        venue.getHallName(), venue.getRegion());
                 show.setVenue(venue);
             }
             if (request.salePeriod() != null) {
@@ -384,16 +388,16 @@ public class AdminShowService {
         if (request.deletedDetailImageIds() != null && !request.deletedDetailImageIds().isEmpty()) {
             for (Long imageIdToDelete : request.deletedDetailImageIds()) {
                 DetailImage imageToDelete = detailImageRepository.findById(imageIdToDelete)
-                    .orElseThrow(() -> new RuntimeException("삭제할 이미지를 찾을 수 없습니다: " + imageIdToDelete));
-                
+                        .orElseThrow(() -> new RuntimeException("삭제할 이미지를 찾을 수 없습니다: " + imageIdToDelete));
+
                 // 해당 이미지가 이 공연에 속하는지 확인
                 if (!imageToDelete.getShow().getId().equals(id)) {
                     throw new RuntimeException("이미지가 이 공연에 속하지 않습니다. 이미지 ID: " + imageIdToDelete);
                 }
-                
+
                 // 파일 시스템에서 삭제
                 fileService.deleteFile(imageToDelete.getUrl());
-                
+
                 // DB에서 삭제
                 detailImageRepository.delete(imageToDelete);
             }
@@ -404,30 +408,31 @@ public class AdminShowService {
             // 현재 최대 display_order 조회
             List<DetailImage> existingImages = detailImageRepository.findByShowIdOrderByDisplayOrderAsc(id);
             int maxOrder = existingImages.stream()
-                .mapToInt(img -> img.getDisplayOrder() != null ? img.getDisplayOrder() : 0)
-                .max()
-                .orElse(-1);
-            
+                    .mapToInt(img -> img.getDisplayOrder() != null ? img.getDisplayOrder() : 0)
+                    .max()
+                    .orElse(-1);
+
             // 새 이미지 업로드 및 저장
             String[] newDetailImageUrls = fileService.uploadFiles(detailImages, "details");
             for (int i = 0; i < newDetailImageUrls.length; i++) {
                 DetailImage newDetailImage = DetailImage.builder()
-                    .show(show)
-                    .url(newDetailImageUrls[i])
-                    .displayOrder(maxOrder + 1 + i)
-                    .build();
+                        .show(show)
+                        .url(newDetailImageUrls[i])
+                        .displayOrder(maxOrder + 1 + i)
+                        .build();
                 detailImageRepository.save(newDetailImage);
             }
         }
 
         // 스케줄 추가/수정/삭제 처리 (팝업에서 변경한 모든 일정을 최종 저장)
-        if (request.schedules() != null || (request.deletedScheduleIds() != null && !request.deletedScheduleIds().isEmpty())) {
+        if (request.schedules() != null
+                || (request.deletedScheduleIds() != null && !request.deletedScheduleIds().isEmpty())) {
             // 1. 스케줄 삭제 처리
             if (request.deletedScheduleIds() != null && !request.deletedScheduleIds().isEmpty()) {
                 for (Long scheduleIdToDelete : request.deletedScheduleIds()) {
                     // 스케줄을 직접 ID로 조회 (더 안전함)
                     ShowSchedule scheduleToDelete = showScheduleRepository.findById(scheduleIdToDelete)
-                        .orElseThrow(() -> new RuntimeException("삭제할 스케줄을 찾을 수 없습니다: " + scheduleIdToDelete));
+                            .orElseThrow(() -> new RuntimeException("삭제할 스케줄을 찾을 수 없습니다: " + scheduleIdToDelete));
 
                     // 해당 스케줄이 이 공연에 속하는지 확인
                     if (!scheduleToDelete.getShow().getId().equals(id)) {
@@ -438,7 +443,8 @@ public class AdminShowService {
                     if (show.getStatus() != ShowStatus.WAITING) {
                         Long reservationCount = reservationRepository.countByScheduleId(scheduleToDelete.getId());
                         if (reservationCount > 0) {
-                            throw new RuntimeException("예매된 좌석이 있는 스케줄은 삭제할 수 없습니다. 스케줄 ID: " + scheduleToDelete.getId());
+                            throw new RuntimeException(
+                                    "예매된 좌석이 있는 스케줄은 삭제할 수 없습니다. 스케줄 ID: " + scheduleToDelete.getId());
                         }
                     }
 
@@ -453,42 +459,43 @@ public class AdminShowService {
                 log.info("=== 스케줄 처리 시작 ===");
                 log.info("공연 ID: {}", id);
                 log.info("기존 스케줄 개수: {}", existingSchedules.size());
-                existingSchedules.forEach(s -> log.info("  - 기존 스케줄: id={}, showDate={}, showTime={}", 
-                    s.getId(), s.getShowDate(), s.getShowTime()));
-                
+                existingSchedules.forEach(s -> log.info("  - 기존 스케줄: id={}, showDate={}, showTime={}",
+                        s.getId(), s.getShowDate(), s.getShowTime()));
+
                 for (ShowDto.UpdateRequest.ScheduleUpdateRequest scheduleReq : request.schedules()) {
-                    log.info("처리 중인 스케줄: scheduleId={}, showDate={}, showTime={}", 
-                        scheduleReq.scheduleId(), scheduleReq.showDate(), scheduleReq.showTime());
-                    
+                    log.info("처리 중인 스케줄: scheduleId={}, showDate={}, showTime={}",
+                            scheduleReq.scheduleId(), scheduleReq.showDate(), scheduleReq.showTime());
+
                     if (scheduleReq.scheduleId() == null) {
                         // 새 스케줄 추가
                         log.info("새 스케줄 추가: showDate={}, showTime={}", scheduleReq.showDate(), scheduleReq.showTime());
-                        LocalTime showTime = LocalTime.parse(scheduleReq.showTime(), DateTimeFormatter.ofPattern("HH:mm"));
+                        LocalTime showTime = LocalTime.parse(scheduleReq.showTime(),
+                                DateTimeFormatter.ofPattern("HH:mm"));
                         ShowSchedule newSchedule = ShowSchedule.builder()
-                            .show(show)
-                            .showDate(scheduleReq.showDate())
-                            .showTime(showTime)
-                            .ticketOpenTime(scheduleReq.ticketOpenTime())
-                            .status(ScheduleStatus.BEFORE_OPEN)
-                            .build();
+                                .show(show)
+                                .showDate(scheduleReq.showDate())
+                                .showTime(showTime)
+                                .ticketOpenTime(scheduleReq.ticketOpenTime())
+                                .status(ScheduleStatus.BEFORE_OPEN)
+                                .build();
                         showScheduleRepository.save(newSchedule);
                         log.info("새 스케줄 저장 완료: id={}", newSchedule.getId());
                     } else {
                         // 기존 스케줄 수정 - 직접 ID로 조회 (더 안전함)
                         log.info("스케줄 수정 시도: scheduleId={}", scheduleReq.scheduleId());
                         ShowSchedule existingSchedule = showScheduleRepository.findById(scheduleReq.scheduleId())
-                            .orElseThrow(() -> {
-                                log.error("스케줄을 찾을 수 없음: scheduleId={}, 공연 ID={}", scheduleReq.scheduleId(), id);
-                                return new RuntimeException("스케줄을 찾을 수 없습니다: " + scheduleReq.scheduleId());
-                            });
+                                .orElseThrow(() -> {
+                                    log.error("스케줄을 찾을 수 없음: scheduleId={}, 공연 ID={}", scheduleReq.scheduleId(), id);
+                                    return new RuntimeException("스케줄을 찾을 수 없습니다: " + scheduleReq.scheduleId());
+                                });
 
-                        log.info("스케줄 조회 성공: scheduleId={}, 속한 공연 ID={}", 
-                            existingSchedule.getId(), existingSchedule.getShow().getId());
+                        log.info("스케줄 조회 성공: scheduleId={}, 속한 공연 ID={}",
+                                existingSchedule.getId(), existingSchedule.getShow().getId());
 
                         // 해당 스케줄이 이 공연에 속하는지 확인
                         if (!existingSchedule.getShow().getId().equals(id)) {
-                            log.error("스케줄이 다른 공연에 속함: scheduleId={}, 요청 공연 ID={}, 실제 공연 ID={}", 
-                                scheduleReq.scheduleId(), id, existingSchedule.getShow().getId());
+                            log.error("스케줄이 다른 공연에 속함: scheduleId={}, 요청 공연 ID={}, 실제 공연 ID={}",
+                                    scheduleReq.scheduleId(), id, existingSchedule.getShow().getId());
                             throw new RuntimeException("스케줄이 이 공연에 속하지 않습니다. 스케줄 ID: " + scheduleReq.scheduleId());
                         }
 
@@ -496,12 +503,14 @@ public class AdminShowService {
                         if (show.getStatus() != ShowStatus.WAITING) {
                             Long reservationCount = reservationRepository.countByScheduleId(existingSchedule.getId());
                             if (reservationCount > 0) {
-                                throw new RuntimeException("예매된 좌석이 있는 스케줄은 수정할 수 없습니다. 스케줄 ID: " + existingSchedule.getId());
+                                throw new RuntimeException(
+                                        "예매된 좌석이 있는 스케줄은 수정할 수 없습니다. 스케줄 ID: " + existingSchedule.getId());
                             }
                         }
 
                         // 스케줄 정보 업데이트
-                        LocalTime showTime = LocalTime.parse(scheduleReq.showTime(), DateTimeFormatter.ofPattern("HH:mm"));
+                        LocalTime showTime = LocalTime.parse(scheduleReq.showTime(),
+                                DateTimeFormatter.ofPattern("HH:mm"));
                         existingSchedule.setShowDate(scheduleReq.showDate());
                         existingSchedule.setShowTime(showTime);
                         existingSchedule.setTicketOpenTime(scheduleReq.ticketOpenTime());
@@ -523,7 +532,7 @@ public class AdminShowService {
     @Transactional
     public ShowDto.DeleteResponse deleteShow(Long id) {
         Show show = showRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
+                .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
 
         // WAITING 상태의 공연만 삭제 가능
         if (show.getStatus() != ShowStatus.WAITING) {
@@ -594,7 +603,6 @@ public class AdminShowService {
         return new ShowDto.SaleStatusUpdateResponse(show.getId(), show.getSaleStatus(), "판매 상태가 변경되었습니다");
     }
 
-
     /**
      * 공연의 종료일(endDate, saleEndDate) 재계산
      * 모든 일정 중 가장 마지막 공연일을 기준으로 설정
@@ -603,14 +611,14 @@ public class AdminShowService {
         List<ShowSchedule> allSchedules = showScheduleRepository.findByShowIdOrderByDateAndTime(show.getId());
         if (!allSchedules.isEmpty()) {
             LocalDate lastShowDate = allSchedules.stream()
-                .map(ShowSchedule::getShowDate)
-                .max(LocalDate::compareTo)
-                .orElse(show.getEndDate());
-            
+                    .map(ShowSchedule::getShowDate)
+                    .max(LocalDate::compareTo)
+                    .orElse(show.getEndDate());
+
             LocalDate firstShowDate = allSchedules.stream()
-                .map(ShowSchedule::getShowDate)
-                .min(LocalDate::compareTo)
-                .orElse(show.getStartDate());
+                    .map(ShowSchedule::getShowDate)
+                    .min(LocalDate::compareTo)
+                    .orElse(show.getStartDate());
 
             show.setStartDate(firstShowDate);
             show.setEndDate(lastShowDate);
@@ -620,4 +628,3 @@ public class AdminShowService {
     }
 
 }
-

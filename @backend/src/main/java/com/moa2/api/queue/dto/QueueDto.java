@@ -65,19 +65,32 @@ public class QueueDto {
             @Schema(description = "예상 대기 시간(초) (WAITING 상태일 때만)", example = "84")
             Long estimatedWaitTime,
 
+            @Schema(description = "전체 대기 인원 수 (WAITING 상태일 때만)", example = "150")
+            Long totalWaiting,
+
+            @Schema(description = "다음 폴링까지 대기 시간(초) (WAITING 상태일 때만)", example = "3")
+            Long retryAfter,
+
             @Schema(description = "입장 가능 시간 (READY 상태일 때만)", example = "2026-01-20T10:10:00")
             LocalDateTime activeUntil
     ) {
         /**
          * WAITING 상태 응답 생성
+         * @param position 내 앞 대기 인원 수
+         * @param totalWaiting 전체 대기 인원 수
          */
-        public static StatusResponse waiting(Long position) {
+        public static StatusResponse waiting(Long position, Long totalWaiting) {
             long estimatedWaitTime = position * 2;
+            
+            // 전체 대기 인원이 100명을 넘으면 retryAfter를 10초로, 아니면 3초로 설정
+            long retryAfter = (totalWaiting != null && totalWaiting > 100) ? 10L : 3L;
 
             return StatusResponse.builder()
                     .status(QueueStatus.WAITING)
                     .position(position)
                     .estimatedWaitTime(estimatedWaitTime)
+                    .totalWaiting(totalWaiting)
+                    .retryAfter(retryAfter)
                     .build();
         }
 

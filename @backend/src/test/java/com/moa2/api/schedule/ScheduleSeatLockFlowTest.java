@@ -3,20 +3,8 @@ package com.moa2.api.schedule;
 import com.moa2.api.queue.scheduler.QueueScheduler;
 import com.moa2.api.schedule.scheduler.ScheduleSeatLockScheduler;
 import com.moa2.api.queue.queue.repository.QueueRepository;
-import com.moa2.domain.show.entity.ScheduleSeat;
-import com.moa2.domain.show.entity.Seat;
-import com.moa2.domain.show.entity.Show;
-import com.moa2.domain.show.entity.ShowSchedule;
-import com.moa2.domain.show.entity.ShowSeatGrade;
-import com.moa2.domain.show.entity.Venue;
-import com.moa2.domain.show.entity.VenueSeatSection;
-import com.moa2.domain.show.repository.ScheduleSeatRepository;
-import com.moa2.domain.show.repository.SeatRepository;
-import com.moa2.domain.show.repository.ShowRepository;
-import com.moa2.domain.show.repository.ShowScheduleRepository;
-import com.moa2.domain.show.repository.ShowSeatGradeRepository;
-import com.moa2.domain.show.repository.VenueRepository;
-import com.moa2.domain.show.repository.VenueSeatSectionRepository;
+import com.moa2.api.show.domain.entity.*;
+import com.moa2.api.show.domain.repository.*;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.model.Genre;
@@ -174,7 +162,7 @@ class ScheduleSeatLockFlowTest {
                         post("/api/v1/queue/tokens")
                                 .with(withAuth(auth))
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"scheduleId\":" + schedule.getId() + "}")
+                                .content("{\"scheduleId\":\"" + schedule.getId() + "\"}")
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -184,7 +172,7 @@ class ScheduleSeatLockFlowTest {
                         post("/api/v1/schedules/{scheduleId}/seats/lock", schedule.getId())
                                 .with(withAuth(auth))
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"seatIds\":[" + seat1.getId() + "," + seat2.getId() + "]}")
+                                .content("{\"seatIds\":[\"" + seat1.getId() + "\",\"" + seat2.getId() + "\"]}")
                 )
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
@@ -198,7 +186,7 @@ class ScheduleSeatLockFlowTest {
                                 .with(withAuth(auth))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 // 일부러 내림차순으로 보내도, 서비스에서 오름차순 정렬 후 락을 잡아야 함
-                                .content("{\"seatIds\":[" + seat2.getId() + "," + seat1.getId() + "]}")
+                                .content("{\"seatIds\":[\"" + seat1.getId() + "\",\"" + seat2.getId() + "\"]}")
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -226,7 +214,7 @@ class ScheduleSeatLockFlowTest {
                         post("/api/v1/schedules/{scheduleId}/seats/unlock", schedule.getId())
                                 .with(withAuth(auth))
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"seatIds\":[" + seat1.getId() + "," + seat2.getId() + "]}")
+                                .content("{\"seatIds\":[\"" + seat1.getId() + "\",\"" + seat2.getId() + "\"]}")
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
