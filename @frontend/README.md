@@ -24,7 +24,7 @@ components/
 ├── organisms/       # 재사용 가능한 복합 컴포넌트 (AdminSidebar, AdminBreadcrumb)
 └── pages/           # 도메인별 페이지 컴포넌트
 app/
-└── admin/show/upsert/
+└── admin/shows/upsert/
     └── _components/ # 페이지별 컴포넌트 (ShowUpsertForm) - Next.js 라우팅 제외
 ```
 

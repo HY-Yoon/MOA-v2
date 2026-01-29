@@ -1,6 +1,6 @@
 # Page-specific Components
 
-이 폴더에는 **admin/show/upsert 페이지에서만 사용되는 로컬 컴포넌트들**이 포함됩니다.
+이 폴더에는 **admin/shows/upsert 페이지에서만 사용되는 로컬 컴포넌트들**이 포함됩니다.
 
 > **📝 참고**: 폴더 이름이 `_components`인 이유는 Next.js에서 `_`로 시작하는 폴더는 라우팅에서 제외되기 때문입니다.
 
