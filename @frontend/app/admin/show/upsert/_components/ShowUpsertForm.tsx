@@ -31,6 +31,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { PageCard } from '@/components/molecules/PageCard';
+import StatusBadge from '@/components/molecules/StatusBadge';
 
 interface Props {
   id?: string;
@@ -479,11 +480,7 @@ export default function ShowUpsertForm(props: Props) {
   // 공연 상태 (수정화면에서만)
   const statusField = (
     <FormField isLoading={isLoading} label="상태" htmlFor="status">
-      {data?.status ? (
-        <Badge className={SHOW_STATUS_COLORS[data.status as ShowStatus]}>
-          {SHOW_STATUS_LABELS[data.status as ShowStatus]}
-        </Badge>
-      ) : null}
+      {data?.status ? <StatusBadge type="show" status={data.status} /> : null}
     </FormField>
   );
 
