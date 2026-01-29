@@ -5,6 +5,15 @@ type ShowUpsert = { showId?: number; message?: string };
 
 const BASE_URL = '/api/v1/admin/shows' as const;
 
+// 공연 목록 조회
+export const getShowList = (params: Show.ListParams) => ({
+  queryKey: ['admin', 'show', 'list', params],
+  queryFn: async () => {
+    const response = await axiosInstance.get(BASE_URL, { params });
+    return response?.data.data;
+  },
+});
+
 // 공연 상세 조회
 export const getShow = (id: number) => ({
   queryKey: ['admin', 'show', 'detail', id],
@@ -37,4 +46,20 @@ export const updateShow = (
     });
     return response?.data;
   },
+});
+
+// 공연 판매 설정 (ALLOWED ↔ SUSPENDED)
+type ChangeParams = { id: number; saleStatus: Show.SaleStatus };
+export const changeSaleStatus = () => ({
+  mutationKey: ['admin', 'show', 'saleStatus'],
+  mutationFn: async ({ id, saleStatus }: ChangeParams) => {
+    const response = await axiosInstance.patch(`${BASE_URL}/${id}`, { saleStatus });
+    return response?.data;
+  },
+});
+
+// 공연 삭제
+export const deleteShow = () => ({
+  mutationKey: ['admin', 'show', 'delete'],
+  mutationFn: async (id: number) => await axiosInstance.delete(`${BASE_URL}/${id}`),
 });
