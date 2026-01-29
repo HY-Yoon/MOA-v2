@@ -13,7 +13,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "reservation_seats")
 public class ReservationSeat {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // [단방향] 예약 정보를 참조
@@ -25,24 +26,16 @@ public class ReservationSeat {
     @JoinColumn(name = "seat_id", nullable = false)
     private Seat seat; // 공연 도메인`의 물리적 좌석
 
+    @Column(name = "schedule_seat_id")
+    private Long scheduleSeatId; // 회차별 좌석 ID (ScheduleSeat.id) - 결제 검증 시 사용
+
     private Integer price;
 
     @Builder
-    public ReservationSeat(Reservation reservation, Seat seat, Integer price) {
+    public ReservationSeat(Reservation reservation, Seat seat, Long scheduleSeatId, Integer price) {
         this.reservation = reservation;
         this.seat = seat;
+        this.scheduleSeatId = scheduleSeatId;
         this.price = price;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

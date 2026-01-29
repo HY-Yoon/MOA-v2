@@ -44,11 +44,18 @@ public class MockPaymentController {
                                         request.orderId(),
                                         request.amount());
                         return ResponseEntity.ok(ApiResponse.success(response));
-                } catch (PaymentException e) {
-                        log.warn("Mock 결제 승인 실패: orderId={}, code={}, message={}",
-                                        request.orderId(), e.getCode(), e.getMessage());
-                        return ResponseEntity.status(e.getStatus())
-                                        .body(ApiResponse.error(e.getMessage()));
+                } catch (Exception e) {
+                        log.warn("Mock 결제 승인 실패: orderId={}, message={}", request.orderId(), e.getMessage());
+
+                        // PaymentException인 경우 해당 status 사용, 그 외에는 400 Bad Request
+                        org.springframework.http.HttpStatus status = org.springframework.http.HttpStatus.BAD_REQUEST;
+                        if (e instanceof PaymentException pe) {
+                                status = pe.getStatus();
+                        }
+
+                        // code를 null로 전달하여 응답 JSON에서 제외되도록 함
+                        return ResponseEntity.status(status)
+                                        .body(ApiResponse.error(e.getMessage(), null, null));
                 }
         }
 }

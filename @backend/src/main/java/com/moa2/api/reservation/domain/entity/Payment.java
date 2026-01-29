@@ -24,10 +24,12 @@ public class Payment {
     @JoinColumn(name = "reservation_id", nullable = false, unique = true)
     private Reservation reservation;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 255)
     private String orderId;
 
+    @Column(length = 500) // 토스 paymentKey는 길 수 있음
     private String paymentKey;
+
     private Integer amount;
 
     @Enumerated(EnumType.STRING)
@@ -36,6 +38,7 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     private PaymentStatus status; // PENDING, COMPLETED, FAILED
 
+    @Column(length = 1000) // 실패 사유는 길 수 있음
     private String failureReason;
 
     private LocalDateTime requestedAt;

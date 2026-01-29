@@ -15,43 +15,52 @@ import java.util.Optional;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
-    
-    @Query("SELECT COUNT(r) FROM Reservation r WHERE r.showSchedule.id = :scheduleId AND r.status != 'CANCELLED'")
-    Long countByScheduleId(@Param("scheduleId") Long scheduleId);
-    
-    /**
-     * 사용자의 특정 상태 예매 목록 조회 (진행중인 예매 확인용)
-     */
-    List<Reservation> findByUserAndStatusIn(User user, List<ReservationStatus> statuses);
-    
-    /**
-     * 사용자의 모든 예매 목록 조회 (페이지네이션)
-     */
-    @Query("SELECT r FROM Reservation r " +
-           "JOIN FETCH r.showSchedule sch " +
-           "JOIN FETCH sch.show s " +
-           "WHERE r.user = :user " +
-           "ORDER BY r.createdAt DESC")
-    Page<Reservation> findByUser(@Param("user") User user, Pageable pageable);
-    
-    /**
-     * 사용자의 특정 상태 예매 목록 조회 (페이지네이션)
-     */
-    @Query("SELECT r FROM Reservation r " +
-           "JOIN FETCH r.showSchedule sch " +
-           "JOIN FETCH sch.show s " +
-           "WHERE r.user = :user AND r.status = :status " +
-           "ORDER BY r.createdAt DESC")
-    Page<Reservation> findByUserAndStatus(@Param("user") User user, @Param("status") ReservationStatus status, Pageable pageable);
-    
-    /**
-     * 예매 상세 조회 (사용자 검증용)
-     */
-    @Query("SELECT r FROM Reservation r " +
-           "JOIN FETCH r.showSchedule sch " +
-           "JOIN FETCH sch.show s " +
-           "JOIN FETCH s.venue v " +
-           "WHERE r.id = :reservationId AND r.user = :user")
-    Optional<Reservation> findByIdAndUser(@Param("reservationId") Long reservationId, @Param("user") User user);
-}
 
+       @Query("SELECT COUNT(r) FROM Reservation r WHERE r.showSchedule.id = :scheduleId AND r.status != 'CANCELLED'")
+       Long countByScheduleId(@Param("scheduleId") Long scheduleId);
+
+       /**
+        * 사용자의 특정 상태 예매 목록 조회 (진행중인 예매 확인용)
+        */
+       List<Reservation> findByUserAndStatusIn(User user, List<ReservationStatus> statuses);
+
+       /**
+        * 사용자의 모든 예매 목록 조회 (페이지네이션)
+        */
+       @Query("SELECT r FROM Reservation r " +
+                     "JOIN FETCH r.showSchedule sch " +
+                     "JOIN FETCH sch.show s " +
+                     "WHERE r.user = :user " +
+                     "ORDER BY r.createdAt DESC")
+       Page<Reservation> findByUser(@Param("user") User user, Pageable pageable);
+
+       /**
+        * 사용자의 특정 상태 예매 목록 조회 (페이지네이션)
+        */
+       @Query("SELECT r FROM Reservation r " +
+                     "JOIN FETCH r.showSchedule sch " +
+                     "JOIN FETCH sch.show s " +
+                     "WHERE r.user = :user AND r.status = :status " +
+                     "ORDER BY r.createdAt DESC")
+       Page<Reservation> findByUserAndStatus(@Param("user") User user, @Param("status") ReservationStatus status,
+                     Pageable pageable);
+
+       /**
+        * 예매 상세 조회 (사용자 검증용)
+        */
+       @Query("SELECT r FROM Reservation r " +
+                     "JOIN FETCH r.showSchedule sch " +
+                     "JOIN FETCH sch.show s " +
+                     "JOIN FETCH s.venue v " +
+                     "WHERE r.id = :reservationId AND r.user = :user")
+       Optional<Reservation> findByIdAndUser(@Param("reservationId") Long reservationId, @Param("user") User user);
+
+       /**
+        * 예매번호로 예매 조회 (결제 완료 페이지용, 스케줄/공연 fetch)
+        */
+       @Query("SELECT r FROM Reservation r " +
+                     "JOIN FETCH r.showSchedule sch " +
+                     "JOIN FETCH sch.show s " +
+                     "WHERE r.reservationNumber = :reservationNumber")
+       Optional<Reservation> findByReservationNumberWithSchedule(@Param("reservationNumber") String reservationNumber);
+}

@@ -4,7 +4,6 @@ import com.moa2.api.payment.client.TossPaymentClient;
 import com.moa2.api.payment.client.TossPaymentResponse;
 import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
-import com.moa2.api.payment.exception.TossPaymentException;
 import com.moa2.api.reservation.domain.entity.Payment;
 import com.moa2.api.reservation.domain.entity.Reservation;
 import com.moa2.api.reservation.domain.entity.ReservationSeat;
@@ -27,7 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -47,6 +49,7 @@ public class PaymentService {
         private final UserRepository userRepository;
         private final TossPaymentClient tossPaymentClient;
 
+        /** 토스 리다이렉트 대상: 백엔드 success/fail 핸들러 URL */
         @Value("${app.payment.success-url}")
         private String successUrl;
 
@@ -121,6 +124,7 @@ public class PaymentService {
                         ReservationSeat reservationSeat = ReservationSeat.builder()
                                         .reservation(reservation)
                                         .seat(scheduleSeat.getSeat())
+                                        .scheduleSeatId(scheduleSeat.getId()) // schedule_seat_id 저장
                                         .price(scheduleSeat.getGrade().getPrice())
                                         .build();
                         reservationSeatRepository.save(reservationSeat);
@@ -138,6 +142,12 @@ public class PaymentService {
                 Show show = schedule.getShow();
                 String orderName = createOrderName(show.getTitle(), scheduleSeats.size());
 
+                // 12. 예매자 정보 생성
+                PaymentDto.RequestResponse.BookerInfo booker = new PaymentDto.RequestResponse.BookerInfo(
+                                request.bookerName(),
+                                request.bookerEmail(),
+                                request.bookerPhone());
+
                 log.info("결제 요청 완료: orderId={}, reservationNumber={}, amount={}",
                                 orderId, reservationNumber, totalAmount);
 
@@ -145,11 +155,119 @@ public class PaymentService {
                                 orderId,
                                 totalAmount,
                                 orderName,
-                                request.bookerName(),
-                                request.bookerEmail(),
-                                request.bookerPhone(),
-                                successUrl + "?orderId=" + orderId,
-                                failUrl + "?orderId=" + orderId);
+                                booker,
+                                successUrl + (successUrl.contains("?") ? "&" : "?") + "orderId=" + orderId,
+                                failUrl + (failUrl.contains("?") ? "&" : "?") + "orderId=" + orderId);
+        }
+
+        /**
+         * 결제 완료 페이지용 정보 조회 (예매 완료 정보 노출)
+         * GET /api/v1/payment/complete?reservationNumber=xxx 에서 사용.
+         * 본인 예매이며 결제 COMPLETED 인 경우만 반환.
+         */
+        @Transactional(readOnly = true)
+        public PaymentDto.CompletionResponse getCompletionInfo(String reservationNumber, Long userId) {
+                Reservation reservation = reservationRepository.findByReservationNumberWithSchedule(reservationNumber)
+                                .orElseThrow(() -> PaymentException.notFound("예매 정보를 찾을 수 없습니다."));
+
+                if (!reservation.getUser().getId().equals(userId)) {
+                        throw PaymentException.unauthorized("본인의 예매만 조회할 수 있습니다.");
+                }
+
+                com.moa2.api.reservation.domain.entity.Payment payment = paymentRepository
+                                .findByReservation(reservation)
+                                .orElseThrow(() -> PaymentException.notFound("결제 정보를 찾을 수 없습니다."));
+
+                if (payment.getStatus() != com.moa2.global.model.PaymentStatus.COMPLETED) {
+                        throw PaymentException.invalidState("결제가 완료된 예매만 조회할 수 있습니다. 상태: " + payment.getStatus());
+                }
+
+                return buildCompletionResponse(reservation, payment);
+        }
+
+        /**
+         * orderId로 예매번호 조회 (noRedirect 테스트 등에서 사용)
+         * 단순 조회이므로 락이 필요 없는 메서드 사용
+         */
+        @Transactional(readOnly = true)
+        public String getReservationNumberByOrderId(String orderId) {
+                Payment payment = paymentRepository.findByOrderIdWithReservationReadOnly(orderId)
+                                .orElseThrow(() -> PaymentException.notFound("결제 정보를 찾을 수 없습니다."));
+                return payment.getReservation().getReservationNumber();
+        }
+
+        /**
+         * reservationId로 결제 완료 정보 조회 (GET /complete 용)
+         * 본인 예매이며 결제 COMPLETED 인 경우만 반환.
+         */
+        @Transactional(readOnly = true)
+        public PaymentDto.CompletionResponse getCompletionInfoByReservationId(Long reservationId, Long userId) {
+                User user = userRepository.findById(userId)
+                                .orElseThrow(() -> PaymentException.notFound("사용자를 찾을 수 없습니다."));
+                Reservation reservation = reservationRepository.findByIdAndUser(reservationId, user)
+                                .orElseThrow(() -> PaymentException.notFound("예매 정보를 찾을 수 없습니다."));
+                com.moa2.api.reservation.domain.entity.Payment payment = paymentRepository
+                                .findByReservation(reservation)
+                                .orElseThrow(() -> PaymentException.notFound("결제 정보를 찾을 수 없습니다."));
+                if (payment.getStatus() != com.moa2.global.model.PaymentStatus.COMPLETED) {
+                        throw PaymentException.invalidState("결제가 완료된 예매만 조회할 수 있습니다. 상태: " + payment.getStatus());
+                }
+                return buildCompletionResponse(reservation, payment);
+        }
+
+        private PaymentDto.CompletionResponse buildCompletionResponse(Reservation reservation,
+                        com.moa2.api.reservation.domain.entity.Payment payment) {
+                var sch = reservation.getShowSchedule();
+                var show = sch.getShow();
+                String dateStr = sch.getShowDate() != null
+                                ? sch.getShowDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                : "";
+                String timeStr = sch.getShowTime() != null
+                                ? sch.getShowTime().format(DateTimeFormatter.ofPattern("HH:mm"))
+                                : "";
+                // session 계산 (같은 날짜의 몇 번째 회차인지)
+                Integer session = calculateSession(sch);
+                var performance = new PaymentDto.CompletionResponse.CompletionPerformanceInfo(
+                                show != null ? show.getTitle() : "",
+                                dateStr,
+                                timeStr,
+                                session);
+                List<PaymentDto.CompletionResponse.CompletionSeatInfo> seats = reservationSeatRepository
+                                .findByReservationWithSeat(reservation)
+                                .stream()
+                                .map(rs -> {
+                                        var seat = rs.getSeat();
+                                        String sectionName = (seat.getSection() != null) ? seat.getSection().getName()
+                                                        : "";
+                                        String sn = (seat.getSeatRow() != null ? seat.getSeatRow() : "")
+                                                        + (seat.getSeatNumber() != null ? "-" + seat.getSeatNumber()
+                                                                        : "");
+                                        return new PaymentDto.CompletionResponse.CompletionSeatInfo(sectionName, sn);
+                                })
+                                .toList();
+                var booker = new PaymentDto.CompletionResponse.CompletionBookerInfo(
+                                reservation.getBookerName() != null ? reservation.getBookerName() : "",
+                                reservation.getBookerPhone() != null ? reservation.getBookerPhone() : "",
+                                reservation.getBookerEmail() != null ? reservation.getBookerEmail() : "");
+                // paidAt 포맷팅 (yyyy-MM-dd'T'HH:mm:ss 형식, 나노초 제거)
+                LocalDateTime approvedAt = payment.getApprovedAt();
+                LocalDateTime formattedPaidAt = approvedAt != null
+                                ? LocalDateTime.of(
+                                                approvedAt.getYear(), approvedAt.getMonthValue(),
+                                                approvedAt.getDayOfMonth(),
+                                                approvedAt.getHour(), approvedAt.getMinute(), approvedAt.getSecond())
+                                : null;
+                var paymentInfo = new PaymentDto.PaymentInfo(
+                                payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : "ETC",
+                                payment.getAmount() != null ? payment.getAmount().longValue() : 0L,
+                                formattedPaidAt);
+                return new PaymentDto.CompletionResponse(
+                                reservation.getReservationNumber(),
+                                payment.getOrderId(),
+                                performance,
+                                seats,
+                                booker,
+                                paymentInfo);
         }
 
         /**
@@ -195,7 +313,7 @@ public class PaymentService {
                                 .map(rs -> rs.getSeat().getId())
                                 .toList();
 
-                //실제 좌석만 Lock
+                // 실제 좌석만 Lock
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
                                 .findByScheduleIdAndSeatIdInForUpdate(
                                                 reservation.getShowSchedule().getId(), seatIds);
@@ -338,7 +456,60 @@ public class PaymentService {
                         throw PaymentException.invalidState("이미 처리된 결제입니다.");
                 }
 
-                // 4. 상태 변경 (IN_PROGRESS)
+                // 4. 좌석 상태 검증 (schedule_seat_id로 직접 조회)
+                List<ReservationSeat> reservationSeats = reservationSeatRepository
+                                .findByReservationWithSeat(reservation);
+                List<Long> scheduleSeatIds = reservationSeats.stream()
+                                .map(rs -> rs.getScheduleSeatId())
+                                .toList();
+
+                log.debug("Mock 결제 준비: orderId={}, reservationId={}, scheduleSeatIds={}, scheduleId={}",
+                                orderId, reservation.getId(), scheduleSeatIds, reservation.getShowSchedule().getId());
+
+                if (scheduleSeatIds.isEmpty()) {
+                        throw PaymentException.notFound("예약된 좌석이 없습니다.");
+                }
+
+                // 비관적 락으로 좌석 조회 (schedule_seat_id로 직접 조회)
+                List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                reservation.getShowSchedule().getId(), scheduleSeatIds);
+
+                if (scheduleSeats.size() != scheduleSeatIds.size()) {
+                        log.error("Mock 결제 준비 실패: 조회된 ScheduleSeat 수가 일치하지 않음. orderId={}, 예상 scheduleSeatIds={}, 조회된 scheduleSeatIds={}",
+                                        orderId, scheduleSeatIds,
+                                        scheduleSeats.stream().map(ScheduleSeat::getId).toList());
+                        throw PaymentException.notFound("일부 좌석을 찾을 수 없습니다.");
+                }
+
+                Long bookerId = reservation.getUser().getId();
+
+                for (ScheduleSeat seat : scheduleSeats) {
+                        log.debug("Mock 결제 준비: 좌석 검증 중. scheduleSeatId={}, seatId={}, seatNumber={}, status={}, lockedByUserId={}, bookerId={}",
+                                        seat.getId(), seat.getSeat().getId(), seat.getSeat().getSeatNumber(),
+                                        seat.getStatus(), seat.getLockedByUserId(), bookerId);
+
+                        // Mock 테스트라도 LOCKED 상태여야 정상적인 흐름
+                        if (!seat.isLockedBy(bookerId)) {
+                                log.error("Mock 결제 준비 실패: 좌석 선점 권한 없음. scheduleSeatId={}, seatNumber={}, status={}, lockedByUserId={}, bookerId={}",
+                                                seat.getId(), seat.getSeat().getSeatNumber(), seat.getStatus(),
+                                                seat.getLockedByUserId(), bookerId);
+                                throw PaymentException.seatNotLocked(
+                                                String.format("좌석 선점 권한이 없거나 선점이 해제되었습니다. 좌석: %s (scheduleSeatId: %d, status: %s, lockedByUserId: %s)",
+                                                                seat.getSeat().getSeatNumber(), seat.getId(),
+                                                                seat.getStatus(),
+                                                                seat.getLockedByUserId()));
+                        }
+                        if (seat.isLockExpired()) {
+                                log.error("Mock 결제 준비 실패: 좌석 선점 만료. scheduleSeatId={}, seatNumber={}, lockedUntil={}",
+                                                seat.getId(), seat.getSeat().getSeatNumber(), seat.getLockedUntil());
+                                throw PaymentException.lockExpired(
+                                                String.format("좌석 선점 시간이 만료되었습니다. 좌석: %s (scheduleSeatId: %d, lockedUntil: %s)",
+                                                                seat.getSeat().getSeatNumber(), seat.getId(),
+                                                                seat.getLockedUntil()));
+                        }
+                }
+
+                // 5. 상태 변경 (IN_PROGRESS)
                 payment.markAsInProgress();
         }
 
@@ -378,21 +549,33 @@ public class PaymentService {
                                         })
                                         .toList();
 
+                        // paidAt 포맷팅 (yyyy-MM-dd'T'HH:mm:ss 형식, 나노초 제거)
+                        LocalDateTime approvedAt = payment.getApprovedAt();
+                        LocalDateTime formattedPaidAt = approvedAt != null
+                                        ? LocalDateTime.of(
+                                                        approvedAt.getYear(), approvedAt.getMonthValue(),
+                                                        approvedAt.getDayOfMonth(),
+                                                        approvedAt.getHour(), approvedAt.getMinute(),
+                                                        approvedAt.getSecond())
+                                        : null;
+                        // session 계산 (같은 날짜의 몇 번째 회차인지)
+                        Integer session = calculateSession(reservation.getShowSchedule());
                         return new PaymentDto.PaymentSuccessResponse(
                                         reservation.getId().toString(),
                                         new PaymentDto.PaymentSuccessResponse.PerformanceInfo(
                                                         reservation.getShowSchedule().getShow().getTitle(),
                                                         LocalDateTime.of(reservation.getShowSchedule().getShowDate(),
                                                                         reservation.getShowSchedule().getShowTime()),
-                                                        null),
+                                                        session),
                                         seats,
                                         new PaymentDto.PaymentSuccessResponse.BookerInfo(
                                                         reservation.getBookerName(),
-                                                        reservation.getBookerPhone()),
+                                                        reservation.getBookerPhone(),
+                                                        reservation.getBookerEmail()),
                                         new PaymentDto.PaymentInfo(
                                                         payment.getPaymentMethod().name(),
                                                         payment.getAmount().longValue(),
-                                                        payment.getApprovedAt()));
+                                                        formattedPaidAt));
                 }
 
                 // [Gap Check] 상태가 IN_PROGRESS가 아니면 (즉, PENDING이나 FAILED 등) 이상한 상황
@@ -404,14 +587,54 @@ public class PaymentService {
                 reservation.updateStatus(ReservationStatus.SOLD);
                 payment.approve(paymentKey, PaymentMethod.ETC);
 
+                // 2-1. ScheduleSeat SOLD 처리 (schedule_seat_id로 직접 조회)
+                List<ReservationSeat> reservationSeats = reservationSeatRepository
+                                .findByReservationWithSeat(reservation);
+                List<Long> scheduleSeatIds = reservationSeats.stream()
+                                .map(rs -> rs.getScheduleSeatId())
+                                .toList();
+                List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
+                                .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                reservation.getShowSchedule().getId(), scheduleSeatIds);
+
+                // 좌석 상태 검증 (LOCKED 또는 RESERVED 상태여야 markAsSold 가능)
+                Long bookerId = reservation.getUser().getId();
+                for (ScheduleSeat seat : scheduleSeats) {
+                        if (seat.getStatus() == com.moa2.global.model.SeatStatus.AVAILABLE) {
+                                throw PaymentException.seatNotLocked(
+                                                String.format(
+                                                                "좌석 선점이 해제되었습니다. 좌석 선점 후 5분 이내에 결제를 완료해주세요. 좌석: %s, scheduleSeatId: %d",
+                                                                seat.getSeat().getSeatNumber(), seat.getId()));
+                        }
+                        if (seat.getStatus() == com.moa2.global.model.SeatStatus.LOCKED) {
+                                // LOCKED 상태이면 본인 선점인지 확인
+                                if (!seat.isLockedBy(bookerId)) {
+                                        throw PaymentException.seatNotLocked(
+                                                        String.format("좌석 선점 권한이 없습니다. 좌석: %s, scheduleSeatId: %d",
+                                                                        seat.getSeat().getSeatNumber(), seat.getId()));
+                                }
+                                if (seat.isLockExpired()) {
+                                        throw PaymentException.lockExpired(
+                                                        String.format(
+                                                                        "좌석 선점 시간이 만료되었습니다. 다시 선점 후 결제를 진행해주세요. 좌석: %s, scheduleSeatId: %d, lockedUntil: %s",
+                                                                        seat.getSeat().getSeatNumber(), seat.getId(),
+                                                                        seat.getLockedUntil()));
+                                }
+                        }
+                        // RESERVED 상태는 그대로 진행 (이미 예약된 상태)
+                }
+
+                scheduleSeats.forEach(ScheduleSeat::markAsSold);
+
                 // 3. 공연 정보 (PerformanceInfo record)
                 ShowSchedule sch = reservation.getShowSchedule();
                 Show show = sch.getShow();
+                // session 계산 (같은 날짜의 몇 번째 회차인지)
+                Integer session = calculateSession(sch);
                 var performance = new PaymentDto.PaymentSuccessResponse.PerformanceInfo(
                                 show.getTitle(),
                                 LocalDateTime.of(sch.getShowDate(), sch.getShowTime()),
-                                null // posterUrl
-                );
+                                session);
 
                 // 4. 좌석 정보 리스트 (SeatInfo record)
                 List<PaymentDto.PaymentSuccessResponse.SeatInfo> seats = reservationSeatRepository
@@ -431,13 +654,20 @@ public class PaymentService {
                 // 5. 예약자 정보 (BookerInfo record)
                 var booker = new PaymentDto.PaymentSuccessResponse.BookerInfo(
                                 reservation.getBookerName() != null ? reservation.getBookerName() : "",
-                                reservation.getBookerPhone() != null ? reservation.getBookerPhone() : "");
+                                reservation.getBookerPhone() != null ? reservation.getBookerPhone() : "",
+                                reservation.getBookerEmail() != null ? reservation.getBookerEmail() : "");
 
                 // 6. 결제 상세 정보 (PaymentInfo record)
+                // paidAt 포맷팅 (yyyy-MM-dd'T'HH:mm:ss 형식, 나노초 제거)
+                LocalDateTime approvedAt = payment.getApprovedAt() != null ? payment.getApprovedAt()
+                                : LocalDateTime.now();
+                LocalDateTime formattedPaidAt = LocalDateTime.of(
+                                approvedAt.getYear(), approvedAt.getMonthValue(), approvedAt.getDayOfMonth(),
+                                approvedAt.getHour(), approvedAt.getMinute(), approvedAt.getSecond());
                 var paymentInfo = new PaymentDto.PaymentInfo(
                                 payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : "ETC",
                                 payment.getAmount() != null ? payment.getAmount().longValue() : amount,
-                                payment.getApprovedAt() != null ? payment.getApprovedAt() : LocalDateTime.now());
+                                formattedPaidAt);
 
                 // 7. 최종 record 생성 및 반환
                 return new PaymentDto.PaymentSuccessResponse(
@@ -536,6 +766,41 @@ public class PaymentService {
                                 ? showTitle.substring(0, 30) + "..."
                                 : showTitle;
                 return truncatedTitle + " - " + seatCount + "좌석";
+        }
+
+        /**
+         * 회차(session) 계산
+         * AdminShowService와 동일한 로직: 같은 날짜의 스케줄들을 조회하여 현재 스케줄이 몇 번째 회차인지 계산
+         * 날짜별로 독립적으로 1부터 시작
+         */
+        private Integer calculateSession(ShowSchedule schedule) {
+                if (schedule == null || schedule.getShowDate() == null) {
+                        return null;
+                }
+
+                // 같은 공연의 모든 스케줄을 조회 (날짜와 시간 순으로 정렬)
+                List<ShowSchedule> allSchedules = showScheduleRepository
+                                .findByShowIdOrderByDateAndTime(schedule.getShow().getId());
+
+                // AdminShowService와 동일한 로직: 날짜별로 세션 카운트 관리
+                Map<java.time.LocalDate, Integer> sessionCountByDate = new HashMap<>();
+                int session = 0;
+
+                for (ShowSchedule ss : allSchedules) {
+                        // 같은 날짜인 경우만 카운트
+                        if (ss.getShowDate() != null && ss.getShowDate().equals(schedule.getShowDate())) {
+                                java.time.LocalDate date = ss.getShowDate();
+                                session = sessionCountByDate.getOrDefault(date, 0) + 1;
+                                sessionCountByDate.put(date, session);
+
+                                // 현재 스케줄을 찾으면 종료
+                                if (ss.getId().equals(schedule.getId())) {
+                                        break;
+                                }
+                        }
+                }
+
+                return session > 0 ? session : null;
         }
 
         /**

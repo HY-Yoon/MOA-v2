@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,7 +22,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
 
 /**
  * 결제 컨트롤러
@@ -38,6 +44,15 @@ public class PaymentController {
         private final PaymentService paymentService;
         private final com.moa2.api.payment.facade.PaymentFacade paymentFacade;
         private final UserRepository userRepository;
+
+        @Value("${app.payment.frontend-complete-url:http://localhost:5173/payment/complete}")
+        private String frontendCompleteUrl;
+
+        @Value("${app.payment.frontend-fail-url:http://localhost:5173/payment/fail}")
+        private String frontendFailUrl;
+
+        @Value("${app.payment.test-no-redirect:false}")
+        private boolean testNoRedirect;
 
         /**
          * 예매자 확인 정보 조회
@@ -170,6 +185,174 @@ public class PaymentController {
                                         request.orderId(), e.getMessage());
                         // 실패 처리는 최대한 성공 응답 (클라이언트 UX)
                         return ResponseEntity.ok(ApiResponse.success(null));
+                }
+        }
+
+        // ------------------------- 토스 success/fail 핸들러 (GET 리다이렉트)
+        // -------------------------
+
+        /**
+         * 토스 successUrl 핸들러 (GET)
+         * 토스 결제 인증 성공 후 리다이렉트 → confirm 처리 → 프론트 완료 페이지로 302
+         */
+        @Operation(summary = "결제 성공 핸들러 (토스 리다이렉트)", description = """
+                        토스가 successUrl로 GET 리다이렉트할 때 호출됩니다.
+                        orderId, paymentKey, amount로 결제 승인 후 프론트 완료 페이지로 302 리다이렉트합니다.
+                        인증(쿠키) 필요. 미인증 시 완료 페이지 대신 실패 페이지로 리다이렉트합니다.
+                        백엔드만 테스트: noRedirect=1 및 app.payment.test-no-redirect=true 이면
+                        Mock 승인 후 200 + CompletionResponse JSON 반환 (302 없음).
+                        """)
+        @GetMapping("/success")
+        public ResponseEntity<?> successHandler(
+                        @RequestParam(required = false) String orderId,
+                        @RequestParam(required = false) String paymentKey,
+                        @RequestParam(required = false) Long amount,
+                        @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                Long userId;
+                try {
+                        userId = getAuthenticatedUserId();
+                } catch (PaymentException e) {
+                        log.warn("결제 성공 핸들러 인증 실패: {}", e.getMessage());
+                        if (testNoRedirect && "1".equals(noRedirect)) {
+                                return ResponseEntity.status(e.getStatus())
+                                                .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
+                        }
+                        String failUrl = UriComponentsBuilder.fromUriString(frontendFailUrl)
+                                        .queryParam("code", "UNAUTHORIZED")
+                                        .queryParam("message", e.getMessage())
+                                        .build().toUriString();
+                        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(failUrl)).build();
+                }
+                if (orderId == null || orderId.isBlank() || paymentKey == null || paymentKey.isBlank()
+                                || amount == null) {
+                        log.warn("결제 성공 핸들러 파라미터 누락: orderId={}, paymentKey={}, amount={}", orderId, paymentKey,
+                                        amount);
+                        if (testNoRedirect && "1".equals(noRedirect)) {
+                                return ResponseEntity.badRequest()
+                                                .body(ApiResponse.error("결제 정보가 올바르지 않습니다.", "INVALID_PARAMS", null));
+                        }
+                        String failUrl = UriComponentsBuilder.fromUriString(frontendFailUrl)
+                                        .queryParam("code", "INVALID_PARAMS")
+                                        .queryParam("message", "결제 정보가 올바르지 않습니다.")
+                                        .build().toUriString();
+                        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(failUrl)).build();
+                }
+
+                boolean useNoRedirect = testNoRedirect && "1".equals(noRedirect);
+
+                if (useNoRedirect) {
+                        try {
+                                paymentFacade.confirmPaymentMock(
+                                                paymentKey != null ? paymentKey : "test_no_redirect_key",
+                                                orderId, amount);
+                                String rn = paymentService.getReservationNumberByOrderId(orderId);
+                                PaymentDto.CompletionResponse completion = paymentService.getCompletionInfo(rn, userId);
+                                return ResponseEntity.ok(ApiResponse.success(completion));
+                        } catch (PaymentException e) {
+                                log.warn("결제 Mock 승인 실패(noRedirect): orderId={}, message={}", orderId, e.getMessage());
+                                return ResponseEntity.status(e.getStatus())
+                                                .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
+                        }
+                }
+
+                try {
+                        PaymentDto.SuccessResponse resp = paymentFacade.confirmPayment(
+                                        new PaymentDto.ConfirmRequest(paymentKey, orderId, amount), userId);
+                        String redirectUrl = UriComponentsBuilder.fromUriString(frontendCompleteUrl)
+                                        .queryParam("reservationNumber", resp.reservationNumber())
+                                        .build().toUriString();
+                        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
+                } catch (PaymentException e) {
+                        log.warn("결제 승인 실패(핸들러): orderId={}, code={}, message={}",
+                                        orderId, e.getCode(), e.getMessage());
+                        String failUrl = UriComponentsBuilder.fromUriString(frontendFailUrl)
+                                        .queryParam("code", e.getCode() != null ? e.getCode() : "CONFIRM_FAILED")
+                                        .queryParam("message", e.getMessage())
+                                        .queryParam("orderId", orderId)
+                                        .build().toUriString();
+                        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(failUrl)).build();
+                }
+        }
+
+        /**
+         * 토스 failUrl 핸들러 (GET)
+         * 토스 결제 인증 실패/취소 시 리다이렉트 → fail 처리 → 프론트 실패 페이지로 302
+         */
+        @Operation(summary = "결제 실패 핸들러 (토스 리다이렉트)", description = """
+                        토스가 failUrl로 GET 리다이렉트할 때 호출됩니다.
+                        orderId, code, message로 실패 처리 후 프론트 실패 페이지로 302 리다이렉트합니다.
+                        orderId는 없을 수 있습니다 (PAY_PROCESS_CANCELED 등).
+                        백엔드만 테스트: noRedirect=1 및 app.payment.test-no-redirect=true 이면
+                        302 대신 200 + TestNoRedirectFailResponse JSON 반환.
+                        """)
+        @GetMapping("/fail")
+        public ResponseEntity<?> failHandler(
+                        @RequestParam(required = false) String orderId,
+                        @RequestParam(required = false) String code,
+                        @RequestParam(required = false) String message,
+                        @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                String codeVal = code != null ? code : "UNKNOWN";
+                String msgVal = message != null ? message : "결제가 실패하거나 취소되었습니다.";
+                try {
+                        paymentService.failPayment(new PaymentDto.FailRequest(
+                                        orderId != null ? orderId : "",
+                                        codeVal,
+                                        msgVal));
+                } catch (Exception e) {
+                        log.error("결제 실패 핸들러 처리 중 오류: orderId={}, error={}", orderId, e.getMessage());
+                }
+                var b = UriComponentsBuilder.fromUriString(frontendFailUrl)
+                                .queryParam("code", codeVal)
+                                .queryParam("message", msgVal);
+                if (orderId != null && !orderId.isBlank()) {
+                        b.queryParam("orderId", orderId);
+                }
+                String redirectUrl = b.build().toUriString();
+
+                if (testNoRedirect && "1".equals(noRedirect)) {
+                        return ResponseEntity.ok(ApiResponse.success(
+                                        new PaymentDto.TestNoRedirectFailResponse(codeVal, msgVal, orderId,
+                                                        redirectUrl)));
+                }
+                return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
+        }
+
+        /**
+         * 결제 완료 페이지용 정보 조회 (예매 완료 정보 노출)
+         * GET ?reservationNumber=xxx 또는 ?reservationId=xxx → 공연 기본 정보, 예매자 정보, 결제 정보
+         * 반환.
+         * reservationNumber(예매번호) / reservationId 둘 중 하나 필수. Mock 응답의 reservationId로도
+         * 조회 가능.
+         */
+        @Operation(summary = "결제 완료 정보 조회", description = """
+                        예매 완료 페이지에서 호출합니다.
+                        reservationNumber(예매번호) 또는 reservationId로 본인 예매인지 검증 후, 공연/예매자/결제 정보를 반환합니다.
+                        Mock 결제 승인 응답의 reservationId로 조회 가능.
+                        **권한:** 인증된 사용자 (본인 예매만)
+                        """)
+        @GetMapping("/complete")
+        public ResponseEntity<ApiResponse<PaymentDto.CompletionResponse>> getComplete(
+                        @RequestParam(required = false) String reservationNumber,
+                        @RequestParam(required = false) Long reservationId) {
+                boolean hasNumber = reservationNumber != null && !reservationNumber.isBlank();
+                boolean hasId = reservationId != null;
+                if (hasNumber == hasId) {
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.error(
+                                                        "reservationNumber 또는 reservationId 중 하나만 필수입니다.",
+                                                        "INVALID_PARAMS", null));
+                }
+                try {
+                        Long userId = getAuthenticatedUserId();
+                        PaymentDto.CompletionResponse response = hasId
+                                        ? paymentService.getCompletionInfoByReservationId(reservationId, userId)
+                                        : paymentService.getCompletionInfo(reservationNumber, userId);
+                        return ResponseEntity.ok(ApiResponse.success(response));
+                } catch (PaymentException e) {
+                        log.warn("결제 완료 정보 조회 실패: reservationNumber={}, reservationId={}, code={}, message={}",
+                                        reservationNumber, reservationId, e.getCode(), e.getMessage());
+                        return ResponseEntity.status(e.getStatus())
+                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
                 }
         }
 

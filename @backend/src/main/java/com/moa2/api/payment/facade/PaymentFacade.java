@@ -81,10 +81,16 @@ public class PaymentFacade {
 
         // Step 2. 외부 API 호출 시뮬레이션 (약 500ms 지연 가정)
         // 실제 외부 연동이 없으므로 단순 로깅 처리하거나 Thread.sleep()을 줄 수 있음.
-        // 여기서는 비즈니스 로직과 분리됨을 보여줌.
         log.info("Mock 외부 결제 시스템 승인 처리 중... (Simulation)");
 
         // Step 3. 결제 완료 처리 (트랜잭션 B)
-        return paymentService.completePaymentMock(paymentKey, orderId, amount);
+        try {
+            return paymentService.completePaymentMock(paymentKey, orderId, amount);
+        } catch (Exception e) {
+            log.error("Mock 결제 완료 처리 중 오류 발생: {}", e.getMessage());
+            // 실패 시 상태 롤백 (FAILED)
+            paymentService.failPaymentProcessing(orderId, "Mock System Error: " + e.getMessage());
+            throw e;
+        }
     }
 }

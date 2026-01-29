@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,7 @@ public class QueueScheduler {
     /**
      * 3초마다 대기열 처리
      */
-//    @Scheduled(fixedDelayString = "${queue.scheduler.fixed-delay-ms:10000}")
+    @Scheduled(fixedDelayString = "${queue.scheduler.fixed-delay-ms:10000}")
     @Transactional
     public void processQueue() {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
