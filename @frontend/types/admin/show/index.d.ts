@@ -4,23 +4,55 @@ namespace Show {
   type ShowStatus = import('@shared/enums').ShowStatus;
   type SaleStatus = import('@shared/enums').SaleStatus;
 
-  // 공연 목록
-  // interface List {
-  //   id: number;
-  //   title: string;
-  //   genre: Genre;
-  //   region: Region;
-  //   venueName: string;
-  //   startDate: string;
-  //   endDate: string;
-  //   thumbnailUrl?: string;
-  // }
+  // 공연 목록 파라미터
+  interface ListParams {
+    page: number; // 현재 페이지
+    size: number; // 페이지당 개수 (10개, 20개...)
+    sort?: string; // 정렬 기준 {컬럼명}, {기준} (ex. 'id, asc')
+    showStatus?: ShowStatus; // 공연 상태
+    saleStatus?: SaleStatus; // 판매 상태
+    startDate?: string; // YYYY-MM-DD
+    endDate?: string; // YYYY-MM-DD
+    keyword?: string; // 검색어
+  }
 
-  // interface ListResponse {
-  //   data: ShowListItem[];
-  //   totalCount: number;
-  //   message: string;
-  // }
+  // 공연 목록 스케줄
+  interface SchedulesList {
+    keyId: number;
+    date: string; // YYYY-MM-DD
+    time: string; // HH:mm
+    session: number;
+  }
+
+  // 공연 목록
+  interface List {
+    id: number;
+    title: string;
+    genre: Genre;
+    status: ShowStatus;
+    saleStatus: SaleStatus;
+    posterUrl: string;
+    location: {
+      region: Region;
+      venue: string;
+      hallName: string;
+    };
+    salePeriod: {
+      startDate: string; // YYYY-MM-DDTHH:mm
+      endDate: string; // YYYY-MM-DDTHH:mm
+    };
+    schedules: SchedulesList[];
+  }
+
+  interface ListResponse {
+    content: List[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+  }
 
   // 공연 상세
   interface Schedules {
