@@ -193,6 +193,8 @@ public class ShowDto {
 
                         @Schema(description = "공연 상태", example = "ON_SALE") String status,
 
+                        @Schema(description = "판매 허용 상태 (ALLOWED, SUSPENDED)") String saleStatus,
+
                         @Schema(description = "포스터 URL", example = "/images/posters/show1.jpg") String posterUrl,
 
                         @Schema(description = "공연 장소 정보") LocationInfo location,

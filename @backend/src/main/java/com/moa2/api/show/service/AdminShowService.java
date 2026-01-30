@@ -104,6 +104,7 @@ public class AdminShowService {
                             .title(show.getTitle())
                             .genre(show.getGenre() != null ? show.getGenre().name() : null)
                             .status(show.getStatus() != null ? show.getStatus().name() : null)
+                            .saleStatus(show.getSaleStatus() != null ? show.getSaleStatus().name() : null)
                             .posterUrl(show.getPosterUrl())
                             .location(locationInfo)
                             .salePeriod(salePeriod)
