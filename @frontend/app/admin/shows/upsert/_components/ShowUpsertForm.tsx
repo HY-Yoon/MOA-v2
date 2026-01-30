@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, Skeleton } from '@/components/atoms';
-import { Badge } from '@/components/atoms/badge';
 import {
   FormField,
   FormFileField,
@@ -11,12 +10,7 @@ import {
 } from '@/components/molecules';
 import { useAlert } from '@/components/molecules/AlertContext';
 import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
-import {
-  GENRE_OPTIONS,
-  REGION_OPTIONS,
-  SHOW_STATUS_COLORS,
-  SHOW_STATUS_LABELS,
-} from '@/constants/common';
+import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { getFirstShowDate } from '@/lib/admin/show';
@@ -24,8 +18,8 @@ import { createShow, getShow, updateShow } from '@/lib/api/admin/show';
 import { stringToDate } from '@/lib/common/date';
 import dayjs from '@/plugins/dayjs';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Genre, Region, ShowStatus } from '@shared/enums';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { Genre, Region } from '@shared/enums';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
@@ -132,9 +126,12 @@ export default function ShowUpsertForm(props: Props) {
   const isUpdate = !!showId && showId > 0;
   const flag = isUpdate ? '수정' : '등록';
 
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery(getShow(showId));
-  const createShowMutation = useMutation(createShow());
-  const updateShowMutation = useMutation(updateShow(showId));
+  const { mutateAsync: onCreateShow, isPending: createPending } = useMutation(createShow());
+  const { mutateAsync: onUpdateShow, isPending: updatePending } = useMutation(updateShow(showId));
+
+  const loading = isLoading || createPending || updatePending;
 
   // TODO: api 적용 예정
   const [venueOptions, setVenueOptions] = useState([
@@ -468,18 +465,19 @@ export default function ShowUpsertForm(props: Props) {
 
     // api
     const response = isUpdate
-      ? await updateShowMutation.mutateAsync(requestFormData)
-      : await createShowMutation.mutateAsync(requestFormData);
+      ? await onUpdateShow(requestFormData)
+      : await onCreateShow(requestFormData);
 
-    // 성공시 목록 화면으로 이동
+    // 성공시 목록으로 이동 및 새로고침
     if (response.success && response?.data?.showId && response.data.showId > 0) {
       router.push(ADMIN_ROUTES.SHOW);
+      queryClient.refetchQueries({ queryKey: ['admin', 'show', 'list'] });
     }
   }
 
   // 공연 상태 (수정화면에서만)
   const statusField = (
-    <FormField isLoading={isLoading} label="상태" htmlFor="status">
+    <FormField isLoading={loading} label="상태" htmlFor="status">
       {data?.status ? <StatusBadge type="show" status={data.status} /> : null}
     </FormField>
   );
@@ -505,7 +503,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 1. 제목 */}
               <FormInputField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.TITLE}
                 label="제목"
                 htmlFor={SHOW_FORM_FIELDS.TITLE}
@@ -517,7 +515,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 2. 장르 */}
               <FormSelectField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.GENRE}
                 label="장르"
                 htmlFor={SHOW_FORM_FIELDS.GENRE}
@@ -531,7 +529,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 3. 지역 */}
               <FormSelectField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.REGION}
                 label="지역"
                 htmlFor={SHOW_FORM_FIELDS.REGION}
@@ -545,7 +543,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 4. 장소 */}
               <FormSelectField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.VENUE_NAME}
                 label="장소"
                 htmlFor={SHOW_FORM_FIELDS.VENUE_NAME}
@@ -560,7 +558,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 5. 공연장 */}
               <FormSelectField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.HALL_NAME}
                 label="공연장"
                 htmlFor={SHOW_FORM_FIELDS.HALL_NAME}
@@ -575,7 +573,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 6. 관람시간 */}
               <FormInputField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.RUNNING_TIME}
                 label="관람시간"
                 htmlFor={SHOW_FORM_FIELDS.RUNNING_TIME}
@@ -587,7 +585,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 7. 출연진 */}
               <FormInputField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.CAST}
                 label="출연진"
                 htmlFor={SHOW_FORM_FIELDS.CAST}
@@ -599,7 +597,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 8. 일정(테이블) */}
               <FormField
-                isLoading={isLoading}
+                isLoading={loading}
                 label="일정"
                 htmlFor={SHOW_FORM_FIELDS.SCHEDULES}
                 required={true}
@@ -619,7 +617,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 9. 예매 시작일 */}
               <FormInputField
-                isLoading={isLoading}
+                isLoading={loading}
                 name={SHOW_FORM_FIELDS.START_DATE}
                 label="예매 시작일"
                 htmlFor={SHOW_FORM_FIELDS.START_DATE}
@@ -634,7 +632,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 10. 메인 포스터 */}
               <FormFileField
-                isLoading={isLoading}
+                isLoading={loading}
                 label="메인 포스터"
                 htmlFor="poster"
                 required={true}
@@ -646,7 +644,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/* 11. 상세 이미지 */}
               <FormFileField
-                isLoading={isLoading}
+                isLoading={loading}
                 label="상세 이미지"
                 htmlFor="detail-images"
                 required={true}
@@ -659,7 +657,7 @@ export default function ShowUpsertForm(props: Props) {
 
               {/*footer*/}
               <div className="flex gap-4 border-t pt-6">
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Skeleton className="h-12 flex-1" />
                     <Skeleton className="h-12 flex-1" />
