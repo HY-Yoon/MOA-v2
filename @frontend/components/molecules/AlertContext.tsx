@@ -1,7 +1,7 @@
 // contexts/AlertContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +12,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/atoms/alert-dialog';
+import { Label } from '@/components/atoms/label';
+import { cn } from '@/lib/utils';
 
 export interface AlertOptions {
   title: string;
@@ -21,23 +23,49 @@ export interface AlertOptions {
   variant?: 'default' | 'destructive';
 }
 
+/** confirm + input */
+export interface ConfirmWithInputOptions extends AlertOptions {
+  input?: {
+    label?: string;
+    placeholder?: string;
+    required?: boolean;
+    maxLength?: number;
+  };
+}
+
+export type ConfirmWithInputResult = { confirmed: true; value: string } | { confirmed: false };
+
 interface AlertContextType {
   confirm: (options: AlertOptions) => Promise<boolean>;
+  confirmWithInput: (options: ConfirmWithInputOptions) => Promise<ConfirmWithInputResult>;
   alert: (options: Omit<AlertOptions, 'cancelText'>) => Promise<void>;
 }
 
+type ResolverValue = boolean | ConfirmWithInputResult;
 const AlertContext = createContext<AlertContextType | undefined>(undefined);
 
 export function AlertProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [config, setConfig] = useState<AlertOptions>({
+  const [config, setConfig] = useState<ConfirmWithInputOptions>({
     title: '',
     description: '',
     confirmText: '확인',
     cancelText: '취소',
     variant: 'default',
   });
-  const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
+  const [resolver, setResolver] = useState<((value: ResolverValue) => void) | null>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [inputError, setInputError] = useState('');
+
+  const hasInput = !!config.input;
+  const maxLen = config.input?.maxLength || 100;
+
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue('');
+      setInputError('');
+    }
+  }, [isOpen]);
 
   const confirm = useCallback((options: AlertOptions): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -46,11 +74,28 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         cancelText: '취소',
         variant: 'default',
         ...options,
+        input: undefined,
       });
-      setResolver(() => resolve);
+      setResolver(() => resolve as (v: ResolverValue) => void);
       setIsOpen(true);
     });
   }, []);
+
+  const confirmWithInput = useCallback(
+    (options: ConfirmWithInputOptions): Promise<ConfirmWithInputResult> => {
+      return new Promise((resolve) => {
+        setConfig({
+          confirmText: '확인',
+          cancelText: '취소',
+          variant: 'default',
+          ...options,
+        });
+        setResolver(() => resolve);
+        setIsOpen(true);
+      });
+    },
+    [],
+  );
 
   const alert = useCallback((options: Omit<AlertOptions, 'cancelText'>): Promise<void> => {
     return new Promise((resolve) => {
@@ -59,26 +104,55 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         variant: 'default',
         ...options,
         cancelText: undefined,
+        input: undefined,
       });
-      setResolver(() => resolve);
+      setResolver(() => resolve as unknown as (v: ResolverValue) => void);
       setIsOpen(true);
     });
   }, []);
 
-  const handleConfirm = () => {
-    resolver?.(true);
-    setIsOpen(false);
-    setResolver(null);
-  };
+  // 인풋 타입인 경우 입력 검증
+  function validateInput(trimmedVal: string) {
+    if (config.input?.required && trimmedVal.length === 0) {
+      setInputError(`${config?.input?.label}을(를) 입력해 주세요.`);
+      return false;
+    }
+    if (trimmedVal.length > maxLen) {
+      setInputError(`${maxLen}자 이내로 입력해 주세요.`);
+      return false;
+    }
+    return true;
+  }
 
-  const handleCancel = () => {
-    resolver?.(false);
+  function handleConfirm(e?: React.MouseEvent) {
+    if (hasInput) {
+      const trimmed = inputValue.trim();
+      const result = validateInput(trimmed);
+      if (!result) {
+        // 모달 닫힘 방지
+        e?.preventDefault();
+        e?.stopPropagation();
+        return;
+      }
+      resolver?.({ confirmed: true, value: trimmed });
+    } else {
+      resolver?.(true);
+    }
+
     setIsOpen(false);
     setResolver(null);
-  };
+  }
+
+  function handleCancel() {
+    const resolve = (hasInput ? { confirmed: false } : false) as ResolverValue;
+    resolver?.(resolve);
+
+    setIsOpen(false);
+    setResolver(null);
+  }
 
   return (
-    <AlertContext.Provider value={{ confirm, alert }}>
+    <AlertContext.Provider value={{ confirm, confirmWithInput, alert }}>
       {children}
       <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
         <AlertDialogContent>
@@ -88,12 +162,48 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
               <AlertDialogDescription>{config.description}</AlertDialogDescription>
             )}
           </AlertDialogHeader>
+
+          {hasInput && (
+            <div className="grid gap-2 py-2">
+              <Label htmlFor="alert-context-input" className="flex items-center gap-1.5">
+                {config.input?.label ?? ''}
+                {config.input?.required && (
+                  <span className="text-destructive" aria-hidden>
+                    (*)
+                  </span>
+                )}
+              </Label>
+              <textarea
+                id="alert-context-input"
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  if (inputError) setInputError('');
+                }}
+                placeholder={config.input?.placeholder ?? ''}
+                maxLength={maxLen}
+                rows={3}
+                className={cn(
+                  'border-input placeholder:text-muted-foreground w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none',
+                  'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+                  inputError && 'border-destructive',
+                )}
+              />
+              {inputError && <p className="text-destructive text-sm">{inputError}</p>}
+              {maxLen > 0 && (
+                <p className="text-muted-foreground text-xs">
+                  {inputValue.length} / {maxLen}자
+                </p>
+              )}
+            </div>
+          )}
+
           <AlertDialogFooter>
             {config.cancelText && (
               <AlertDialogCancel onClick={handleCancel}>{config.cancelText}</AlertDialogCancel>
             )}
             <AlertDialogAction
-              onClick={handleConfirm}
+              onClick={(e) => handleConfirm(e)}
               className={
                 config.variant === 'destructive'
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
