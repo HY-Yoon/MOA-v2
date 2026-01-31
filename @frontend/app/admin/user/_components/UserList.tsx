@@ -15,7 +15,7 @@ import StatusBadge from '@/components/molecules/StatusBadge';
 import { VERIFY_LABELS } from '@/constants/admin/user';
 
 export default function UserList() {
-  const { confirm } = useAlert();
+  const { confirmWithInput } = useAlert();
 
   const [mounted, setMounted] = useState(false);
 
@@ -141,14 +141,18 @@ export default function UserList() {
   ) {
     const requestStatus = isActive ? 'SUSPENDED' : 'ACTIVE';
 
-    const confirmed = await confirm({
+    const result = await confirmWithInput({
       title: '회원 설정',
-      description: `'${name}' 회원을 [${label}] 처리하시겠습니까?`,
+      description: `${name} 회원을 [${label}] 처리하시겠습니까?`,
       confirmText: '설정',
+      input: {
+        label: '사유',
+        placeholder: '변경 사유를 입력하세요.',
+        required: true,
+      },
     });
-    if (confirmed) {
-      // TODO: 사유 입력칸 추가?
-      await onChangeUserStatus({ id, status: requestStatus, reason: '-' });
+    if (result.confirmed) {
+      await onChangeUserStatus({ id, status: requestStatus, reason: result.value });
       refetch();
     }
   }
