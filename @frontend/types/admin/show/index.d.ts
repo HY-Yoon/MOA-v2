@@ -44,16 +44,6 @@ namespace Show {
     schedules: SchedulesList[];
   }
 
-  interface ListResponse {
-    content: List[];
-    page: number;
-    size: number;
-    totalElements: number;
-    totalPages: number;
-    first: boolean;
-    last: boolean;
-  }
-
   // 공연 상세
   interface Schedules {
     scheduleId: number;
