@@ -1,6 +1,6 @@
 // [dayjs] date format 관리
 export const DATE_FORMAT = {
-  FULL: 'YYYY-MM-DD HH:mm:ss',
+  FULL: 'YYYY-MM-DD HH:mm',
   FULL_TIMEZONE: 'YYYY-MM-DDTHH:mm',
   FULL_DOT: 'YYYY.MM.DD HH:mm:ss',
   FULL_FLAT: 'YYYYMMDDHHmmss',
