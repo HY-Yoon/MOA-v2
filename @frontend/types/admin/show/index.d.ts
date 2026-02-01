@@ -55,6 +55,17 @@ namespace Show {
     reservationCount: number;
   }
 
+  interface SeatPrices {
+    sectionId: string;
+    sectionName: string;
+    price: number;
+  }
+
+  interface DetailImages {
+    id: number;
+    url: string;
+  }
+
   interface Detail {
     id: number;
     title: string;
@@ -71,7 +82,8 @@ namespace Show {
     saleStartDate: string;
     saleEndDate: string;
     schedules: Schedules[];
-    seatPrices: [];
+    seatPrices: SeatPrices[];
+    detailImages: DetailImages[];
     createdAt: string;
     updatedAt: string;
   }
