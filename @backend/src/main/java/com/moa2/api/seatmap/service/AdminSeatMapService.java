@@ -1,8 +1,8 @@
 package com.moa2.api.seatmap.service;
 
 import com.moa2.api.seatmap.dto.*;
-import com.moa2.api.seatmap.entity.SeatMap;
-import com.moa2.api.seatmap.seatmap.repository.SeatMapRepository;
+import com.moa2.api.seatmap.domain.entity.SeatMap;
+import com.moa2.api.seatmap.domain.repository.SeatMapRepository;
 import com.moa2.api.show.domain.entity.Seat;
 import com.moa2.api.show.domain.entity.Venue;
 import com.moa2.api.show.domain.entity.VenueSeatSection;
@@ -63,10 +63,6 @@ public class AdminSeatMapService {
          * 중복 검사
          */
         public SeatmapDto.DuplicateCheckResponse checkDuplicate(SeatmapDto.DuplicateCheckRequest request) {
-                // Record 방식 적용
-                if (request.region() == null || request.venueName() == null || request.hallName() == null) {
-                        return new SeatmapDto.DuplicateCheckResponse(false);
-                }
 
                 boolean isDuplicate = seatMapRepository.findByRegionAndVenueNameAndHallName(
                                 request.region(),

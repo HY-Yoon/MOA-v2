@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,26 +26,19 @@ import org.springframework.web.bind.annotation.*;
 public class AdminSeatMapController {
 
     private final AdminSeatMapService adminSeatMapService;
+    private static final String SORT_CREATED_AT = "createdAt";
 
     @Operation(summary = "좌석배치도 목록 조회", description = "필터링 조건에 맞는 좌석배치도 목록을 조회합니다.")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<SeatmapDto.ListResponse>>> getSeatMapList(
-            @Parameter(description = "지역", example = "SEOUL") @RequestParam(required = false) Region region,
-            @Parameter(description = "공연장명", example = "올림픽공원") @RequestParam(required = false) String venueName,
-            @Parameter(description = "홀명", example = "KSPO DOME") @RequestParam(required = false) String hallName,
-            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "페이지 크기", example = "20") @RequestParam(defaultValue = "20") int size) {
+            @ParameterObject @ModelAttribute SeatmapDto.ListRequest request) {
 
-        // ✅ Record 빌더를 사용하여 객체 생성
-        SeatmapDto.ListRequest request = SeatmapDto.ListRequest.builder()
-                .region(region)
-                .venueName(venueName)
-                .hallName(hallName)
-                .page(page)
-                .size(size)
-                .build();
+        Pageable pageable = PageRequest.of(
+                request.page(),
+                request.size(),
+                Sort.by(Sort.Direction.DESC, SORT_CREATED_AT)
+        );
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<SeatmapDto.ListResponse> pageResult = adminSeatMapService.getSeatMapList(request, pageable);
         PageResponse<SeatmapDto.ListResponse> result = PageResponse.of(pageResult);
 
@@ -54,16 +48,7 @@ public class AdminSeatMapController {
     @Operation(summary = "좌석배치도 중복 검사", description = "지역, 공연장명, 홀명으로 좌석배치도 중복 여부를 확인합니다.")
     @GetMapping("/duplicate")
     public ResponseEntity<ApiResponse<SeatmapDto.DuplicateCheckResponse>> checkDuplicate(
-            @Parameter(description = "지역", example = "SEOUL") @RequestParam(required = false) Region region,
-            @Parameter(description = "공연장명", example = "올림픽공원") @RequestParam(required = false) String venueName,
-            @Parameter(description = "홀명", example = "KSPO DOME") @RequestParam(required = false) String hallName) {
-
-        // ✅ Record 빌더를 사용하여 객체 생성
-        SeatmapDto.DuplicateCheckRequest request = SeatmapDto.DuplicateCheckRequest.builder()
-                .region(region)
-                .venueName(venueName)
-                .hallName(hallName)
-                .build();
+            @ParameterObject @ModelAttribute @Valid SeatmapDto.DuplicateCheckRequest request) {
 
         SeatmapDto.DuplicateCheckResponse result = adminSeatMapService.checkDuplicate(request);
         return ResponseEntity.ok(ApiResponse.success(result));
@@ -74,7 +59,6 @@ public class AdminSeatMapController {
     public ResponseEntity<ApiResponse<SeatmapDto.CreateResponse>> createSeatMap(
             @Valid @RequestBody SeatmapDto.CreateRequest request) {
 
-        // @RequestBody를 통해 들어오는 JSON은 Jackson이 자동으로 Record를 생성해주므로 별도 빌더 작업 불필요
         SeatmapDto.CreateResponse result = adminSeatMapService.createSeatMap(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(result));

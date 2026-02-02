@@ -18,6 +18,10 @@ public class ApiResponse<T> {
         this.code = code;
     }
 
+    private ApiResponse(boolean success, T data, String message) {
+        this(success, data, message, null);
+    }
+
     public static <T> ApiResponse<T> success(T data) {
         return new ApiResponse<>(true, data, null, null);
     }
@@ -27,7 +31,11 @@ public class ApiResponse<T> {
     }
 
     public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, null, message, "ERROR");
+        return new ApiResponse<>(false, null, message, null);
+    }
+
+    public static <T> ApiResponse<T> error(String message, T data) {
+        return new ApiResponse<>(false, data, message, null);
     }
 
     public static <T> ApiResponse<T> error(String message, String code, T data) {

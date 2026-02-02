@@ -17,12 +17,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-/**
- * 좌석 선점(LOCK) 서비스
- * - 동시성 제어: SELECT ... FOR UPDATE(PESSIMISTIC_WRITE)로 schedule_seats를 잠근 뒤 상태
- * 변경
- * - 규칙: 요청 좌석이 모두 AVAILABLE일 때만 LOCKED로 변경
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,79 +25,72 @@ public class ScheduleSeatLockService {
     private final ShowScheduleRepository showScheduleRepository;
     private final ScheduleSeatRepository scheduleSeatRepository;
 
-    /**
-     * 좌석 선점 (5분)
-     *
-     * @param scheduleId 스케줄 ID
-     * @param seatIds    선점할 좌석 ID 목록 (서비스에서 오름차순 정렬 후 락 획득)
-     * @param userId     선점 사용자 ID
-     * @return 선점 만료 시각
-     */
+    private static final int LOCK_EXPIRATION_MINUTES = 5;
+
     @Transactional
     public LocalDateTime lockSeats(Long scheduleId, List<Long> seatIds, Long userId) {
-        if (scheduleId == null) {
-            throw new IllegalArgumentException("scheduleId는 필수입니다.");
-        }
-        if (userId == null) {
-            throw new IllegalArgumentException("userId는 필수입니다.");
-        }
-        if (seatIds == null || seatIds.isEmpty()) {
-            throw new IllegalArgumentException("seatIds는 최소 1개 이상 필요합니다.");
-        }
-        // 중복 좌석 요청 방지
-        if (new HashSet<>(seatIds).size() != seatIds.size()) {
-            throw new IllegalArgumentException("seatIds에 중복 값이 포함되어 있습니다.");
+        validateInputs(scheduleId, seatIds, userId);
+
+        // 스케줄 확인
+        if (!showScheduleRepository.existsById(scheduleId)) {
+            throw new IllegalArgumentException("존재하지 않는 스케줄입니다.");
         }
 
-        // 스케줄 존재 여부 확인
-        showScheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
-
-        // 데드락 방지: 좌석 ID 오름차순으로 정렬 후 락 획득
+        // 데드락 방지: ID 정렬
         List<Long> sortedSeatIds = new ArrayList<>(seatIds);
         sortedSeatIds.sort(Long::compareTo);
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
-        LocalDateTime expiresAt = now.plusMinutes(5);
+        LocalDateTime expiresAt = now.plusMinutes(LOCK_EXPIRATION_MINUTES);
 
-        // SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
-        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId,
-                sortedSeatIds);
+        // 1. PESSIMISTIC LOCK 획득
+        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId, sortedSeatIds);
 
-        if (scheduleSeats.size() != sortedSeatIds.size()) {
-            List<Long> foundIds = scheduleSeats.stream().map(ScheduleSeat::getId).toList();
-            List<Long> missingIds = sortedSeatIds.stream()
-                    .filter(id -> !foundIds.contains(id))
-                    .toList();
+        // 2. 존재하지 않는 좌석 검증
+        validateAllSeatsFound(scheduleSeats, sortedSeatIds);
 
-            log.warn("좌석 선점 실패(존재하지 않는 좌석 포함): scheduleId={}, userId={}, missingIds={}",
-                    scheduleId, userId, missingIds);
-            throw new SeatNotFoundException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.", missingIds);
-        }
+        // 3. 상태 검증 (모두 AVAILABLE이어야 함)
+        validateSeatsAvailable(scheduleSeats);
 
-        // 모두 AVAILABLE일 때만 LOCKED로 변경
-        List<Long> conflictSeatIds = scheduleSeats.stream()
-                .filter(ss -> ss.getStatus() != SeatStatus.AVAILABLE)
-                .map(ScheduleSeat::getId)
-                .toList();
-
-        if (!conflictSeatIds.isEmpty()) {
-            log.info("좌석 선점 충돌(409): scheduleId={}, userId={}, conflictSeatIds={}, statuses={}",
-                    scheduleId,
-                    userId,
-                    conflictSeatIds,
-                    scheduleSeats.stream().map(ScheduleSeat::getStatus).toList());
-            throw new SeatLockConflictException("선점할 수 없는 좌석이 포함되어 있습니다. (이미 선점/예약/판매됨)", conflictSeatIds);
-        }
-
+        // 4. 상태 변경 (LOCK)
         for (ScheduleSeat ss : scheduleSeats) {
             ss.lock(userId, expiresAt);
         }
         scheduleSeatRepository.saveAll(scheduleSeats);
 
-        log.info("좌석 선점 성공: scheduleId={}, userId={}, seatIds={}, expiresAt={}",
-                scheduleId, userId, sortedSeatIds, expiresAt);
+        log.info("좌석 선점 성공: scheduleId={}, userId={}, count={}, expiresAt={}",
+                scheduleId, userId, sortedSeatIds.size(), expiresAt);
 
         return expiresAt;
+    }
+
+    // --- Private Validation Methods ---
+
+    private void validateInputs(Long scheduleId, List<Long> seatIds, Long userId) {
+        if (scheduleId == null) throw new IllegalArgumentException("scheduleId는 필수입니다.");
+        if (userId == null) throw new IllegalArgumentException("userId는 필수입니다.");
+        if (seatIds == null || seatIds.isEmpty()) throw new IllegalArgumentException("seatIds는 최소 1개 이상 필요합니다.");
+        if (new HashSet<>(seatIds).size() != seatIds.size()) throw new IllegalArgumentException("seatIds에 중복 값이 포함되어 있습니다.");
+    }
+
+    private void validateAllSeatsFound(List<ScheduleSeat> foundSeats, List<Long> requestedIds) {
+        if (foundSeats.size() != requestedIds.size()) {
+            List<Long> foundIds = foundSeats.stream().map(ScheduleSeat::getId).toList();
+            List<Long> missingIds = requestedIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+            throw new SeatNotFoundException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.", missingIds);
+        }
+    }
+
+    private void validateSeatsAvailable(List<ScheduleSeat> seats) {
+        List<Long> conflictSeatIds = seats.stream()
+                .filter(ss -> ss.getStatus() != SeatStatus.AVAILABLE)
+                .map(ScheduleSeat::getId)
+                .toList();
+
+        if (!conflictSeatIds.isEmpty()) {
+            throw new SeatLockConflictException("선점할 수 없는 좌석이 포함되어 있습니다. (이미 선점/예약/판매됨)", conflictSeatIds);
+        }
     }
 }

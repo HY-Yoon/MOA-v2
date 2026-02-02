@@ -1,5 +1,7 @@
 package com.moa2.api.payment.dto;
 
+import com.moa2.api.user.domain.entity.User;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -14,199 +16,237 @@ public class PaymentDto {
 
         /**
          * 결제 정보 (결제 완료 응답에 포함)
-         * method, amount, paidAt
          */
+        @Schema(description = "결제 정보")
         public record PaymentInfo(
-                        String method,
-                        Long amount,
-                        LocalDateTime paidAt) {
+                        @Schema(description = "결제 수단", example = "CARD") String method,
+
+                        @Schema(description = "결제 금액", example = "150000") Long amount,
+
+                        @Schema(description = "결제 일시", example = "2024-01-01T12:00:00") LocalDateTime paidAt) {
         }
 
         /**
          * 결제 요청 DTO
-         * 프론트가 토스 위젯을 띄우기 전, 사전 데이터를 생성하기 위한 요청
          */
+        @Schema(description = "결제 요청 정보")
         public record Request(
-                        @NotNull(message = "스케줄 ID는 필수입니다") Long scheduleId,
+                        @Schema(description = "스케줄 ID", example = "1") @NotNull(message = "스케줄 ID는 필수입니다") Long scheduleId,
 
-                        @NotEmpty(message = "좌석 ID 목록은 필수입니다") List<Long> seatIds,
+                        @Schema(description = "선점할 좌석 ID 목록", example = "[10, 11]") @NotEmpty(message = "좌석 ID 목록은 필수입니다") List<Long> seatIds,
 
-                        @NotBlank(message = "예매자 이름은 필수입니다") String bookerName,
+                        @Schema(description = "예매자 이름", example = "홍길동") @NotBlank(message = "예매자 이름은 필수입니다") String bookerName,
 
-                        @NotBlank(message = "예매자 연락처는 필수입니다") String bookerPhone,
+                        @Schema(description = "예매자 연락처", example = "010-1234-5678") @NotBlank(message = "예매자 연락처는 필수입니다") String bookerPhone,
 
-                        String bookerEmail) {
+                        @Schema(description = "예매자 이메일", example = "hong@example.com") String bookerEmail) {
         }
 
         /**
          * 결제 요청 응답 DTO
-         * 프론트가 토스 위젯에 전달할 정보
          */
+        @Schema(description = "결제 요청 응답 정보")
         public record RequestResponse(
-                        String orderId, // UUID 기반 주문번호
-                        Integer amount, // 결제 금액
-                        String orderName, // "뮤지컬 XX - 2좌석" 형식
-                        BookerInfo booker, // 예매자 정보
-                        String successUrl, // 결제 성공 시 리다이렉트 URL
-                        String failUrl // 결제 실패 시 리다이렉트 URL
-        ) {
-                /**
-                 * 예매자 정보
-                 */
+                        @Schema(description = "주문 번호 (UUID)", example = "550e8400-e29b-41d4-a716-446655440000") String orderId,
+
+                        @Schema(description = "결제 금액", example = "150000") Integer amount,
+
+                        @Schema(description = "주문명", example = "뮤지컬 캣츠 - 2좌석") String orderName,
+
+                        @Schema(description = "예매자 정보") BookerInfo booker,
+
+                        @Schema(description = "결제 성공 리다이렉트 URL", example = "http://localhost:5173/payment/success") String successUrl,
+
+                        @Schema(description = "결제 실패 리다이렉트 URL", example = "http://localhost:5173/payment/fail") String failUrl) {
+                @Schema(description = "예매자 상세 정보")
                 public record BookerInfo(
-                                String name,
-                                String email,
-                                String phone) {
+                                @Schema(description = "이름", example = "홍길동") String name,
+
+                                @Schema(description = "이메일", example = "hong@example.com") String email,
+
+                                @Schema(description = "연락처", example = "010-1234-5678") String phone) {
                 }
         }
 
         /**
          * 결제 승인 요청 DTO
-         * 토스 successUrl에서 받은 파라미터
          */
+        @Schema(description = "결제 승인 요청 정보")
         public record ConfirmRequest(
-                        @NotBlank(message = "paymentKey는 필수입니다") String paymentKey,
+                        @Schema(description = "결제 키", example = "test_payment_key") @NotBlank(message = "paymentKey는 필수입니다") String paymentKey,
 
-                        @NotBlank(message = "orderId는 필수입니다") String orderId,
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") @NotBlank(message = "orderId는 필수입니다") String orderId,
 
-                        @NotNull(message = "amount는 필수입니다") Long amount) {
+                        @Schema(description = "결제 금액", example = "150000") @NotNull(message = "amount는 필수입니다") Long amount) {
         }
 
         /**
          * 결제 승인 성공 응답 DTO
          */
+        @Schema(description = "결제 승인 성공 응답")
         public record SuccessResponse(
-                        Long reservationId, // 예약 ID
-                        String reservationNumber, // 예약 번호
-                        String orderId, // 주문 번호
-                        String paymentKey, // 토스 결제 키
-                        Integer amount, // 결제 금액
-                        String method, // 결제 수단
-                        String orderName, // 주문명
-                        LocalDateTime approvedAt // 승인 일시
-        ) {
+                        @Schema(description = "예약 ID", example = "100") Long reservationId,
+
+                        @Schema(description = "예약 번호", example = "BOOK-1234567890") String reservationNumber,
+
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") String orderId,
+
+                        @Schema(description = "결제 키", example = "test_payment_key") String paymentKey,
+
+                        @Schema(description = "결제 금액", example = "150000") Integer amount,
+
+                        @Schema(description = "결제 수단", example = "CARD") String method,
+
+                        @Schema(description = "주문명", example = "뮤지컬 캣츠 - 2좌석") String orderName,
+
+                        @Schema(description = "승인 일시", example = "2024-01-01T12:05:00") LocalDateTime approvedAt) {
         }
 
         /**
          * 결제 실패 요청 DTO
-         * 토스 failUrl에서 받은 파라미터
          */
+        @Schema(description = "결제 실패 요청 정보")
         public record FailRequest(
-                        String orderId, // 주문 번호 (없을 수 있음 - PAY_PROCESS_CANCELED 케이스)
-                        String code, // 에러 코드
-                        String message // 에러 메시지
-        ) {
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") String orderId,
+
+                        @Schema(description = "에러 코드", example = "PAY_PROCESS_CANCELED") String code,
+
+                        @Schema(description = "에러 메시지", example = "사용자에 의해 결제가 취소되었습니다.") String message) {
         }
 
         /**
-         * 결제 완료 시 내려줄 최종 응답 DTO (Record 방식)
+         * 결제 완료 시 내려줄 최종 응답 DTO
          */
+        @Schema(description = "결제 완료 상세 정보")
         public record PaymentSuccessResponse(
-                        String reservationId,
-                        PerformanceInfo performance, // 내부 record 참조
-                        List<SeatInfo> seats, // 내부 record 참조
-                        BookerInfo booker, // 예매자 정보
-                        PaymentInfo payment) {
+                        @Schema(description = "예약 ID", example = "booking_123") String reservationId,
+
+                        @Schema(description = "공연 정보") PerformanceInfo performance,
+
+                        @Schema(description = "좌석 정보 목록") List<SeatInfo> seats,
+
+                        @Schema(description = "예매자 정보") BookerInfo booker,
+
+                        @Schema(description = "결제 정보") PaymentInfo payment) {
                 public PaymentSuccessResponse {
                         seats = seats == null ? List.of() : List.copyOf(seats);
                 }
 
-                /**
-                 * 공연 정보
-                 */
+                @Schema(description = "공연 상세 정보")
                 public record PerformanceInfo(
-                                String title,
-                                LocalDateTime date,
-                                Integer session) { // 회차 (같은 날짜의 몇 번째 회차인지)
+                                @Schema(description = "공연 제목", example = "캣츠") String title,
+
+                                @Schema(description = "공연 일시", example = "2024-02-20T19:00:00") LocalDateTime date,
+
+                                @Schema(description = "회차", example = "1") Integer session) {
                 }
 
-                /**
-                 * 좌석 정보
-                 */
+                @Schema(description = "좌석 상세 정보")
                 public record SeatInfo(
-                                String section,
-                                String seatNumber) {
+                                @Schema(description = "구역명", example = "VIP") String section,
+
+                                @Schema(description = "좌석 번호", example = "A-12") String seatNumber) {
                 }
 
-                /**
-                 * 예매자 정보
-                 */
+                @Schema(description = "예매자 상세 정보")
                 public record BookerInfo(
-                                String name,
-                                String phone,
-                                String email) {
+                                @Schema(description = "이름", example = "홍길동") String name,
+
+                                @Schema(description = "연락처", example = "010-1234-5678") String phone,
+
+                                @Schema(description = "이메일", example = "hong@example.com") String email) {
                 }
         }
 
         /**
          * 예매자 확인 정보 응답 DTO
-         * 결제 과정 중 예매자 확인 단계에서 사용
          */
+        @Schema(description = "예매자 확인 정보")
         public record BuyerInfoResponse(
-                        String name, // 예매자 이름
-                        String email, // 예매자 이메일
-                        String phone // 예매자 연락처 (nullable)
-        ) {
+                        @Schema(description = "예매자 이름", example = "홍길동") String name,
+
+                        @Schema(description = "예매자 이메일", example = "test@example.com") String email,
+
+                        @Schema(description = "예매자 연락처", example = "010-1234-5678") String phone) {
+                public static BuyerInfoResponse from(User user) {
+                        return new BuyerInfoResponse(
+                                        user.getName(),
+                                        user.getEmail(),
+                                        user.getPhone());
+                }
         }
 
-        // ------------------------- 결제 완료 / 실패 페이지 (핸들러 연동) -------------------------
-
         /**
-         * 결제 완료 페이지용 응답 DTO (예매 완료 정보 노출)
-         * GET /api/v1/payment/complete?reservationNumber=xxx 응답.
-         * 스펙: 공연 기본 정보, 예매자 정보, 결제 정보. 엔티티명 유지 (reservationNumber, orderId 등).
+         * 결제 완료 페이지용 응답 DTO
          */
+        @Schema(description = "결제 완료 페이지 응답 정보")
         public record CompletionResponse(
-                        String reservationNumber, // 예매번호 (bookingId)
-                        String orderId, // 주문 번호
-                        CompletionPerformanceInfo performance,
-                        List<CompletionSeatInfo> seats,
-                        CompletionBookerInfo booker,
-                        PaymentInfo payment) {
+                        @Schema(description = "예매 번호", example = "BOOK-20240201-XXXX") String reservationNumber,
+
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") String orderId,
+
+                        @Schema(description = "공연 정보") CompletionPerformanceInfo performance,
+
+                        @Schema(description = "좌석 정보 목록") List<CompletionSeatInfo> seats,
+
+                        @Schema(description = "예매자 정보") CompletionBookerInfo booker,
+
+                        @Schema(description = "결제 정보") PaymentInfo payment) {
                 public CompletionResponse {
                         seats = seats == null ? List.of() : List.copyOf(seats);
                 }
 
+                @Schema(description = "완료 페이지 공연 정보")
                 public record CompletionPerformanceInfo(
-                                String title,
-                                String date, // yyyy-MM-dd
-                                String showTime, // HH:mm
-                                Integer session) { // 회차 (같은 날짜의 몇 번째 회차인지)
+                                @Schema(description = "공연 제목", example = "캣츠") String title,
+
+                                @Schema(description = "공연 날짜", example = "2024-02-20") String date,
+
+                                @Schema(description = "공연 시간", example = "19:00") String showTime,
+
+                                @Schema(description = "회차", example = "1") Integer session) {
                 }
 
+                @Schema(description = "완료 페이지 좌석 정보")
                 public record CompletionSeatInfo(
-                                String section, // 구역명
-                                String seatNumber // 좌석번호 (row-number 등)
-                ) {
+                                @Schema(description = "구역명", example = "VIP") String section,
+
+                                @Schema(description = "좌석 번호", example = "A-12") String seatNumber) {
                 }
 
+                @Schema(description = "완료 페이지 예매자 정보")
                 public record CompletionBookerInfo(
-                                String name,
-                                String phone,
-                                String email) {
+                                @Schema(description = "이름", example = "홍길동") String name,
+
+                                @Schema(description = "연락처", example = "010-1234-5678") String phone,
+
+                                @Schema(description = "이메일", example = "hong@example.com") String email) {
                 }
         }
 
         /**
-         * 실패 시 프론트 리다이렉트 URL 쿼리 파라미터 (문서/구성용)
-         * GET /fail 핸들러가 frontend-fail-url 로 redirect 시
-         * ?code=...&message=...&orderId=...
+         * 실패 시 프론트 리다이렉트 URL 쿼리 파라미터
          */
+        @Schema(description = "실패 리다이렉트 파라미터")
         public record FailRedirectParams(
-                        String code,
-                        String message,
-                        String orderId // 없을 수 있음 (PAY_PROCESS_CANCELED 등)
-        ) {
+                        @Schema(description = "에러 코드", example = "PAY_PROCESS_CANCELED") String code,
+
+                        @Schema(description = "에러 메시지", example = "사용자에 의해 취소되었습니다.") String message,
+
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") String orderId) {
         }
 
         /**
-         * 백엔드만 테스트 시 GET /fail?noRedirect=1 응답 (302 대신 200 JSON)
+         * 백엔드만 테스트 시 GET /fail?noRedirect=1 응답
          */
+        @Schema(description = "테스트용 리다이렉트 방지 실패 응답")
         public record TestNoRedirectFailResponse(
-                        String code,
-                        String message,
-                        String orderId,
-                        String redirectUrl) {
-        }
+                        @Schema(description = "에러 코드", example = "PAY_PROCESS_CANCELED") String code,
 
+                        @Schema(description = "에러 메시지", example = "사용자에 의해 취소되었습니다.") String message,
+
+                        @Schema(description = "주문 번호", example = "550e8400-e29b-41d4-a716-446655440000") String orderId,
+
+                        @Schema(description = "리다이렉트 예정 URL", example = "http://localhost:5173/payment/fail?...") String redirectUrl) {
+        }
 }

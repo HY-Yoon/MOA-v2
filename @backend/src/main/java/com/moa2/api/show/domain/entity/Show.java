@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Getter
@@ -47,6 +48,11 @@ public class Show extends BaseTimeEntity {
     @Builder.Default
     private java.util.List<DetailImage> detailImages = new java.util.ArrayList<>();
 
+    @OneToMany(mappedBy = "show", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private java.util.List<ShowSeatGrade> showSeatGrades = new java.util.ArrayList<>();
+
+    private LocalTime startTime;
     private LocalDate startDate;
     private LocalDate endDate;
 
@@ -60,4 +66,39 @@ public class Show extends BaseTimeEntity {
     private LocalDateTime saleEndDate; // 판매 종료일시
 
     private Long viewCount;
+
+    public void increaseViewCount() {
+        if (this.viewCount == null) {
+            this.viewCount = 0L;
+        }
+        this.viewCount++;
+    }
+
+    public void update(String title, String runningTime, String cast) {
+        if (title != null)
+            this.title = title;
+        if (runningTime != null)
+            this.runningTime = runningTime;
+        if (cast != null)
+            this.cast = cast;
+    }
+
+    public void updateWaitStatusFields(Genre genre, Venue venue, LocalDateTime saleStartDate,
+            LocalDateTime saleEndDate) {
+        if (this.status != ShowStatus.WAITING) {
+            throw new IllegalStateException("WAITING 상태가 아닌 공연은 중요 정보를 수정할 수 없습니다.");
+        }
+        if (genre != null)
+            this.genre = genre;
+        if (venue != null)
+            this.venue = venue;
+        if (saleStartDate != null)
+            this.saleStartDate = saleStartDate;
+        if (saleEndDate != null)
+            this.saleEndDate = saleEndDate;
+    }
+
+    public void updatePoster(String posterUrl) {
+        this.posterUrl = posterUrl;
+    }
 }

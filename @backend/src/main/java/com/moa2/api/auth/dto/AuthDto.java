@@ -3,29 +3,32 @@ package com.moa2.api.auth.dto;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.model.UserRole;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 
+/**
+ * 인증 관련 DTO 통합 클래스
+ */
 public class AuthDto {
 
     /**
-     *  사용자 정보 응답 DTO
+     * 사용자 정보 응답 DTO
      */
-    @Getter
+    @Schema(description = "사용자 정보 응답")
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class UserInfoResponse {
-        private String email;
-        private String name;
-        private String picture;
-        private SocialProvider provider;
-        private String providerId;
-        private UserRole role;
+    public record UserInfoResponse(
+            @Schema(description = "이메일", example = "test@example.com") String email,
 
+            @Schema(description = "이름", example = "홍길동") String name,
+
+            @Schema(description = "프로필 사진 URL", example = "https://example.com/profile.jpg") String picture,
+
+            @Schema(description = "소셜 제공자", example = "GOOGLE") SocialProvider provider,
+
+            @Schema(description = "제공자 ID", example = "1234567890") String providerId,
+
+            @Schema(description = "사용자 권한", example = "USER") UserRole role) {
         public static UserInfoResponse from(User user) {
             return UserInfoResponse.builder()
                     .email(user.getEmail())
@@ -41,16 +44,14 @@ public class AuthDto {
     /**
      * JWT 토큰 검증 응답 DTO
      */
-    @Getter
+    @Schema(description = "토큰 검증 응답")
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TokenVerifyResponse {
-        private boolean valid;
-        private String message;
-        private UserInfoResponse user;
+    public record TokenVerifyResponse(
+            @Schema(description = "유효 여부", example = "true") boolean valid,
 
-        // 성공 응답 생성용 팩토리 메서드
+            @Schema(description = "메시지", example = "유효한 토큰입니다.") String message,
+
+            @Schema(description = "사용자 정보 (유효한 경우)") UserInfoResponse user) {
         public static TokenVerifyResponse success(UserInfoResponse userInfo) {
             return TokenVerifyResponse.builder()
                     .valid(true)
@@ -59,7 +60,6 @@ public class AuthDto {
                     .build();
         }
 
-        // 실패 응답 생성용 팩토리 메서드
         public static TokenVerifyResponse fail(String message) {
             return TokenVerifyResponse.builder()
                     .valid(false)
@@ -72,24 +72,25 @@ public class AuthDto {
     /**
      * 토큰 응답 DTO - AccessToken과 RefreshToken 함께 반환
      */
-    @Getter
+    @Schema(description = "토큰 갱신 응답")
     @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TokenResponse {
-        private String accessToken;
-        private String refreshToken;
-        private Long accessTokenExpiresIn;
-        private Long refreshTokenExpiresIn;
-        private String email;
+    public record TokenResponse(
+            @Schema(description = "Access Token", example = "eyJhbGciOiJIUzI1NiIsIn...") String accessToken,
+
+            @Schema(description = "Refresh Token", example = "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4...") String refreshToken,
+
+            @Schema(description = "Access Token 만료 시간 (밀리초)", example = "3600000") Long accessTokenExpiresIn,
+
+            @Schema(description = "Refresh Token 만료 시간 (밀리초)", example = "1209600000") Long refreshTokenExpiresIn,
+
+            @Schema(description = "사용자 이메일", example = "test@example.com") String email) {
     }
 
     /**
      * Refresh Token 요청 DTO
      */
-    public record RefreshTokenRequest (
-        @NotBlank(message = "Refresh Token은 필수입니다.")
-        String refreshToken
-    ){}
-
+    @Schema(description = "Refresh Token 요청")
+    public record RefreshTokenRequest(
+            @NotBlank(message = "Refresh Token은 필수입니다.") @Schema(description = "Refresh Token", required = true) String refreshToken) {
+    }
 }

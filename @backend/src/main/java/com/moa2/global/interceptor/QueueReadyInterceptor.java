@@ -144,6 +144,6 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
         response.setStatus(status.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message, code, null)));
+        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message)));
     }
 }

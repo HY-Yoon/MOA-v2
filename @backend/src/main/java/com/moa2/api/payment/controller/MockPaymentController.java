@@ -55,7 +55,7 @@ public class MockPaymentController {
 
                         // code를 null로 전달하여 응답 JSON에서 제외되도록 함
                         return ResponseEntity.status(status)
-                                        .body(ApiResponse.error(e.getMessage(), null, null));
+                                        .body(ApiResponse.error(e.getMessage()));
                 }
         }
 }

@@ -85,4 +85,49 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
         * 특정 회차의 전체 좌석 수 조회
         */
        Long countByScheduleId(Long scheduleId);
+
+       /**
+        * 회차별 좌석 등급 통계 (구역ID, 구역명, 가격, 잔여석, 전체석)
+        */
+       @Query("SELECT " +
+                     "g.section.id, " +
+                     "g.section.name, " +
+                     "g.price, " +
+                     "SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END), " +
+                     "COUNT(ss) " +
+                     "FROM ScheduleSeat ss " +
+                     "JOIN ss.grade g " +
+                     "WHERE ss.schedule.id = :scheduleId " +
+                     "GROUP BY g.section.id, g.section.name, g.price")
+       List<Object[]> countByGradeForSchedule(@Param("scheduleId") Long scheduleId);
+
+       /**
+        * 여러 회차의 좌석 등급별 통계 조회 (N+1 방지)
+        * 반환: [scheduleId, sectionId, sectionName, price, remainingSeats, totalSeats]
+        */
+       @Query("SELECT " +
+                     "ss.schedule.id, " +
+                     "g.section.id, " +
+                     "g.section.name, " +
+                     "g.price, " +
+                     "SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END), " +
+                     "COUNT(ss) " +
+                     "FROM ScheduleSeat ss " +
+                     "JOIN ss.grade g " +
+                     "WHERE ss.schedule.id IN :scheduleIds " +
+                     "GROUP BY ss.schedule.id, g.section.id, g.section.name, g.price")
+       List<Object[]> countSeatGradeStatsByScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
+
+       /**
+        * 여러 회차의 전체 좌석 수 및 잔여 좌석 수 조회
+        * 반환: [scheduleId, totalSeats, remainingSeats]
+        */
+       @Query("SELECT " +
+                     "ss.schedule.id, " +
+                     "COUNT(ss), " +
+                     "SUM(CASE WHEN ss.status = 'AVAILABLE' THEN 1 ELSE 0 END) " +
+                     "FROM ScheduleSeat ss " +
+                     "WHERE ss.schedule.id IN :scheduleIds " +
+                     "GROUP BY ss.schedule.id")
+       List<Object[]> countTotalAndRemainingSeatsByScheduleIds(@Param("scheduleIds") List<Long> scheduleIds);
 }

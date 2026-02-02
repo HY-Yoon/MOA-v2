@@ -1,6 +1,6 @@
-package com.moa2.api.seatmap.seatmap.repository;
+package com.moa2.api.seatmap.domain.repository;
 
-import com.moa2.api.seatmap.entity.SeatMap;
+import com.moa2.api.seatmap.domain.entity.SeatMap;
 import com.moa2.global.model.Region;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

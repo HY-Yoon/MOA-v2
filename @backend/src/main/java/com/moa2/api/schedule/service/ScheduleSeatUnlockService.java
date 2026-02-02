@@ -15,12 +15,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-/**
- * 좌석 선점 해제(UNLOCK) 서비스
- * - 사용자가 결제 취소/뒤로가기 등을 했을 때 즉시 선점을 해제하기 위한 용도
- * - 동시성 제어: SELECT ... FOR UPDATE(PESSIMISTIC_WRITE)로 schedule_seats를 잠근 뒤 상태
- * 변경
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,82 +23,72 @@ public class ScheduleSeatUnlockService {
     private final ShowScheduleRepository showScheduleRepository;
     private final ScheduleSeatRepository scheduleSeatRepository;
 
-    /**
-     * 좌석 선점 해제
-     * - 요청 좌석이 모두 "내가 선점한 LOCKED" 이거나 "이미 AVAILABLE(해제된 상태)" 일 때만 성공 처리(멱등)
-     *
-     * @param scheduleId 스케줄 ID
-     * @param seatIds    선점 해제할 좌석 ID 목록 (서비스에서 오름차순 정렬 후 락 획득)
-     * @param userId     요청 사용자 ID
-     */
     @Transactional
     public void unlockSeats(Long scheduleId, List<Long> seatIds, Long userId) {
-        if (scheduleId == null) {
-            throw new IllegalArgumentException("scheduleId는 필수입니다.");
-        }
-        if (userId == null) {
-            throw new IllegalArgumentException("userId는 필수입니다.");
-        }
-        if (seatIds == null || seatIds.isEmpty()) {
-            throw new IllegalArgumentException("seatIds는 최소 1개 이상 필요합니다.");
-        }
-        // 중복 좌석 요청 방지
-        if (new HashSet<>(seatIds).size() != seatIds.size()) {
-            throw new IllegalArgumentException("seatIds에 중복 값이 포함되어 있습니다.");
+        validateInputs(scheduleId, seatIds, userId);
+
+        if (!showScheduleRepository.existsById(scheduleId)) {
+            throw new IllegalArgumentException("존재하지 않는 스케줄입니다.");
         }
 
-        // 스케줄 존재 여부 확인
-        showScheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
-
-        // 데드락 방지: 좌석 ID 오름차순 정렬 후 락 획득
+        // 데드락 방지: ID 정렬
         List<Long> sortedSeatIds = new ArrayList<>(seatIds);
         sortedSeatIds.sort(Long::compareTo);
 
-        // SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
-        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId,
-                sortedSeatIds);
+        // 1. PESSIMISTIC LOCK 획득
+        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId, sortedSeatIds);
 
-        if (scheduleSeats.size() != sortedSeatIds.size()) {
-            List<Long> foundIds = scheduleSeats.stream().map(ScheduleSeat::getId).toList();
-            List<Long> missingIds = sortedSeatIds.stream()
-                    .filter(id -> !foundIds.contains(id))
-                    .toList();
+        // 2. 존재하지 않는 좌석 검증
+        validateAllSeatsFound(scheduleSeats, sortedSeatIds);
 
-            log.warn("좌석 선점 해제 실패(존재하지 않는 좌석 포함): scheduleId={}, userId={}, missingIds={}",
-                    scheduleId, userId, missingIds);
-            throw new SeatNotFoundException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.", missingIds);
-        }
+        // 3. 해제 가능 여부 검증 (멱등성 + 권한 체크)
+        validateUnlockable(scheduleSeats, userId);
 
-        // 정책: 내 LOCKED 또는 이미 AVAILABLE만 성공 (그 외는 충돌 처리)
-        List<Long> conflictSeatIds = new ArrayList<>();
+        // 4. 상태 변경 (UNLOCK)
         for (ScheduleSeat ss : scheduleSeats) {
-            if (ss.getStatus() == SeatStatus.AVAILABLE) {
-                continue; // 이미 해제됨 (멱등)
-            }
-
-            if (ss.getStatus() == SeatStatus.LOCKED && userId.equals(ss.getLockedByUserId())) {
-                continue; // 내 선점 -> 해제 가능
-            }
-
-            // 그 외: 다른 사람의 LOCKED, RESERVED, SOLD 등
-            conflictSeatIds.add(ss.getId());
-        }
-
-        if (!conflictSeatIds.isEmpty()) {
-            log.info("좌석 선점 해제 충돌(409): scheduleId={}, userId={}, conflictSeatIds={}",
-                    scheduleId, userId, conflictSeatIds);
-            throw new SeatLockConflictException("선점 해제할 수 없는 좌석이 포함되어 있습니다. (내 선점이 아니거나 이미 예약/판매됨)", conflictSeatIds);
-        }
-
-        // 실제 해제 로직
-        for (ScheduleSeat ss : scheduleSeats) {
+            // 이미 AVAILABLE이면 pass, 내 선점이면 release
             if (ss.getStatus() == SeatStatus.LOCKED && userId.equals(ss.getLockedByUserId())) {
                 ss.releaseLock();
             }
         }
-
         scheduleSeatRepository.saveAll(scheduleSeats);
-        log.info("좌석 선점 해제 성공: scheduleId={}, userId={}, seatIds={}", scheduleId, userId, sortedSeatIds);
+
+        log.info("좌석 선점 해제 성공: scheduleId={}, userId={}, count={}", scheduleId, userId, sortedSeatIds.size());
+    }
+
+
+    private void validateInputs(Long scheduleId, List<Long> seatIds, Long userId) {
+        if (scheduleId == null) throw new IllegalArgumentException("scheduleId는 필수입니다.");
+        if (userId == null) throw new IllegalArgumentException("userId는 필수입니다.");
+        if (seatIds == null || seatIds.isEmpty()) throw new IllegalArgumentException("seatIds는 최소 1개 이상 필요합니다.");
+        if (new HashSet<>(seatIds).size() != seatIds.size()) throw new IllegalArgumentException("seatIds에 중복 값이 포함되어 있습니다.");
+    }
+
+    private void validateAllSeatsFound(List<ScheduleSeat> foundSeats, List<Long> requestedIds) {
+        if (foundSeats.size() != requestedIds.size()) {
+            List<Long> foundIds = foundSeats.stream().map(ScheduleSeat::getId).toList();
+            List<Long> missingIds = requestedIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+            throw new SeatNotFoundException("요청한 좌석 중 존재하지 않는 좌석이 포함되어 있습니다.", missingIds);
+        }
+    }
+
+    private void validateUnlockable(List<ScheduleSeat> seats, Long userId) {
+        List<Long> conflictSeatIds = new ArrayList<>();
+        for (ScheduleSeat ss : seats) {
+            if (ss.getStatus() == SeatStatus.AVAILABLE) {
+                continue; // 이미 해제됨 (성공으로 간주)
+            }
+            if (ss.getStatus() == SeatStatus.LOCKED && userId.equals(ss.getLockedByUserId())) {
+                continue; // 내 선점 (해제 가능)
+            }
+            // 그 외: 다른 사람의 LOCKED, RESERVED, SOLD
+            conflictSeatIds.add(ss.getId());
+        }
+
+        if (!conflictSeatIds.isEmpty()) {
+            throw new SeatLockConflictException("선점 해제할 수 없는 좌석이 포함되어 있습니다. (내 선점이 아니거나 이미 예약/판매됨)", conflictSeatIds);
+        }
     }
 }

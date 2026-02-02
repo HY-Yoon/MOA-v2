@@ -5,6 +5,7 @@ import com.moa2.global.model.SocialProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,15 +13,15 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
-    
+public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
+
     /**
      * 이름 또는 이메일로 검색 (LIKE 검색)
      * phone은 검색 대상에서 제외
      */
     @Query("SELECT u FROM User u WHERE " +
-           "(:keyword IS NULL OR :keyword = '' OR " +
-           "u.name LIKE %:keyword% OR u.email LIKE %:keyword%)")
+            "(:keyword IS NULL OR :keyword = '' OR " +
+            "u.name LIKE %:keyword% OR u.email LIKE %:keyword%)")
     Page<User> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     /**
@@ -35,4 +36,3 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmailAndSocialProvider(String email, SocialProvider socialProvider);
 }
-

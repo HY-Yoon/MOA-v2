@@ -1,4 +1,4 @@
-package com.moa2.api.seatmap.entity;
+package com.moa2.api.seatmap.domain.entity;
 
 import com.moa2.global.entity.BaseTimeEntity;
 import com.moa2.global.model.Region;

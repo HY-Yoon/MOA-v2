@@ -1,9 +1,10 @@
 package com.moa2.api.show.service;
 
-import com.moa2.api.show.dto.*;
+import com.moa2.api.reservation.domain.repository.ReservationRepository;
 import com.moa2.api.show.domain.entity.*;
 import com.moa2.api.show.domain.repository.*;
-import com.moa2.api.reservation.domain.repository.ReservationRepository;
+import com.moa2.api.show.dto.ShowDto;
+import com.moa2.global.model.SeatStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -13,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ShowService {
 
         private final ShowRepository showRepository;
@@ -36,21 +40,10 @@ public class ShowService {
          * - 판매 허용(ALLOWED)된 공연만
          * - 판매중(ON_SALE) 또는 매진(SOLD_OUT) 상태만
          */
-        @Transactional(readOnly = true)
         public Page<ShowDto.ListResponse> getShowList(ShowDto.ListRequest request, Pageable pageable) {
-                log.debug("사용자 공연 목록 조회 요청: genre={}, region={}, keyword={}, startDate={}, endDate={}",
-                                request.genre(), request.region(), request.keyword(),
-                                request.startDate(), request.endDate());
-
-                // keyword가 있으면 LIKE 검색을 위해 % 추가
-                String keywordPattern = null;
-                if (request.keyword() != null && !request.keyword().trim().isEmpty()) {
-                        keywordPattern = "%" + request.keyword().trim() + "%";
-                }
-
-                log.debug("Repository 호출 전 파라미터: genre={}, region={}, keywordPattern={}, startDate={}, endDate={}",
-                                request.genre(), request.region(), keywordPattern,
-                                request.startDate(), request.endDate());
+                String keywordPattern = (request.keyword() != null && !request.keyword().trim().isEmpty())
+                                ? "%" + request.keyword().trim().toLowerCase() + "%"
+                                : null;
 
                 Page<Show> shows = showRepository.findShowsForUser(
                                 request.genre(),
@@ -60,64 +53,20 @@ public class ShowService {
                                 request.endDate(),
                                 pageable);
 
+                // N+1 방지: 조회된 공연들의 모든 스케줄을 한 번에 조회
+                List<Long> showIds = shows.getContent().stream()
+                                .map(Show::getId)
+                                .collect(Collectors.toList());
+
+                List<ShowSchedule> allSchedules = showScheduleRepository.findAllByShowIdInOrderByDateAndTime(showIds);
+
+                // 스케줄을 공연 ID별로 그룹화
+                Map<Long, List<ShowSchedule>> schedulesByShowId = allSchedules.stream()
+                                .collect(Collectors.groupingBy(s -> s.getShow().getId()));
+
                 List<ShowDto.ListResponse> content = shows.getContent().stream()
-                                .map(show -> {
-                                        // 모든 일정 조회
-                                        List<ShowSchedule> allSchedules = showScheduleRepository
-                                                        .findByShowIdOrderByDateAndTime(show.getId());
-
-                                        // 일정 목록 생성 (회차 자동 계산)
-                                        Map<java.time.LocalDate, Integer> sessionCountByDate = new HashMap<>();
-                                        List<ShowDto.ListResponse.ScheduleInfo> scheduleInfos = allSchedules.stream()
-                                                        .map(schedule -> {
-                                                                // 같은 날짜의 회차 계산
-                                                                java.time.LocalDate date = schedule.getShowDate();
-                                                                int session = sessionCountByDate.getOrDefault(date, 0)
-                                                                                + 1;
-                                                                sessionCountByDate.put(date, session);
-
-                                                                return ShowDto.ListResponse.ScheduleInfo.builder()
-                                                                                .keyId(schedule.getId())
-                                                                                .date(schedule.getShowDate())
-                                                                                .time(schedule.getShowTime())
-                                                                                .session(session)
-                                                                                .build();
-                                                        })
-                                                        .collect(Collectors.toList());
-
-                                        // 판매 기간 생성
-                                        ShowDto.ListResponse.SalePeriod salePeriod = null;
-                                        if (show.getSaleStartDate() != null || show.getSaleEndDate() != null) {
-                                                salePeriod = ShowDto.ListResponse.SalePeriod.builder()
-                                                                .startDate(show.getSaleStartDate())
-                                                                .endDate(show.getSaleEndDate())
-                                                                .build();
-                                        }
-
-                                        // 장소 정보 생성
-                                        ShowDto.ListResponse.LocationInfo location = null;
-                                        if (show.getVenue() != null) {
-                                                location = ShowDto.ListResponse.LocationInfo.builder()
-                                                                .region(show.getVenue().getRegion() != null
-                                                                                ? show.getVenue().getRegion().name()
-                                                                                : null)
-                                                                .venue(show.getVenue().getName())
-                                                                .hallName(show.getVenue().getHallName())
-                                                                .build();
-                                        }
-
-                                        return ShowDto.ListResponse.builder()
-                                                        .id(show.getId())
-                                                        .title(show.getTitle())
-                                                        .genre(show.getGenre() != null ? show.getGenre().name() : null)
-                                                        .status(show.getStatus() != null ? show.getStatus().name()
-                                                                        : null)
-                                                        .posterUrl(show.getPosterUrl())
-                                                        .location(location)
-                                                        .salePeriod(salePeriod)
-                                                        .schedules(scheduleInfos)
-                                                        .build();
-                                })
+                                .map(show -> ShowDto.from(show,
+                                                schedulesByShowId.getOrDefault(show.getId(), List.of())))
                                 .collect(Collectors.toList());
 
                 return new PageImpl<>(content, pageable, shows.getTotalElements());
@@ -125,202 +74,90 @@ public class ShowService {
 
         /**
          * 공연 상세 조회 (사용자용)
-         * ⭐ 조회 시 viewCount 자동 증가
+         * 조회 시 viewCount 자동 증가
          */
         @Transactional
         public ShowDto.DetailResponse getShowDetail(Long id) {
-                log.debug("사용자 공연 상세 조회 요청: showId={}", id);
-
                 Show show = showRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
 
-                // ⭐ viewCount 증가 (사용자만)
-                if (show.getViewCount() == null) {
-                        show.setViewCount(0L);
-                }
-                show.setViewCount(show.getViewCount() + 1);
-                showRepository.save(show);
-                log.debug("공연 조회수 증가: showId={}, newViewCount={}", id, show.getViewCount());
+                // viewCount 증가
+                increaseViewCount(show);
 
-                // 일정 정보 조회
+                // 일정 정보 조회 & 변환 (회차 계산 필요)
                 List<ShowSchedule> schedules = showScheduleRepository.findByShowIdOrderByDateAndTime(id);
-                List<ShowDto.DetailResponse.ScheduleInfo> scheduleInfos = schedules.stream()
-                                .map(schedule -> {
-                                        Long totalSeats = show.getVenue() != null
-                                                        ? seatRepository.countByVenueId(show.getVenue().getId())
-                                                        : 0L;
-                                        Long reservationCount = reservationRepository
-                                                        .countByScheduleId(schedule.getId());
-                                        Long remainingSeats = totalSeats - reservationCount;
 
-                                        return ShowDto.DetailResponse.ScheduleInfo.builder()
-                                                        .scheduleId(schedule.getId())
-                                                        .showDate(schedule.getShowDate())
-                                                        .showTime(schedule.getShowTime())
-                                                        .ticketOpenTime(schedule.getTicketOpenTime())
-                                                        .remainingSeats(remainingSeats.intValue())
-                                                        .totalSeats(totalSeats.intValue())
-                                                        .build();
-                                })
-                                .collect(Collectors.toList());
-
-                // 좌석 가격 정보 조회
-                List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(id);
-                List<ShowDto.DetailResponse.SeatGradeInfo> seatGradeInfos = seatGrades.stream()
-                                .map(grade -> ShowDto.DetailResponse.SeatGradeInfo.builder()
-                                                .sectionId(grade.getSection().getId().toString())
-                                                .sectionName(grade.getSection().getName())
-                                                .price(grade.getPrice())
-                                                .build())
-                                .collect(Collectors.toList());
-
-                // 판매 기간 생성
-                ShowDto.DetailResponse.SalePeriod salePeriod = null;
-                if (show.getSaleStartDate() != null || show.getSaleEndDate() != null) {
-                        salePeriod = ShowDto.DetailResponse.SalePeriod.builder()
-                                        .startDate(show.getSaleStartDate())
-                                        .endDate(show.getSaleEndDate())
-                                        .build();
-                }
-
-                // 장소 정보 생성
-                ShowDto.DetailResponse.LocationInfo location = null;
-                if (show.getVenue() != null) {
-                        location = ShowDto.DetailResponse.LocationInfo.builder()
-                                        .region(show.getVenue().getRegion() != null ? show.getVenue().getRegion().name()
-                                                        : null)
-                                        .venue(show.getVenue().getName())
-                                        .hallName(show.getVenue().getHallName())
-                                        .build();
-                }
-
-                // 상세 이미지 URL 목록 생성
-                List<String> detailImageUrls = show.getDetailImages().stream()
-                                .map(DetailImage::getUrl)
-                                .collect(Collectors.toList());
-
-                return ShowDto.DetailResponse.builder()
-                                .id(show.getId())
-                                .title(show.getTitle())
-                                .genre(show.getGenre() != null ? show.getGenre().name() : null)
-                                .status(show.getStatus() != null ? show.getStatus().name() : null)
-                                .posterUrl(show.getPosterUrl())
-                                .detailImageUrls(detailImageUrls)
-                                .location(location)
-                                .runningTime(show.getRunningTime())
-                                .cast(show.getCast())
-                                .salePeriod(salePeriod)
-                                .schedules(scheduleInfos)
-                                .seatGrades(seatGradeInfos)
-                                .build();
+                return ShowDto.of(show, schedules);
         }
-
-//        /**
-//         * 스케줄별 잔여석 조회
-//         */
-//        @Transactional(readOnly = true)
-//        public ShowDto.SeatAvailabilityResponse getScheduleSeatAvailability(Long showId, Long scheduleId) {
-//                log.debug("스케줄별 잔여석 조회 요청: showId={}, scheduleId={}", showId, scheduleId);
-//
-//                Show show = showRepository.findById(showId)
-//                                .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
-//
-//                ShowSchedule schedule = showScheduleRepository.findById(scheduleId)
-//                                .orElseThrow(() -> new RuntimeException("스케줄을 찾을 수 없습니다"));
-//
-//                // 스케줄이 해당 공연에 속하는지 확인
-//                if (!schedule.getShow().getId().equals(showId)) {
-//                        throw new RuntimeException("스케줄이 해당 공연에 속하지 않습니다");
-//                }
-//
-//                // 좌석 가격 정보 조회
-//                List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(showId);
-//
-//                // 구역별 잔여석 계산
-//                List<ShowDto.SeatAvailabilityResponse.SeatAvailability> seatAvailabilityList = seatGrades.stream()
-//                                .map(grade -> {
-//                                        VenueSeatSection section = grade.getSection();
-//
-//                                        // 해당 구역의 전체 좌석 수 (venue의 물리적 좌석)
-//                                        Long totalSeats = seatRepository.countByVenueId(show.getVenue().getId());
-//                                        // TODO: section별로 카운트하는 메서드 필요 (현재는 전체 venue 좌석 수)
-//
-//                                        // 해당 구역, 스케줄의 예약된 좌석 수
-//                                        Long reservedSeats = reservationRepository.countByScheduleId(scheduleId);
-//                                        // TODO: section별로 카운트하는 메서드 필요
-//
-//                                        // 잔여석 계산
-//                                        Long remainingSeats = totalSeats - reservedSeats;
-//                                        int availabilityRate = totalSeats > 0
-//                                                        ? (int) ((remainingSeats * 100) / totalSeats)
-//                                                        : 0;
-//
-//                                        return ShowDto.SeatAvailabilityResponse.SeatAvailability.builder()
-//                                                        .sectionId(section.getId().toString())
-//                                                        .sectionName(section.getName())
-//                                                        .price(grade.getPrice())
-//                                                        .totalSeats(totalSeats.intValue())
-//                                                        .remainingSeats(remainingSeats.intValue())
-//                                                        .availabilityRate(availabilityRate)
-//                                                        .build();
-//                                })
-//                                .collect(Collectors.toList());
-//
-//                // 전체 통계 계산
-//                int totalSeats = seatAvailabilityList.stream()
-//                                .mapToInt(ShowDto.SeatAvailabilityResponse.SeatAvailability::totalSeats)
-//                                .sum();
-//                int totalRemainingSeats = seatAvailabilityList.stream()
-//                                .mapToInt(ShowDto.SeatAvailabilityResponse.SeatAvailability::remainingSeats)
-//                                .sum();
-//                int totalAvailabilityRate = totalSeats > 0 ? (totalRemainingSeats * 100) / totalSeats : 0;
-//
-//                return ShowDto.SeatAvailabilityResponse.builder()
-//                                .scheduleId(schedule.getId())
-//                                .showId(show.getId())
-//                                .showDate(schedule.getShowDate())
-//                                .showTime(schedule.getShowTime())
-//                                .seatAvailability(seatAvailabilityList)
-//                                .totalSeats(totalSeats)
-//                                .totalRemainingSeats(totalRemainingSeats)
-//                                .totalAvailabilityRate(totalAvailabilityRate)
-//                                .build();
-//        }
 
         /**
          * 날짜별 회차 조회
-         * - date가 없으면 전체 회차 반환
-         * - isSoldOut: (예약된 좌석 수 >= 전체 좌석 수) 기준
          */
-        @Transactional(readOnly = true)
         public List<ShowDto.ScheduleListResponse> getShowSchedules(Long showId, LocalDate date) {
-                log.debug("공연 회차 조회 요청: showId={}, date={}", showId, date);
-
-                Show show = showRepository.findById(showId)
-                                .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
+                // 공연 존재 여부 확인
+                if (!showRepository.existsById(showId)) {
+                        throw new RuntimeException("공연을 찾을 수 없습니다");
+                }
 
                 List<ShowSchedule> schedules = showScheduleRepository.findByShowIdAndOptionalDate(showId, date);
+                if (schedules.isEmpty()) {
+                        return List.of();
+                }
+
+                List<Long> scheduleIds = schedules.stream().map(ShowSchedule::getId).collect(Collectors.toList());
+
+                // 1. 전체/잔여 좌석 집계
+                List<Object[]> totalSeatStats = scheduleSeatRepository
+                                .countTotalAndRemainingSeatsByScheduleIds(scheduleIds);
+                Map<Long, int[]> seatCountsMap = totalSeatStats.stream()
+                                .collect(Collectors.toMap(
+                                                row -> (Long) row[0],
+                                                row -> new int[] { ((Number) row[1]).intValue(),
+                                                                ((Number) row[2]).intValue() })); // key: scheduleId,
+                                                                                                  // value: [total,
+                                                                                                  // remaining]
+
+                // 2. 등급별 통계 집계
+                List<Object[]> gradeStats = scheduleSeatRepository.countSeatGradeStatsByScheduleIds(scheduleIds);
+                Map<Long, List<ShowDto.ScheduleListResponse.SeatGradeStats>> gradeStatsMap = gradeStats.stream()
+                                .collect(Collectors.groupingBy(
+                                                row -> (Long) row[0],
+                                                Collectors.mapping(row -> ShowDto.ScheduleListResponse.SeatGradeStats
+                                                                .builder()
+                                                                .sectionId(String.valueOf(row[1]))
+                                                                .sectionName((String) row[2])
+                                                                .price((Integer) row[3])
+                                                                .remainingSeats(((Number) row[4]).intValue())
+                                                                .totalSeats(((Number) row[5]).intValue())
+                                                                .build(), Collectors.toList())));
 
                 return schedules.stream()
                                 .map(schedule -> {
-                                        // 1. 해당 회차의 전체 좌석 수 조회 (ScheduleSeat 기준)
-                                        Long totalSeats = scheduleSeatRepository.countByScheduleId(schedule.getId());
-
-                                        // 2. 해당 회차의 잔여 좌석 수 조회 (AVAILABLE 상태인 좌석)
-                                        Long availableSeats = scheduleSeatRepository.countByScheduleIdAndStatus(
-                                                        schedule.getId(),
-                                                        com.moa2.global.model.SeatStatus.AVAILABLE);
-
+                                        int[] seatCounts = seatCountsMap.getOrDefault(schedule.getId(),
+                                                        new int[] { 0, 0 });
+                                        int totalSeats = seatCounts[0];
+                                        int availableSeats = seatCounts[1];
                                         boolean isSoldOut = totalSeats > 0 && availableSeats <= 0;
+
+                                        List<ShowDto.ScheduleListResponse.SeatGradeStats> seatGradeStats = gradeStatsMap
+                                                        .getOrDefault(schedule.getId(), List.of());
 
                                         return new ShowDto.ScheduleListResponse(
                                                         schedule.getId(),
                                                         schedule.getShowDate(),
                                                         schedule.getShowTime(),
                                                         isSoldOut,
-                                                        totalSeats.intValue(),
-                                                        availableSeats.intValue());
+                                                        totalSeats,
+                                                        availableSeats,
+                                                        seatGradeStats);
                                 })
                                 .collect(Collectors.toList());
+        }
+
+        // --- Private Helper Methods (Mapping Logic) ---
+
+        private void increaseViewCount(Show show) {
+                show.increaseViewCount();
+                showRepository.save(show);
         }
 }
