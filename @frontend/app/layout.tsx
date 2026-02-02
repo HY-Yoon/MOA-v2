@@ -1,42 +1,34 @@
-import type { Metadata } from "next";
-import { Inter, Noto_Sans_KR, Sansation } from "next/font/google";
-import "./globals.css";
+import { Inter, Noto_Sans_KR } from 'next/font/google';
+import './globals.css';
+import { Providers } from '@/lib/client-providers';
+import { AlertProvider } from '@/components/molecules/AlertContext';
 
 const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-})
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
 
 const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  variable: "--font-noto-kr",
-})
+  subsets: ['latin'],
+  variable: '--font-noto-kr',
+});
 
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html  lang="ko">
+    <html lang="ko">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Sansation:wght@700&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body
-        className={`${inter.variable} ${notoSansKr.variable} font-sans`}
-      >
-        {children}
+      <body className={`${inter.variable} ${notoSansKr.variable} font-sans`}>
+        <Providers>
+          <AlertProvider>{children}</AlertProvider>
+        </Providers>
       </body>
     </html>
-  )
+  );
 }

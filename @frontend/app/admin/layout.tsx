@@ -1,9 +1,22 @@
-import { SidebarProvider } from '@/components/ui/sidebar';
-import { AdminSidebar } from '@/components/admin/layout/AdminSidebar';
-import { AdminBreadcrumb } from '@/components/admin/layout/AdminBreadcrumb';
-import React from 'react';
+'use client';
+
+import { SidebarProvider } from '@/components/atoms/sidebar';
+import { AdminSidebar } from '@/components/organisms/AdminSidebar';
+import { AdminBreadcrumb } from '@/components/organisms/AdminBreadcrumb';
+import React, { useEffect } from 'react';
+import { useAlert } from '@/components/molecules/AlertContext';
+import { setGlobalAlertHandler, setGlobalRouter } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { alert } = useAlert();
+
+  useEffect(() => {
+    setGlobalAlertHandler(alert);
+    setGlobalRouter(router);
+  }, []);
+
   return (
     <SidebarProvider style={{ '--sidebar-width': '12rem' } as React.CSSProperties}>
       <div className="flex min-h-screen w-full">
