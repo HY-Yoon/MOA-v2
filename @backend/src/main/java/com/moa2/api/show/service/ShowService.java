@@ -124,7 +124,6 @@ public class ShowService {
                                                 row -> (Long) row[0],
                                                 Collectors.mapping(row -> ShowDto.ScheduleListResponse.SeatGradeStats
                                                                 .builder()
-                                                                .sectionId(String.valueOf(row[1]))
                                                                 .sectionName((String) row[2])
                                                                 .price((Integer) row[3])
                                                                 .remainingSeats(((Number) row[4]).intValue())

@@ -540,7 +540,6 @@ public class ShowDto {
                         @Schema(description = "좌석 등급별 현황") List<SeatGradeStats> seatGrades) {
                 @Builder
                 public record SeatGradeStats(
-                                @Schema(description = "구역 ID") String sectionId,
                                 @Schema(description = "구역명") String sectionName,
                                 @Schema(description = "가격") Integer price,
                                 @Schema(description = "잔여석") Integer remainingSeats,
