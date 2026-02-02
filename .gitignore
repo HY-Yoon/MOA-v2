@@ -29,4 +29,18 @@ lerna-debug.log*
 *.ipr
 *.iws
 .vscode/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+@shared/
+uploads/
+
+
+package-lock.json
+
+.env
+k6/
 .vercel
+

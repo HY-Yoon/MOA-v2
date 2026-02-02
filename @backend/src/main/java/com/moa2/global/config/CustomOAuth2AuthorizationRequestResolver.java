@@ -1,60 +1,65 @@
 package com.moa2.global.config;
 
+import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
+import com.moa2.api.user.domain.repository.UserRepository;
+import com.moa2.global.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * OAuth2 인증 요청에 추가 파라미터를 설정하는 리졸버
- * prompt=consent를 추가하여 항상 동의 화면이 표시되도록 함
- * (이미 동의한 경우에도 다시 동의 화면을 표시하여 신규 회원 테스트 가능)
+ * - 기존 회원(쿠키에 refreshToken 있음): 동의 화면 안 뜸
+ * - 신규 회원(쿠키에 refreshToken 없음): 동의 화면 뜸
  */
+@Slf4j
+@RequiredArgsConstructor
 public class CustomOAuth2AuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
     private final OAuth2AuthorizationRequestResolver defaultResolver;
-
-    public CustomOAuth2AuthorizationRequestResolver(OAuth2AuthorizationRequestResolver defaultResolver) {
-        this.defaultResolver = defaultResolver;
-    }
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
         OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request);
-        return customizeAuthorizationRequest(authorizationRequest);
+        return customizeAuthorizationRequest(authorizationRequest, request);
     }
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
         OAuth2AuthorizationRequest authorizationRequest = defaultResolver.resolve(request, clientRegistrationId);
-        return customizeAuthorizationRequest(authorizationRequest);
+        return customizeAuthorizationRequest(authorizationRequest, request);
     }
 
-    private OAuth2AuthorizationRequest customizeAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest) {
+    private OAuth2AuthorizationRequest customizeAuthorizationRequest(
+            OAuth2AuthorizationRequest authorizationRequest,
+            HttpServletRequest request) {
         if (authorizationRequest == null) {
             return null;
         }
 
-        Map<String, Object> additionalParameters = new HashMap<>(authorizationRequest.getAdditionalParameters());
-
-        // 제공자별 파라미터 설정
-        String registrationId = authorizationRequest.getAttribute("registration_id");
-        if (registrationId != null) {
-            if ("google".equals(registrationId)) {
-                additionalParameters.put("prompt", "consent");
-            } else if ("naver".equals(registrationId)) {
-                additionalParameters.put("auth_type", "reauthenticate");
-            }
-        } else {
-            additionalParameters.put("prompt", "consent");
-        }
+//        Map<String, Object> additionalParameters = new HashMap<>(authorizationRequest.getAdditionalParameters());
+//
+//        // 제공자별 파라미터 설정
+//        String registrationId = authorizationRequest.getAttribute("registration_id");
+//        if (registrationId != null) {
+//            if ("google".equals(registrationId)) {
+//                    additionalParameters.put("prompt", "consent");
+//            } else if ("naver".equals(registrationId)) {
+//                    additionalParameters.put("auth_type", "reprompt");
+//            }
+//        } else {
+//                additionalParameters.put("prompt", "consent");
+//        }
 
         return OAuth2AuthorizationRequest.from(authorizationRequest)
-                .additionalParameters(additionalParameters)
+//                .additionalParameters(additionalParameters)
                 .redirectUri(authorizationRequest.getRedirectUri())
                 .build();
     }
-}
 
+}

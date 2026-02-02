@@ -31,7 +31,7 @@ public class FileService {
      * 
      * @param file         업로드할 파일
      * @param subDirectory 서브 디렉토리 (예: "posters", "details")
-     * @return 상대 경로 (예: "/uploads/posters/2024/01/15/uuid-filename.jpg")
+     * @return 상대 경로 (예: "/uploads/posters/2026/01/15/uuid-filename.jpg")
      */
     public String uploadFile(MultipartFile file, String subDirectory) {
         if (file == null || file.isEmpty()) {
@@ -41,7 +41,7 @@ public class FileService {
         validateFile(file);
 
         try {
-            // 날짜별 디렉토리 생성 (예: 2024/01/15)
+            // 날짜별 디렉토리 생성 (예: 2026/01/15)
             LocalDate today = LocalDate.now();
             String datePath = today.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
 
@@ -65,7 +65,7 @@ public class FileService {
             Path filePath = uploadPath.resolve(fileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // 상대 경로 반환 (예: /uploads/posters/2024/01/15/uuid-filename.jpg)
+            // 상대 경로 반환 (예: /uploads/posters/2026/01/15/uuid-filename.jpg)
             String relativePath = "/" + uploadDir + "/" + subDirectory + "/" + datePath + "/" + fileName;
             log.info("파일 업로드 성공: {}", relativePath);
 
@@ -101,7 +101,7 @@ public class FileService {
     /**
      * 파일 삭제
      * 
-     * @param relativePath 상대 경로 (예: /uploads/posters/2024/01/15/uuid-filename.jpg)
+     * @param relativePath 상대 경로 (예: /uploads/posters/2026/01/15/uuid-filename.jpg)
      */
     public void deleteFile(String relativePath) {
         if (relativePath == null || relativePath.isEmpty()) {

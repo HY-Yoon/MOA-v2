@@ -37,16 +37,18 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 이메일을 기반으로 Access Token 생성
+     * 이메일과 제공자를 기반으로 Access Token 생성
      * @param email 사용자 이메일
+     * @param provider 소셜 제공자 (KAKAO, NAVER, GOOGLE)
      * @return Access Token 문자열
      */
-    public String createAccessToken(String email) {
+    public String createAccessToken(String email, String provider) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
         return Jwts.builder()
                 .subject(email)
+                .claim("provider", provider)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(accessTokenSecretKey, Jwts.SIG.HS256)
@@ -54,16 +56,18 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 이메일을 기반으로 Refresh Token 생성
+     * 이메일과 제공자를 기반으로 Refresh Token 생성
      * @param email 사용자 이메일
+     * @param provider 소셜 제공자 (KAKAO, NAVER, GOOGLE)
      * @return Refresh Token 문자열
      */
-    public String createRefreshToken(String email) {
+    public String createRefreshToken(String email, String provider) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
                 .subject(email)
+                .claim("provider", provider)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(refreshTokenSecretKey, Jwts.SIG.HS256)
@@ -73,10 +77,11 @@ public class JwtTokenProvider {
     /**
      * @deprecated createAccessToken을 사용하세요
      * 이메일을 기반으로 JWT 토큰 생성 (하위 호환성 유지)
+     * provider가 없으면 기본값으로 처리하지 않음 (사용 금지)
      */
     @Deprecated
     public String createToken(String email) {
-        return createAccessToken(email);
+        throw new UnsupportedOperationException("createToken은 더 이상 지원되지 않습니다. createAccessToken(email, provider)를 사용하세요.");
     }
 
     /**
@@ -172,6 +177,40 @@ public class JwtTokenProvider {
     @Deprecated
     public String getEmailFromToken(String token) {
         return getEmailFromAccessToken(token);
+    }
+
+    /**
+     * Access Token에서 제공자(provider) 추출
+     * @param token Access Token 문자열
+     * @return 소셜 제공자 문자열 (KAKAO, NAVER, GOOGLE)
+     */
+    public String getProviderFromAccessToken(String token) {
+        return getProviderFromToken(token, accessTokenSecretKey);
+    }
+
+    /**
+     * Refresh Token에서 제공자(provider) 추출
+     * @param token Refresh Token 문자열
+     * @return 소셜 제공자 문자열 (KAKAO, NAVER, GOOGLE)
+     */
+    public String getProviderFromRefreshToken(String token) {
+        return getProviderFromToken(token, refreshTokenSecretKey);
+    }
+
+    /**
+     * JWT 토큰에서 제공자(provider) 추출 (내부 메서드)
+     * @param token JWT 토큰 문자열
+     * @param secretKey 파싱에 사용할 SecretKey
+     * @return 소셜 제공자 문자열 (KAKAO, NAVER, GOOGLE), 없으면 null
+     */
+    private String getProviderFromToken(String token, SecretKey secretKey) {
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("provider", String.class);
     }
 
     /**

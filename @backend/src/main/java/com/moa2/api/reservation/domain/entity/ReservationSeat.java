@@ -1,0 +1,41 @@
+package com.moa2.api.reservation.domain.entity;
+
+import com.moa2.api.show.domain.entity.Seat;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "reservation_seats")
+public class ReservationSeat {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // [단방향] 예약 정보를 참조
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reservation_id", nullable = false)
+    private Reservation reservation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seat_id", nullable = false)
+    private Seat seat; // 공연 도메인`의 물리적 좌석
+
+    @Column(name = "schedule_seat_id")
+    private Long scheduleSeatId; // 회차별 좌석 ID (ScheduleSeat.id) - 결제 검증 시 사용
+
+    private Integer price;
+
+    @Builder
+    public ReservationSeat(Reservation reservation, Seat seat, Long scheduleSeatId, Integer price) {
+        this.reservation = reservation;
+        this.seat = seat;
+        this.scheduleSeatId = scheduleSeatId;
+        this.price = price;
+    }
+}

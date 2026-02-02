@@ -6,15 +6,15 @@ export type Gender = "MALE" | "FEMALE" | "OTHER";
 
 export type Genre = "MUSICAL" | "CONCERT" | "THEATER" | "CLASSIC" | "DANCE";
 
-export type PaymentMethod = "CARD" | "VIRTUAL_ACCOUNT" | "EASY_PAY" | "TRANSFER" | "TOSS";
+export type PaymentMethod = "CARD" | "VIRTUAL_ACCOUNT" | "EASY_PAY" | "TRANSFER" | "MOBILE" | "TOSS" | "ETC";
 
-export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+export type PaymentStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "CANCELLED";
 
 export type QueueStatus = "WAITING" | "READY" | "EXPIRED" | "COMPLETED";
 
 export type Region = "SEOUL" | "GYEONGGI" | "INCHEON" | "BUSAN" | "DAEGU" | "DAEJEON" | "GWANGJU" | "ULSAN" | "SEJONG" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU";
 
-export type ReservationStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+export type ReservationStatus = "PENDING" | "CONFIRMED" | "SOLD" | "CANCELLED";
 
 export type SaleStatus = "ALLOWED" | "SUSPENDED";
 
