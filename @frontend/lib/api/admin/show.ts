@@ -53,7 +53,7 @@ type ChangeParams = { id: number; saleStatus: Show.SaleStatus };
 export const changeSaleStatus = () => ({
   mutationKey: ['admin', 'show', 'saleStatus'],
   mutationFn: async ({ id, saleStatus }: ChangeParams) => {
-    const response = await axiosInstance.patch(`${BASE_URL}/${id}`, { saleStatus });
+    const response = await axiosInstance.patch(`${BASE_URL}/${id}/sale-status`, { saleStatus });
     return response?.data;
   },
 });
