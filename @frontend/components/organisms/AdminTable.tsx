@@ -2,6 +2,10 @@
 
 import * as React from 'react';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
   Skeleton,
   Table,
   TableBody,
@@ -12,8 +16,11 @@ import {
 } from '@/components/atoms';
 import { SearchBar, SearchColumn } from '@/components/molecules/SearchBar';
 import { Pagination } from '@/components/molecules/Pagination';
+import type { AdminTableFilterOption } from '@/lib/admin/table-filter';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronsUpDown, ListFilter, FunnelX } from 'lucide-react';
+
+export type { AdminTableFilterOption };
 
 export interface AdminTableColumn<T> {
   key: string;
@@ -22,6 +29,8 @@ export interface AdminTableColumn<T> {
   className?: string;
   search?: boolean; // 검색 컬럼 여부
   sorter?: boolean; // 정렬 컬럼 여부
+  filter?: boolean; // 필터 컬럼 여부
+  filterOptions?: AdminTableFilterOption[]; // 필터  옵션 목록
 }
 
 export interface AdminTableProps<T> {
@@ -37,6 +46,10 @@ export interface AdminTableProps<T> {
   defaultSortColumn?: string;
   defaultSortOrder?: 'asc' | 'desc';
   onSort?: (column?: string, order?: 'asc' | 'desc') => void;
+
+  // 필터 기능 (컬럼별 선택값)
+  filterValues?: Record<string, string[]>;
+  onFilter?: (columnKey: string, selectedValues: string[]) => void;
 
   // 페이지네이션
   page: number;
@@ -65,6 +78,8 @@ export function AdminTable<T extends Record<string, any>>({
   defaultSortColumn,
   defaultSortOrder,
   onSort,
+  filterValues,
+  onFilter,
   page,
   totalPages,
   pageSize,
@@ -95,7 +110,7 @@ export function AdminTable<T extends Record<string, any>>({
   }
 
   // 정렬 처리
-  const handleSort = (key: string) => {
+  function handleSort(key: string) {
     let newSortColumn: string | undefined;
     let newSortOrder: 'asc' | 'desc' | undefined;
 
@@ -118,12 +133,21 @@ export function AdminTable<T extends Record<string, any>>({
 
     // 부모에게 정렬 변경 알림
     onSort?.(newSortColumn, newSortOrder);
-  };
+  }
+
+  function handleFilterChange(columnKey: string, selectedVal: string, checked: boolean) {
+    const current = filterValues?.[columnKey] ?? [];
+    // TODO: 필터 다중 선택
+    // const next = checked ? [...current, selectedVal] : current.filter((v) => v !== selectedVal);
+    const next = checked ? [selectedVal] : current.filter((v) => v !== selectedVal);
+
+    onFilter?.(columnKey, next);
+  }
 
   // 정렬 아이콘 렌더링
-  const renderSortIcon = (columnKey: string) => {
+  function renderSortIcon(columnKey: string) {
     if (sortColumn !== columnKey) {
-      return <ArrowUpDown className="ml-2 h-4 w-4" />;
+      return <ChevronsUpDown className="ml-2 h-4 w-4" />;
     }
 
     return sortOrder === 'asc' ? (
@@ -131,7 +155,59 @@ export function AdminTable<T extends Record<string, any>>({
     ) : (
       <ArrowDown className="ml-2 h-4 w-4" />
     );
-  };
+  }
+
+  // 필터 아이콘 + 체크박스 드롭다운 렌더링
+  function renderFilter(column: AdminTableColumn<T>) {
+    if (!column.filter) return null;
+
+    const options = column.filterOptions ?? [];
+    const selectedValues = filterValues?.[column.key] ?? [];
+    const isActive = selectedValues.length > 0;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              'focus-visible:ring-ring ml-2 inline-flex rounded transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+              isActive && 'text-blue-600',
+            )}
+            aria-label={`${column.label} 필터`}
+            aria-pressed={isActive}
+          >
+            {isActive ? (
+              <FunnelX className="h-4 w-4" />
+            ) : (
+              <ListFilter className="h-4 w-4" />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-40">
+          {options.length === 0 ? (
+            <DropdownMenuCheckboxItem
+              disabled
+              checked={false}
+              className="cursor-default px-3 py-2 text-sm text-muted-foreground"
+            >
+              데이터가 없습니다.
+            </DropdownMenuCheckboxItem>
+          ) : (
+            options.map((opt) => (
+              <DropdownMenuCheckboxItem
+                key={opt.value}
+                checked={(filterValues?.[column.key] ?? []).includes(opt.value)}
+                onCheckedChange={(checked) => handleFilterChange(column.key, opt.value, checked)}
+              >
+                {opt.label}
+              </DropdownMenuCheckboxItem>
+            ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <div className={cn('w-full space-y-4', className)}>
@@ -159,18 +235,21 @@ export function AdminTable<T extends Record<string, any>>({
             <TableRow>
               {columns.map((column) => (
                 <TableHead key={column.key} className={column.className}>
-                  {/* 정렬 컬럼인 경우 아이콘 표시 */}
-                  {column.sorter ? (
-                    <button
-                      onClick={() => handleSort(column.key)}
-                      className="flex items-center transition-colors hover:text-gray-900"
-                    >
-                      {column.label}
-                      {renderSortIcon(column.key)}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
+                  <div className="flex items-center">
+                    {/* 컬럼명 */}
+                    {column.label}
+                    {/* 정렬 아이콘 */}
+                    {column.sorter && (
+                      <button
+                        onClick={() => handleSort(column.key)}
+                        className="transition-colors hover:text-gray-900"
+                      >
+                        {renderSortIcon(column.key)}
+                      </button>
+                    )}
+                    {/* 필터 아이콘 + 체크박스 드롭다운 */}
+                    {renderFilter(column)}
+                  </div>
                 </TableHead>
               ))}
             </TableRow>
