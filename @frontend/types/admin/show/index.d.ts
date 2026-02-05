@@ -9,8 +9,9 @@ namespace Show {
     page: number; // 현재 페이지
     size: number; // 페이지당 개수 (10개, 20개...)
     sort?: string; // 정렬 기준 {컬럼명}, {기준} (ex. 'id, asc')
-    showStatus?: ShowStatus; // 공연 상태
-    saleStatus?: SaleStatus; // 판매 상태
+    showStatus?: ShowStatus; // 공연 상태 필터
+    saleStatus?: SaleStatus; // 판매 상태 필터
+    genre?: Genre; // 장르 필터
     startDate?: string; // YYYY-MM-DD
     endDate?: string; // YYYY-MM-DD
     keyword?: string; // 검색어

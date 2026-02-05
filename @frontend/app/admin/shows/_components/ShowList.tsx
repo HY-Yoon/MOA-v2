@@ -5,17 +5,22 @@ import { useAlert } from '@/components/molecules/AlertContext';
 import { changeSaleStatus, deleteShow, getShowList } from '@/lib/api/admin/show';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PageCard } from '@/components/molecules/PageCard';
-import { AdminTable, AdminTableColumn } from '@/components/organisms';
+import {
+  AdminTable,
+  type AdminTableColumn,
+  type AdminTableFilterOption,
+} from '@/components/organisms';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import StatusBadge from '@/components/molecules/StatusBadge';
-import { Genre } from '@shared/enums';
-import { GENRE_LABELS } from '@/constants/common';
+import { GENRE_LABELS, SALE_STATUS_LABELS, SHOW_STATUS_LABELS } from '@/constants/common';
 import dayjs from '@/plugins/dayjs';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import Link from 'next/link';
 import { ToggleDropdown, ToggleItem } from '@/components/molecules/ToggleDropdown';
+import { Genre, SaleStatus, ShowStatus } from '@shared/enums';
+import { deriveFilterOptions } from '@/lib/admin/table-filter';
 
 export default function ShowList() {
   const router = useRouter();
@@ -34,6 +39,12 @@ export default function ShowList() {
   // 검색
   const [keyword, setKeyword] = useState('');
 
+  // 필터
+  const [initialFilterOptions, setInitialFilterOptions] = useState<
+    Record<string, AdminTableFilterOption[]>
+  >({});
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({});
+
   // query params
   const params: Show.ListParams = useMemo(
     () => ({
@@ -41,8 +52,13 @@ export default function ShowList() {
       size: pageSize,
       ...(sortColumn && sortOrder && { sort: `${sortColumn}, ${sortOrder}` }),
       ...(keyword.trim() && { keyword: keyword.trim() }),
+      ...(filterValues.status?.length && { showStatus: filterValues.status[0] as ShowStatus }),
+      ...(filterValues.saleStatus?.length && {
+        saleStatus: filterValues.saleStatus[0] as SaleStatus,
+      }),
+      ...(filterValues.genre?.length && { genre: filterValues.genre[0] as Genre }),
     }),
-    [page, pageSize, sortColumn, sortOrder, keyword],
+    [page, pageSize, sortColumn, sortOrder, keyword, filterValues],
   );
 
   const { data, isFetching, refetch } = useQuery(getShowList(params));
@@ -58,6 +74,35 @@ export default function ShowList() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 필터 옵션 목록
+  useEffect(() => {
+    // 최초 전체 리스트 기준으로 한 번만 계산
+    const hasNoFilter = Object.values(filterValues).every((arr) => !arr?.length);
+    const hasOptions = Object.keys(initialFilterOptions).length > 0;
+
+    if (hasNoFilter && showList.length > 0 && !hasOptions) {
+      setInitialFilterOptions(
+        deriveFilterOptions<Show.List>(showList, [
+          {
+            key: 'status',
+            getValue: (s) => s.status,
+            getLabel: (v) => SHOW_STATUS_LABELS[v as ShowStatus],
+          },
+          {
+            key: 'saleStatus',
+            getValue: (s) => s.saleStatus,
+            getLabel: (v) => SALE_STATUS_LABELS[v as SaleStatus],
+          },
+          {
+            key: 'genre',
+            getValue: (s) => s.genre,
+            getLabel: (v) => GENRE_LABELS[v as Genre],
+          },
+        ]),
+      );
+    }
+  }, [showList, filterValues, initialFilterOptions]);
 
   // 컬럼 정의
   const columns: AdminTableColumn<Show.List>[] = [
@@ -80,16 +125,22 @@ export default function ShowList() {
       key: 'status',
       label: '상태',
       render: (show) => <StatusBadge type="show" status={show.status} />,
+      filter: true,
+      filterOptions: initialFilterOptions.status,
     },
     {
       key: 'saleStatus',
       label: '판매허용',
       render: (show) => <StatusBadge type="sale" status={show.saleStatus} />,
+      filter: true,
+      filterOptions: initialFilterOptions.saleStatus,
     },
     {
       key: 'genre',
       label: '장르',
-      render: (show) => GENRE_LABELS[show.genre as Genre],
+      render: (show) => GENRE_LABELS[show.genre],
+      filter: true,
+      filterOptions: initialFilterOptions.genre,
     },
     {
       key: 'schedule',
@@ -203,6 +254,12 @@ export default function ShowList() {
     setSortOrder(changedOrder);
   };
 
+  // 필터 핸들러
+  function handleFilter(columnKey: string, selectedValues: string[]) {
+    setFilterValues((prev) => ({ ...prev, [columnKey]: selectedValues }));
+    setPage(0);
+  }
+
   // 페이지 사이즈 변경 핸들러
   function handlePageSizeChange(size: number) {
     setPageSize(size);
@@ -223,6 +280,8 @@ export default function ShowList() {
             data={showList}
             columns={columns}
             onSearch={handleSearch}
+            filterValues={filterValues}
+            onFilter={handleFilter}
             page={page}
             defaultSortColumn={sortColumn}
             defaultSortOrder={sortOrder}
