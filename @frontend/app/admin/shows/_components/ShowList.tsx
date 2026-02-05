@@ -33,7 +33,6 @@ export default function ShowList() {
 
   // 검색
   const [keyword, setKeyword] = useState('');
-  const [searchColumn, setSearchColumn] = useState('all');
 
   // query params
   const params: Show.ListParams = useMemo(
@@ -80,27 +79,23 @@ export default function ShowList() {
     {
       key: 'status',
       label: '상태',
-      sorter: true,
       render: (show) => <StatusBadge type="show" status={show.status} />,
     },
     {
       key: 'saleStatus',
       label: '판매허용',
-      sorter: true,
       render: (show) => <StatusBadge type="sale" status={show.saleStatus} />,
     },
     {
       key: 'genre',
       label: '장르',
-      sorter: true,
       render: (show) => GENRE_LABELS[show.genre as Genre],
     },
     {
-      key: 'schedules',
+      key: 'schedule',
       label: '일정',
       sorter: true,
       render: (show) => renderSchedules(show),
-      search: true,
     },
     {
       key: 'salePeriod',
@@ -196,15 +191,12 @@ export default function ShowList() {
     }
   }
 
-  // FIXME: 대소문자 구분 없이 검색 필요, '일정' 검색 방법
   // 검색 핸들러 (ListParams 수정시 useQuery 자동 재요청)
-  function handleSearch(searchKeyword: string, column: string) {
+  function handleSearch(searchKeyword: string) {
     setKeyword(searchKeyword);
-    setSearchColumn(column);
     setPage(0);
   }
 
-  // FIXME: '일정' '예매일정' 정렬 기준, 데이터랑 라벨 데이터 정렬 방법
   // 정렬 핸들러
   const handleSortChange = (changedColumn?: string, changedOrder?: 'asc' | 'desc') => {
     setSortColumn(changedColumn);

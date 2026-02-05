@@ -34,7 +34,7 @@ export default function UserList() {
       size: pageSize,
       ...(sortColumn && sortOrder && { sort: `${sortColumn},${sortOrder}` }),
       ...(keyword.trim() && { keyword: keyword.trim() }),
-      ...(keyword.trim() && searchColumn !== 'all' && { searchColumn }),
+      ...(keyword.trim() && searchColumn !== 'all' && { searchType: searchColumn }),
     }),
     [page, pageSize, sortColumn, sortOrder, keyword, searchColumn],
   );
@@ -54,10 +54,9 @@ export default function UserList() {
   const columns: AdminTableColumn<User.List>[] = [
     {
       key: 'id',
-      label: '아이디',
+      label: '번호',
       render: (user) => user.id || '-',
       sorter: true,
-      search: true,
     },
     {
       key: 'name',
@@ -69,13 +68,11 @@ export default function UserList() {
     {
       key: 'status',
       label: '상태',
-      sorter: true,
       render: (user) => <StatusBadge type="user" status={user.status as UserStatus} />,
     },
     {
       key: 'gender',
       label: '성별',
-      sorter: true,
       render: (user) => <StatusBadge type="gender" status={user.gender as Gender} />,
     },
     {
@@ -95,13 +92,11 @@ export default function UserList() {
       key: 'socialProvider',
       label: '소셜 연동',
       render: (user) => user.socialProvider || '-',
-      sorter: true,
     },
     {
       key: 'isVerified',
       label: '인증 여부',
       render: (user) => (user.isVerified ? VERIFY_LABELS.VERIFY : VERIFY_LABELS.NO_VERIFY),
-      sorter: true,
     },
     {
       key: 'createdAt',
