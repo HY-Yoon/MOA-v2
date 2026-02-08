@@ -7,6 +7,8 @@ export * from './input';
 export * from './label';
 export * from './card';
 export * from './select';
+export * from './alert';
+export * from './alert-dialog';
 export * from './avatar';
 export * from './breadcrumb';
 export * from './dropdown-menu';
