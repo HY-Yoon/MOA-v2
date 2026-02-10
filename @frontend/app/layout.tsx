@@ -1,6 +1,7 @@
 import { Inter, Noto_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/lib/client-providers';
+import { AuthProvider } from '@/lib/auth/AuthContext';
 import { AlertProvider } from '@/components/molecules/AlertContext';
 
 const inter = Inter({
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${inter.variable} ${notoSansKr.variable} font-sans`}>
         <Providers>
-          <AlertProvider>{children}</AlertProvider>
+          <AuthProvider>
+            <AlertProvider>{children}</AlertProvider>
+          </AuthProvider>
         </Providers>
       </body>
     </html>

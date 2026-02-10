@@ -1,51 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { Button } from '@/components/atoms';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { getUserInfo, logout } from '@/lib/api/login/auth';
-import { useAlert } from '@/components/molecules/AlertContext';
-import { queryClient } from '@/lib/query-client';
+import { useAuth, useConfirmLogout } from '@/lib/auth/AuthContext';
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-
-  const { data } = useQuery(getUserInfo());
-  const { mutateAsync: onLogout } = useMutation(logout());
-
-  const { confirm } = useAlert();
-
-  useEffect(() => {
-    if (!data) return;
-
-    // console.log('userInfo', data);
-    setIsLoggedIn(!!data);
-  }, [data]);
-
-  async function handleLogout() {
-    const result = await confirm({
-      title: '로그아웃',
-      description: '로그아웃 하시겠습니까?',
-    });
-
-    if (result) {
-      await onLogout();
-      // 회원정보 캐시 제거
-      queryClient.removeQueries({ queryKey: ['auth', 'user'] });
-      setIsLoggedIn(false);
-    }
-  }
+  const { isLoggedIn, isLoading, user } = useAuth();
+  const handleLogout = useConfirmLogout();
 
   return (
     <div className="bg-muted/30 flex min-h-screen flex-col items-center justify-center px-4 py-12">
       <h1 className="text-foreground text-2xl font-semibold">임시 메인화면</h1>
-      {isLoggedIn === true && <p className="text-muted-foreground mt-2 text-sm">현재 로그인중</p>}
+      {!isLoading && isLoggedIn && (
+        <>
+          <p className="text-muted-foreground mt-2 text-sm">현재 로그인 중</p>
+          <p className="text-muted-foreground mt-2 text-sm">이름: {user?.name}</p>
+          <p className="text-muted-foreground text-sm">이메일: {user?.email}</p>
+          <p className="text-muted-foreground text-sm">소셜: {user?.provider}</p>
+          <p className="text-muted-foreground text-sm">권한: {user?.role}</p>
+        </>
+      )}
       <div className="mt-8 flex gap-3">
-        {isLoggedIn ? (
-          <Button size="lg" asChild onClick={handleLogout}>
-            <Link href="#">로그아웃</Link>
+        {!isLoading && isLoggedIn ? (
+          <Button size="lg" onClick={handleLogout}>
+            로그아웃
           </Button>
         ) : (
           <Button variant="outline" size="lg" asChild>

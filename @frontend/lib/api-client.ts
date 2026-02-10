@@ -20,18 +20,33 @@ export const axiosInstance: AxiosInstance = axios.create({
 // axios interceptor
 let globalRouter: any = null;
 let globalAlert: ((options: AlertOptions) => void) | null = null;
+let globalOnUnauthorized: (() => void) | null = null;
+
 export const setGlobalRouter = (router: any) => (globalRouter = router);
 export const setGlobalAlertHandler = (handler: (options: AlertOptions) => void) =>
   (globalAlert = handler);
+export const setGlobalOnUnauthorized = (handler: (() => void) | null) =>
+  (globalOnUnauthorized = handler);
 
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     console.error('API Error:', error.response?.data || error.message);
 
+    if (error.response?.status === 401) {
+      // 로그인 검증인 경우 401 리다이렉트 제외 (/api/auth/verify)
+      const isVerifyRequest =
+        error.config?.method?.toLowerCase() === 'get' &&
+        (error.config?.url?.includes('auth/verify') ?? false);
+      if (!isVerifyRequest) {
+        globalOnUnauthorized?.();
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 404) {
       const message = error.response?.data?.message || '요청한 데이터를 찾을 수 없습니다';
-      const confirmed = await globalAlert?.({ title: '404 Error', description: message });
+      const confirmed = globalAlert?.({ title: '404 Error', description: message });
       if (confirmed) globalRouter?.back();
     }
 
