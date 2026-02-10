@@ -26,37 +26,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setGlobalRouter(router);
   }, [alert, router]);
 
-  useEffect(() => {
-    if (isLoading) return;
-
-    if (!isLoggedIn) {
-      router.replace(LOGIN_PATH);
-      return;
-    }
-
-    if (isLoggedIn && !isAdmin(user?.role)) {
-      if (!alertShown.current) {
-        alertShown.current = true;
-        alert({
-          title: '접근 불가',
-          description: '권한이 없습니다. 관리자만 접근 가능합니다.',
-        }).then(() => router.replace('/'));
-      }
-    }
-  }, [isLoggedIn, isLoading, router, user?.role, alert]);
-
-  const allowedAdmin = !isLoading && isLoggedIn && isAdmin(user?.role);
-
-  if (!allowedAdmin) {
-    return (
-      <div className="bg-muted/30 flex min-h-screen w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-          <span className="text-muted-foreground text-sm">로딩 중...</span>
-        </div>
-      </div>
-    );
-  }
+  // TODO: 관리자 권한 체크 예정
+  // useEffect(() => {
+  //   if (isLoading) return;
+  //
+  //   if (!isLoggedIn) {
+  //     router.replace(LOGIN_PATH);
+  //     return;
+  //   }
+  //
+  //   if (isLoggedIn && !isAdmin(user?.role)) {
+  //     if (!alertShown.current) {
+  //       alertShown.current = true;
+  //       alert({
+  //         title: '접근 불가',
+  //         description: '권한이 없습니다. 관리자만 접근 가능합니다.',
+  //       }).then(() => router.replace('/'));
+  //     }
+  //   }
+  // }, [isLoggedIn, isLoading, router, user?.role, alert]);
+  //
+  // const allowedAdmin = !isLoading && isLoggedIn && isAdmin(user?.role);
+  //
+  // if (!allowedAdmin) {
+  //   return (
+  //     <div className="bg-muted/30 flex min-h-screen w-full items-center justify-center">
+  //       <div className="flex flex-col items-center gap-3">
+  //         <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+  //         <span className="text-muted-foreground text-sm">로딩 중...</span>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <SidebarProvider style={{ '--sidebar-width': '12rem' } as React.CSSProperties}>
