@@ -1,0 +1,89 @@
+'use client';
+
+import React, { createContext, useCallback, useContext, useEffect } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { getAuthUser, logout as logoutApi } from '@/lib/api/auth/auth';
+import { queryClient } from '@/lib/query-client';
+import { setGlobalOnUnauthorized, setGlobalRouter } from '@/lib/api-client';
+import { useAlert } from '@/components/molecules/AlertContext';
+import { UserRole } from '@shared/enums';
+
+export interface User {
+  name: string;
+  email: string;
+  picture?: string;
+  provider: string;
+  providerId: string;
+  role: UserRole;
+}
+
+interface AuthContextType {
+  user?: User;
+  isLoggedIn: boolean;
+  isLoading: boolean;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const LOGIN_PATH = '/login' as const;
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  const { data: user, isLoading } = useQuery(getAuthUser());
+  const { mutateAsync: logoutMutation } = useMutation(logoutApi());
+
+  const clearSessionAndRedirect = useCallback(() => {
+    queryClient.removeQueries({ queryKey: ['auth'] });
+    router.replace(LOGIN_PATH);
+  }, [router]);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutMutation();
+    } finally {
+      clearSessionAndRedirect();
+    }
+  }, [logoutMutation, clearSessionAndRedirect]);
+
+  useEffect(() => {
+    setGlobalRouter(router);
+    setGlobalOnUnauthorized(clearSessionAndRedirect);
+    return () => {
+      setGlobalOnUnauthorized(null);
+    };
+  }, [router, clearSessionAndRedirect]);
+
+  const value: AuthContextType = {
+    user,
+    isLoggedIn: !!user,
+    isLoading,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+/** 로그아웃 핸들러 훅 */
+export function useConfirmLogout() {
+  const { logout } = useAuth();
+  const { confirm } = useAlert();
+
+  return useCallback(async () => {
+    const result = await confirm({
+      title: '로그아웃',
+      description: '로그아웃 하시겠습니까?',
+    });
+    if (result) await logout();
+  }, [logout, confirm]);
+}

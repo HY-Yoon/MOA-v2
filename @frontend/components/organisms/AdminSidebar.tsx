@@ -24,6 +24,7 @@ import {
 import { Armchair, LayoutDashboard, Theater, Users } from 'lucide-react';
 import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { useEffect, useState } from 'react';
+import { useAuth, useConfirmLogout } from '@/lib/auth/AuthContext';
 
 const ADMIN_ROUTE_ITEMS = [
   {
@@ -48,19 +49,13 @@ const ADMIN_ROUTE_ITEMS = [
   },
 ];
 
-// 🔥 임시 관리자 정보 (나중에 auth로 교체)
-const adminUser = {
-  name: '관리자',
-  email: 'admin@moa.com',
-  image: '/avatar.png', // 없으면 fallback 사용됨
-};
-
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const handleLogout = useConfirmLogout();
 
   // Next.js 하이드레이션 콘솔 에러로 mounted 상태 체크 추가
   const [mounted, setMounted] = useState(false);
-
   useEffect(() => setMounted(true), []);
 
   return (
@@ -94,26 +89,23 @@ export function AdminSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* 🔽 Sidebar Footer */}
       <SidebarFooter>
         {mounted && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="hover:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={adminUser.image} />
-                  <AvatarFallback>{adminUser.name.slice(0, 1)}</AvatarFallback>
+                  <AvatarImage src={user?.picture} />
+                  <AvatarFallback>{(user?.name || '관리자').slice(0, 1)}</AvatarFallback>
                 </Avatar>
-
                 <div className="flex flex-col text-left leading-tight">
-                  <span className="font-medium">{adminUser.name}</span>
-                  <span className="text-muted-foreground text-xs">{adminUser.email}</span>
+                  <span className="font-medium">{user?.name || '관리자'}</span>
+                  <span className="text-muted-foreground text-xs">{user?.email || '-'}</span>
                 </div>
               </button>
             </DropdownMenuTrigger>
-
             <DropdownMenuContent side="top" align="start">
-              <DropdownMenuItem>로그아웃</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>로그아웃</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
