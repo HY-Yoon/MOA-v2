@@ -3,6 +3,7 @@
 // 일부 비즈니스 로직을 포함할 수 있음 (레이아웃, 폼 등)
 // 여러 곳에서 재사용되는 컴포넌트들만 포함
 
+export * from './Header';
 export * from './AdminSidebar';
 export * from './AdminBreadcrumb';
 export * from './AdminTable';
