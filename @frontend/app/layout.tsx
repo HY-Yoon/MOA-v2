@@ -3,6 +3,7 @@ import './globals.css';
 import { Providers } from '@/lib/client-providers';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { AlertProvider } from '@/components/molecules/AlertContext';
+import { Header } from '@/components/organisms/Header';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -28,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} ${notoSansKr.variable} font-sans`}>
         <Providers>
           <AuthProvider>
-            <AlertProvider>{children}</AlertProvider>
+            <AlertProvider>
+              <Header />
+              <main>{children}</main>
+            </AlertProvider>
           </AuthProvider>
         </Providers>
       </body>
