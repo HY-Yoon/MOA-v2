@@ -19,8 +19,8 @@ const NAV_ITEMS = [
     href: USER_ROUTES.SHOW,
   },
   {
-    label: USER_ROUTES_LABELS[USER_ROUTES.COMUNITY],
-    href: USER_ROUTES.COMUNITY,
+    label: USER_ROUTES_LABELS[USER_ROUTES.COMMUNITY],
+    href: USER_ROUTES.COMMUNITY,
   },
 ];
 
@@ -97,7 +97,9 @@ export function Header() {
             {/* 로그인 여부에 따른 헤더 유틸 메뉴 */}
             <div className="flex items-center gap-2 text-sm">
               {isLoggedIn && (
-                <span className="text-foreground text-xs font-medium">{user?.name}님</span>
+                <span className="bg-muted/60 rounded-md px-2.5 py-1 text-xs font-semibold text-foreground">
+                  {user?.name}님
+                </span>
               )}
 
               {(isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
@@ -107,7 +109,7 @@ export function Header() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-auto px-2 py-1 text-xs"
+                        className="text-muted-foreground hover:text-foreground h-auto px-2 py-1 text-xs font-normal"
                         onClick={handleLogout}
                       >
                         {item.label}
@@ -117,7 +119,7 @@ export function Header() {
                         asChild
                         variant="ghost"
                         size="sm"
-                        className="h-auto px-2 py-1 text-xs"
+                        className="text-muted-foreground hover:text-foreground h-auto px-2 py-1 text-xs font-normal"
                       >
                         <Link href={item.href}>{item.label}</Link>
                       </Button>
