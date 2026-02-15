@@ -13,6 +13,7 @@ export interface User {
   name: string;
   email: string;
   picture?: string;
+  phone?: string;
   provider: string;
   providerId: string;
   role: UserRole;
@@ -32,7 +33,17 @@ export const LOGIN_PATH = '/login' as const;
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  const { data: user, isLoading } = useQuery(getAuthUser());
+  // FIXME: 로그인 api 수정
+  // const { data: user, isLoading } = useQuery(getAuthUser());
+  const user = {
+    name: '김모아',
+    email: 'moa@moa.com',
+    phone: '010-1234-5678',
+    provider: 'KAKAO',
+    providerId: 'test',
+    role: 'USER' as UserRole,
+  };
+
   const { mutateAsync: logoutMutation } = useMutation(logoutApi());
 
   const clearSessionAndRedirect = useCallback(() => {
@@ -59,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     isLoggedIn: !!user,
-    isLoading,
+    isLoading: false,
     logout,
   };
 

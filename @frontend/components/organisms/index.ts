@@ -4,6 +4,7 @@
 // 여러 곳에서 재사용되는 컴포넌트들만 포함
 
 export * from './Header';
+export * from './MyPageSideBar';
 export * from './AdminSidebar';
 export * from './AdminBreadcrumb';
 export * from './AdminTable';
