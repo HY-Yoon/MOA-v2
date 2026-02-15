@@ -70,8 +70,6 @@ export function AdminSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
-
           <SidebarGroupContent>
             <SidebarMenu>
               {ADMIN_ROUTE_ITEMS.map((item) => (

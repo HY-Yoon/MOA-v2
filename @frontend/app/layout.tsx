@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Sansation:wght@700&display=swap"
           rel="stylesheet"
         />
+        <title>MOA Place</title>
       </head>
       <body className={`${inter.variable} ${notoSansKr.variable} font-sans`}>
         <Providers>
