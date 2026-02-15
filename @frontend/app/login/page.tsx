@@ -87,8 +87,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     rawMessage == null ? null : Array.isArray(rawMessage) ? rawMessage[0] : rawMessage;
 
   return (
-    <div className="bg-muted/30 flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="flex w-full max-w-md flex-col items-stretch gap-4">
+    <div className="bg-muted/30 flex h-[calc(100vh-3.75rem)] flex-col items-center justify-center px-4 py-12">
+      <div className="flex w-full max-w-md -translate-y-[1.875rem] flex-col items-stretch gap-4">
         {errorMessage && (
           <Alert variant="destructive">
             <AlertCircleIcon />
