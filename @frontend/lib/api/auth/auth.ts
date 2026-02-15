@@ -33,3 +33,9 @@ export const logout = () => ({
   mutationFn: async () =>
     await axiosInstance.post(`${BASE_URL}/logout`, undefined, { withCredentials: true }),
 });
+
+// 회원탈퇴
+export const deleteUser = () => ({
+  mutationKey: ['auth', 'user', 'delete'],
+  mutationFn: async () => await axiosInstance.delete('/api/v1/users/me', { withCredentials: true }),
+});
