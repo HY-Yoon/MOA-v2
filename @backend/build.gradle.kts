@@ -27,14 +27,14 @@ repositories {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-//    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     
     // V2: Redisson (분산 락)
-//    implementation("org.redisson:redisson-spring-boot-starter:3.24.3")
+    implementation("org.redisson:redisson-spring-boot-starter:3.24.3")
 //
     // V2: ShedLock (다중 서버 스케줄러 중복 방지)
-//    implementation("net.javacrumbs.shedlock:shedlock-spring:5.9.1")
-//    implementation("net.javacrumbs.shedlock:shedlock-provider-redis-spring:5.9.1")
+    implementation("net.javacrumbs.shedlock:shedlock-spring:5.9.1")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-redis-spring:5.9.1")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-validation")
