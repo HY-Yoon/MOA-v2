@@ -9,12 +9,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: Redis 기반 대기열 서비스
  * - Redis Sorted Set(ZSet)으로 대기열 관리
  * - 순서 보장, 빠른 순위 조회, 메모리 기반 처리
  */
 @Slf4j
+@Profile("v2")
 @Service
 @RequiredArgsConstructor
 public class QueueServiceV2 {

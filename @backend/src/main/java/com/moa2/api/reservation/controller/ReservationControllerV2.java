@@ -17,12 +17,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: Redis 기반 예매 컨트롤러
  * - 토큰 기반 입장 제어
  * - Redisson 분산 락으로 동시성 제어
  */
 @Slf4j
+@Profile("v2")
 @Tag(name = "예매 API V2", description = "Redis 기반 공연 예매 API (V2)")
 @RestController
 @RequestMapping("/api/v2/reservations")

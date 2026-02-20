@@ -11,12 +11,15 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: 대기열 처리 스케줄러
  * - 주기적으로 대기열에서 상위 N명을 꺼내 토큰 발급
  * - ShedLock으로 다중 서버 환경에서 중복 실행 방지
  */
 @Slf4j
+@Profile("v2")
 @Component
 @RequiredArgsConstructor
 public class QueueProcessorScheduler {

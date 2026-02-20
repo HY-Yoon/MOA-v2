@@ -17,12 +17,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: Redis 기반 대기열 컨트롤러
  * - V1의 DB 기반 대기열을 대체
  * - Redis Sorted Set으로 빠른 순위 조회
  */
 @Slf4j
+@Profile("v2")
 @Tag(name = "대기열 API V2", description = "Redis 기반 공연 예매 대기열 관리 API (V2)")
 @RestController
 @RequestMapping("/api/v2/queue")

@@ -11,12 +11,15 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: 입장 토큰 관리 서비스
  * - 대기열 → 예매 진행 시 필요한 토큰 발급/검증
  * - Queue와 Reservation 모두에서 사용 (공통 인프라)
  */
 @Slf4j
+@Profile("v2")
 @Service
 @RequiredArgsConstructor
 public class TokenService {

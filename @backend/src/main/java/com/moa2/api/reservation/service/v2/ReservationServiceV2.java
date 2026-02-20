@@ -28,12 +28,15 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: Redisson 분산 락 기반 예매 서비스
  * - 좌석 선점 + 예약 생성을 한 트랜잭션에서 처리
  * - Redis 분산 락으로 동시성 제어
  */
 @Slf4j
+@Profile("v2")
 @Service
 @RequiredArgsConstructor
 public class ReservationServiceV2 {

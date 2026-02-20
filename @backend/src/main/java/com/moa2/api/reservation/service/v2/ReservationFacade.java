@@ -8,12 +8,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: 예매 통합 관리 Facade
  * - 토큰 검증 → 좌석 선점 → 예약 생성 → 토큰 소진
  * - 각 서비스 간 복잡한 흐름을 조율
  */
 @Slf4j
+@Profile("v2")
 @Component
 @RequiredArgsConstructor
 public class ReservationFacade {
