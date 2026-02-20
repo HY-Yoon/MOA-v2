@@ -7,11 +7,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: Redisson 분산 락 설정
  * - 좌석 선점 시 분산 환경에서 동시성 제어
  */
 @Configuration
+@Profile("v2")
 public class RedissonConfig {
 
     @Value("${spring.data.redis.host:localhost}")
