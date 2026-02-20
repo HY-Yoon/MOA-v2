@@ -189,6 +189,7 @@ public class AuthController implements AuthControllerDocs {
     // API Methods
     // -------------------------------------------------------------------------
 
+    @Override
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request, HttpServletResponse response) {
         try {
@@ -236,7 +237,24 @@ public class AuthController implements AuthControllerDocs {
                     .build();
             response.addHeader("Set-Cookie", refreshTokenCookie.toString());
 
-            log.info("쿠키 삭제 완료");
+            // JSESSIONID 쿠키 삭제 추가 (OAuth2 세션 잔류 방지)
+            ResponseCookie jsessionidCookie = ResponseCookie.from("JSESSIONID", "")
+                    .path("/")
+                    .httpOnly(true)
+                    .secure(cookieSecure)
+                    .sameSite(cookieSameSite)
+                    .maxAge(0)
+                    .build();
+            response.addHeader("Set-Cookie", jsessionidCookie.toString());
+
+            // 세션 무효화 및 SecurityContext 초기화
+            jakarta.servlet.http.HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.invalidate();
+            }
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+            log.info("쿠키 및 세션 삭제 완료");
 
         } catch (Exception e) {
             log.error("로그아웃 중 오류 발생: {}", e.getMessage(), e);
@@ -249,17 +267,6 @@ public class AuthController implements AuthControllerDocs {
     // -------------------------------------------------------------------------
     // Helper Methods
     // -------------------------------------------------------------------------
-
-    private String getAccessTokenFromCookie(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                if ("accessToken".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
-    }
 
     private String getRefreshTokenFromCookie(HttpServletRequest request) {
         if (request.getCookies() != null) {
