@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import org.springframework.context.annotation.Profile;
+
 /**
  * V2: ShedLock 설정
  * - 다중 서버 환경에서 스케줄러 중복 실행 방지
@@ -15,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @Configuration
 @EnableScheduling
+@Profile("v2")
 @EnableSchedulerLock(defaultLockAtMostFor = "5s")
 public class ShedLockConfig {
 
