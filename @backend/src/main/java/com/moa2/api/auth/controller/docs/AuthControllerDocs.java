@@ -15,18 +15,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Tag(name = "인증 API", description = "로그인, 토큰 검증, 재발급 등 인증 관련 API")
 public interface AuthControllerDocs {
 
-    @Operation(summary = "현재 로그인한 사용자 정보 조회", description = """
-            현재 로그인한 사용자의 정보를 조회합니다.
-            JWT 인증 (Cookie) 또는 OAuth2 세션 인증을 지원합니다.
-
-            **반환 정보:**
-            - 이름, 이메일, 프로필 사진, 소셜 제공자 정보 등
-
-            **권한:** 인증된 사용자만 가능
-            """)
-    ResponseEntity<ApiResponse<AuthDto.UserInfoResponse>> getCurrentUser(
-            @Parameter(hidden = true) @AuthenticationPrincipal OAuth2User oAuth2User,
-            HttpServletRequest request);
+//    @Operation(summary = "현재 로그인한 사용자 정보 조회", description = """
+//            현재 로그인한 사용자의 정보를 조회합니다.
+//            JWT 인증 (Cookie) 또는 OAuth2 세션 인증을 지원합니다.
+//
+//            **반환 정보:**
+//            - 이름, 이메일, 프로필 사진, 소셜 제공자 정보 등
+//
+//            **권한:** 인증된 사용자만 가능
+//            """)
+//    ResponseEntity<ApiResponse<AuthDto.UserInfoResponse>> getCurrentUser(
+//            @Parameter(hidden = true) @AuthenticationPrincipal OAuth2User oAuth2User,
+//            HttpServletRequest request);
 
     @Operation(summary = "JWT 토큰 검증", description = """
             Access Token의 유효성을 검증하고 사용자 정보를 반환합니다.
