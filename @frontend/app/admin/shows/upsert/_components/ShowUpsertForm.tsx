@@ -26,6 +26,7 @@ import { FieldErrors, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { PageCard } from '@/components/molecules/PageCard';
 import StatusBadge from '@/components/molecules/StatusBadge';
+import { getSeatMapList } from '@/lib/api/admin/seat';
 
 interface Props {
   id?: string;
@@ -128,21 +129,12 @@ export default function ShowUpsertForm(props: Props) {
 
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery(getShow(showId));
+
   const { mutateAsync: onCreateShow, isPending: createPending } = useMutation(createShow());
   const { mutateAsync: onUpdateShow, isPending: updatePending } = useMutation(updateShow(showId));
 
   const loading = isLoading || createPending || updatePending;
 
-  // TODO: api 적용 예정
-  const [venueOptions, setVenueOptions] = useState([
-    { label: '예술의 전당', value: 'aa' },
-    { label: '오페라 하우스', value: 'bb' },
-  ]);
-  // TODO: api 적용 예정
-  const [hallOptions, setHallOptions] = useState([
-    { label: '큰홀', value: 'big' },
-    { label: '작은홀', value: 'small' },
-  ]);
   const [mounted, setMounted] = useState(false);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [detailFiles, setDetailFiles] = useState<File[]>([]);
@@ -192,6 +184,64 @@ export default function ShowUpsertForm(props: Props) {
     control,
     name: SHOW_FORM_FIELDS.SCHEDULES,
   });
+
+  const watchedRegion = useWatch({ control, name: SHOW_FORM_FIELDS.REGION });
+  const watchedVenueName = useWatch({ control, name: SHOW_FORM_FIELDS.VENUE_NAME });
+  const watchedHallName = useWatch({ control, name: SHOW_FORM_FIELDS.HALL_NAME });
+
+  // 좌석 목록 api
+  const seatMapParams = useMemo(
+    () => ({ region: watchedRegion ?? '', page: 0, size: 100 }),
+    [watchedRegion],
+  );
+  const { data: seatMapListResponse, isFetched: isSeatMapFetched } = useQuery({
+    ...getSeatMapList(seatMapParams),
+    enabled: !!watchedRegion,
+  });
+  const seatMapList = seatMapListResponse?.content ?? [];
+
+  // 장소 목록
+  const venueOptions = useMemo(() => {
+    const names = [...new Set(seatMapList.map((item) => item.venueName).filter(Boolean))];
+    return names.map((name) => ({ label: name, value: name }));
+  }, [seatMapList]);
+
+  // 공연장 목록
+  const hallOptions = useMemo(() => {
+    if (!watchedRegion || !watchedVenueName) return [];
+    const filtered = seatMapList.filter(
+      (item) => item.region === watchedRegion && item.venueName === watchedVenueName,
+    );
+    const names = [...new Set(filtered.map((item) => item.hallName).filter(Boolean))];
+    return names.map((name) => ({ label: name, value: name }));
+  }, [seatMapList, watchedRegion, watchedVenueName]);
+
+  // 장소 placeholder
+  const venuePlaceholder = useMemo(() => {
+    if (!watchedRegion) return '지역을 먼저 선택하세요.';
+    return '장소를 선택하세요.';
+  }, [watchedRegion]);
+
+  // 공연장 placeholder
+  const hallPlaceholder = useMemo(() => {
+    if (!watchedVenueName) return '장소를 먼저 선택하세요.';
+    return '공연장을 선택하세요.';
+  }, [watchedVenueName]);
+
+  // 지역 또는 장소 선택 변경시 초기화
+  useEffect(() => {
+    const venueValues = venueOptions.map((o) => o.value);
+    if (watchedVenueName && venueValues.length > 0 && !venueValues.includes(watchedVenueName)) {
+      setValue(SHOW_FORM_FIELDS.VENUE_NAME, '');
+      setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
+    }
+  }, [venueOptions, watchedVenueName, setValue]);
+  useEffect(() => {
+    const hallValues = hallOptions.map((o) => o.value);
+    if (watchedHallName && hallValues.length > 0 && !hallValues.includes(watchedHallName)) {
+      setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
+    }
+  }, [hallOptions, watchedHallName, setValue]);
 
   // 리액트 하이드레이션 무한 루프 방지용 마운트 플래그
   useEffect(() => {
@@ -248,7 +298,7 @@ export default function ShowUpsertForm(props: Props) {
     if (!data) return true;
 
     return data.status !== 'WAITING';
-  }, [isUpdate, data?.status]);
+  }, [isUpdate, data]);
 
   // 일정 및 예매 시작일 변경 감지
   const [schedules, startDate] = useWatch({
@@ -550,10 +600,10 @@ export default function ShowUpsertForm(props: Props) {
                 control={control}
                 errors={errors}
                 options={venueOptions}
-                placeholder="장소를 선택하세요."
+                placeholder={venuePlaceholder}
                 required={true}
                 className="xl:col-span-1"
-                disabled={isDisabledEdit}
+                disabled={isDisabledEdit || !watchedRegion}
               />
 
               {/* 5. 공연장 */}
@@ -565,10 +615,10 @@ export default function ShowUpsertForm(props: Props) {
                 control={control}
                 errors={errors}
                 options={hallOptions}
-                placeholder="공연장을 선택하세요."
+                placeholder={hallPlaceholder}
                 required={true}
                 className="xl:col-span-1"
-                disabled={isDisabledEdit}
+                disabled={isDisabledEdit || !watchedRegion || !watchedVenueName}
               />
 
               {/* 6. 관람시간 */}
