@@ -215,7 +215,6 @@ export default function ShowList() {
       confirmText: '설정',
     });
     if (confirmed) {
-      // FIXME: api 415 에러 확인 필요
       await onChangeSaleStatus({ id: show.id, saleStatus: requestStatus });
       refetch();
     }

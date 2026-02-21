@@ -7,7 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAlert } from '@/components/molecules/AlertContext';
 import { setGlobalAlertHandler, setGlobalRouter } from '@/lib/api-client';
-import { LOGIN_PATH, useAuth } from '@/lib/auth/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@shared/enums';
 
@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   //   if (isLoading) return;
   //
   //   if (!isLoggedIn) {
-  //     router.replace(LOGIN_PATH);
+  //     router.replace(HEADER_ROUTES.LOGIN);
   //     return;
   //   }
   //
