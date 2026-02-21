@@ -22,6 +22,7 @@ type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
 export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasCenteredInitialViewRef = useRef(false);
   
   const [canvasSize] = useState({
     width: DEFAULT_CANVAS_CONFIG.WIDTH,
@@ -53,6 +54,27 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
 
   // Animation frame
   const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
+  }, [canvasSize.width, canvasSize.height]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || hasCenteredInitialViewRef.current) return;
+
+    const frameId = requestAnimationFrame(() => {
+      container.scrollLeft = Math.max(0, (container.scrollWidth - container.clientWidth) / 2);
+      container.scrollTop = Math.max(0, (container.scrollHeight - container.clientHeight) / 2);
+      hasCenteredInitialViewRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [canvasSize.width, canvasSize.height, zoom]);
 
   // ============================================
   // 렌더링용 좌석 계산
@@ -152,6 +174,10 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
         target?.tagName === 'SELECT' ||
         target?.isContentEditable;
       const hasModifierKey = e.metaKey || e.ctrlKey || e.altKey;
+      const activeElement = document.activeElement as HTMLElement | null;
+      const isCanvasFocused =
+        !!containerRef.current &&
+        (activeElement === containerRef.current || containerRef.current.contains(activeElement));
 
       // 입력 필드 포커스 중에는 에디터 단축키를 무시
       if (isEditableTarget) return;
@@ -188,25 +214,18 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
         e.preventDefault();
         setMode(EDITOR_MODES.SELECT);
       }
-      
 
-      // +: Zoom In
-      if (!hasModifierKey && (e.key === '+' || e.key === '=')) {
+      // 캔버스 포커스 상태에서만 줌 단축키 동작
+      if (isCanvasFocused && !hasModifierKey && (e.key === '+' || e.key === '=')) {
         e.preventDefault();
-        setZoom((z) => Math.min(2, z + 0.1));
+        setZoom((prev) => Math.min(2, Number((prev + 0.1).toFixed(2))));
+      }
+      if (isCanvasFocused && !hasModifierKey && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        setZoom((prev) => Math.max(0.5, Number((prev - 0.1).toFixed(2))));
       }
 
-      // -: Zoom Out
-      if (!hasModifierKey && (e.key === '-' || e.key === '_')) {
-        e.preventDefault();
-        setZoom((z) => Math.max(0.5, z - 0.1));
-      }
 
-      // 0: Zoom Reset
-      if (!hasModifierKey && e.key === '0') {
-        e.preventDefault();
-        setZoom(1);
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -576,6 +595,8 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
   // ============================================
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      containerRef.current?.focus();
+
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
 
@@ -895,14 +916,16 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
   }, [inputMode, selectedId, dragStart, dragOffset, mode, resizeHandle, seatGroups, objects, seatRadius]);
 
   return (
-    <div className="flex gap-4">
-      {/* 좌측: 구역 관리 */}
-      <div className="w-80">
+    <div className="space-y-4">
+      {/* 상단: 구역 관리 (항상 상단 고정) */}
+      <div>
         <SectionManager sections={sections} onSectionsChange={setSections} />
       </div>
 
-      {/* 메인 에디터 */}
-      <div className="flex flex-1 flex-col gap-4">
+      {/* 하단: 메인 에디터 + 우측 속성 패널 */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        {/* 메인 에디터 */}
+        <div className="flex flex-col gap-4">
         {/* 도구 모음 */}
         <div className="flex items-center gap-2 rounded-lg border bg-white p-4">
           <Button
@@ -952,24 +975,27 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
-              title="축소 (-)"
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setZoom((prev) => Math.max(0.5, Number((prev - 0.1).toFixed(2))))}
+              title="축소"
             >
               -
             </Button>
-            <span className="min-w-[60px] text-center text-sm">{Math.round(zoom * 100)}%</span>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
-              title="확대 (+)"
+            <span className="text-sm text-slate-500">배율 {Math.round(zoom * 100)}%</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setZoom((prev) => Math.min(2, Number((prev + 0.1).toFixed(2))))}
+              title="확대"
             >
               +
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setZoom(1)} title="배율 리셋">
+              리셋
             </Button>
 
             {selectedId && (
@@ -987,28 +1013,30 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
         </div>
 
         {/* Canvas */}
-        <div ref={containerRef} className="overflow-auto rounded-lg border bg-slate-50">
+        <div
+          ref={containerRef}
+          tabIndex={0}
+          className="min-h-[620px] max-h-[70vh] overflow-auto rounded-lg border bg-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+        >
           <canvas
-            ref={canvasRef}
-            width={canvasSize.width}
-            height={canvasSize.height}
-            style={{ 
-              width: canvasSize.width * zoom, 
-              height: canvasSize.height * zoom,
-              display: 'block',
-            }}
-            onMouseDown={handleCanvasMouseDown}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseUp={handleCanvasMouseUp}
-            onMouseLeave={handleCanvasMouseUp}
-            className={
-              mode === EDITOR_MODES.SELECT 
-                ? 'cursor-move' 
-                : mode === EDITOR_MODES.ADD_SEAT_GROUP || mode === EDITOR_MODES.ADD_CURVED_GROUP
-                ? 'cursor-pointer'
-                : 'cursor-crosshair'
-            }
-          />
+              ref={canvasRef}
+              style={{ 
+                width: canvasSize.width * zoom,
+                height: canvasSize.height * zoom,
+                display: 'block',
+              }}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={handleCanvasMouseUp}
+              className={
+                mode === EDITOR_MODES.SELECT 
+                  ? 'cursor-move border border-slate-300 bg-slate-50 shadow-sm' 
+                  : mode === EDITOR_MODES.ADD_SEAT_GROUP || mode === EDITOR_MODES.ADD_CURVED_GROUP
+                  ? 'cursor-pointer border border-slate-300 bg-slate-50 shadow-sm'
+                  : 'cursor-crosshair border border-slate-300 bg-slate-50 shadow-sm'
+              }
+            />
         </div>
 
         {/* 정보 표시 */}
@@ -1018,16 +1046,17 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
             {selectedId && ` | 선택됨: ${selectedElement && 'type' in selectedElement ? selectedElement.label : '좌석 그룹'}`}
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* 우측 속성 패널 */}
-      <div className="w-80">
-        <SeatPropertiesPanel
-          element={selectedElement}
-          sections={sections}
-          onUpdate={handleUpdateElement}
-          onDelete={handleDelete}
-        />
+        {/* 우측 속성 패널 */}
+        <div className="xl:min-w-[320px]">
+          <SeatPropertiesPanel
+            element={selectedElement}
+            sections={sections}
+            onUpdate={handleUpdateElement}
+            onDelete={handleDelete}
+          />
+        </div>
       </div>
     </div>
   );
