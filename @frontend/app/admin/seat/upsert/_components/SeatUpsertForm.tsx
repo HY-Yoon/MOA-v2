@@ -5,10 +5,12 @@ import { FormInputField, FormSelectField } from '@/components/molecules';
 import { useAlert } from '@/components/molecules/AlertContext';
 import { SEAT_ERROR_MESSAGES, SEAT_FORM_FIELDS } from '@/constants/admin/seat';
 import { REGION_OPTIONS } from '@/constants/common';
+import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { flattenSeatGroupsToSeats } from '@/lib/admin/seat-calculator';
-import { createSeat } from '@/lib/api/admin/seat';
+import { checkDuplicateSeat, createSeat } from '@/lib/api/admin/seat';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -26,6 +28,7 @@ const seatFormSchema = z.object({
 export type SeatFormData = z.infer<typeof seatFormSchema>;
 
 export default function SeatUpsertForm() {
+  const router = useRouter();
   const { confirm, alert } = useAlert();
   const [isValidated, setIsValidated] = useState(false);
   const [editorData, setEditorData] = useState<Seat.EditorLayoutData | null>(null);
@@ -53,6 +56,9 @@ export default function SeatUpsertForm() {
   const createSeatMutation = useMutation({
     mutationFn: createSeat,
   });
+  const checkDuplicateMutation = useMutation({
+    mutationFn: checkDuplicateSeat,
+  });
 
   // 중복 체크
   const handleCheckDuplicate = async () => {
@@ -66,25 +72,41 @@ export default function SeatUpsertForm() {
       return;
     }
 
-    setIsValidated(true);
-    // TODO: API 연동
-    // try {
-    //   const response = await checkDuplicateMutation.mutateAsync({
-    //     region: values.region,
-    //     venueName: values.venueName,
-    //     hallName: values.hallName,
-    //   });
-    //   if (response.success && response.data.isDuplicate) {
-    //     await alert({
-    //       title: '중복 확인',
-    //       description: SEAT_ERROR_MESSAGES.DUPLICATE_HALL,
-    //     });
-    //     return;
-    //   }
-    //   setIsValidated(true);
-    // } catch (error) {
-    //   console.error('중복 체크 에러:', error);
-    // }
+    try {
+      const response = await checkDuplicateMutation.mutateAsync({
+        region: values.region,
+        venueName: values.venueName,
+        hallName: values.hallName,
+      });
+
+      if (!response.success || !response.data) {
+        await alert({
+          title: '중복 확인 실패',
+          description: response.message || '중복 확인 중 오류가 발생했습니다.',
+        });
+        return;
+      }
+
+      if (response.data.isDuplicate) {
+        await alert({
+          title: '중복 확인',
+          description: SEAT_ERROR_MESSAGES.DUPLICATE_HALL,
+        });
+        return;
+      }
+
+      setIsValidated(true);
+      await alert({
+        title: '확인 완료',
+        description: '사용 가능한 홀입니다. 좌석 배치도를 작성해주세요.',
+      });
+    } catch (error) {
+      console.error('중복 체크 에러:', error);
+      await alert({
+        title: '오류',
+        description: '중복 확인 중 오류가 발생했습니다.',
+      });
+    }
   };
 
   // 제출
@@ -105,9 +127,48 @@ export default function SeatUpsertForm() {
       return;
     }
 
+    if (editorData.sections.length === 0) {
+      await alert({
+        title: '구역 설정 필요',
+        description: '최소 1개 이상의 구역을 생성해주세요.',
+      });
+      return;
+    }
+
+    const hasInvalidSection = editorData.sections.some(
+      (section) => !section.id?.trim() || !section.name?.trim() || !section.color?.trim(),
+    );
+    if (hasInvalidSection) {
+      await alert({
+        title: '구역 정보 오류',
+        description: '구역 ID, 이름, 색상을 모두 입력해주세요.',
+      });
+      return;
+    }
+
     // EditorLayoutData → SeatRequest 변환
     const flattened = flattenSeatGroupsToSeats(editorData.seatGroups, editorData.canvas.seatRadius);
     const totalSeats = flattened.length;
+    const hasUnassignedSeat = flattened.some((seat) => !seat.sectionId?.trim());
+    const validSectionIds = new Set(editorData.sections.map((section) => section.id.trim()));
+    const hasUnknownSectionSeat = flattened.some(
+      (seat) => !seat.sectionId || !validSectionIds.has(seat.sectionId.trim()),
+    );
+
+    if (hasUnassignedSeat) {
+      await alert({
+        title: '구역 지정 필요',
+        description: '모든 좌석 그룹에 구역을 지정해주세요.',
+      });
+      return;
+    }
+    if (hasUnknownSectionSeat) {
+      await alert({
+        title: '구역 매핑 오류',
+        description: '존재하지 않는 구역이 좌석에 지정되어 있습니다. 구역을 다시 지정해주세요.',
+      });
+      return;
+    }
 
     const confirmed = await confirm({
       title: '좌석 등록',
@@ -125,7 +186,16 @@ export default function SeatUpsertForm() {
         hallName: formData.hallName,
         layoutData: {
           canvas: editorData.canvas,
-          seats: flattened,
+          sections: editorData.sections.map((section) => ({
+            sectionId: section.id,
+            name: section.name,
+            color: section.color,
+            price: section.price ?? 0,
+          })),
+          seats: flattened.map((seat) => ({
+            ...seat,
+            sectionId: seat.sectionId!,
+          })),
           totalSeats,
         },
       };
@@ -137,13 +207,22 @@ export default function SeatUpsertForm() {
           title: '등록 완료',
           description: '좌석이 성공적으로 등록되었습니다.',
         });
-        // router.push(ADMIN_ROUTES.SEAT);
+        router.push(ADMIN_ROUTES.SEAT);
       }
     } catch (error) {
       console.error('좌석 등록 에러:', error);
+      const timeoutMessage =
+        (error as { code?: string; message?: string })?.code === 'ECONNABORTED' ||
+        (error as { message?: string })?.message?.includes('timeout')
+          ? '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+          : null;
+      const errorMessage =
+        timeoutMessage ||
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        '좌석 등록 중 오류가 발생했습니다.';
       await alert({
         title: '오류',
-        description: '좌석 등록 중 오류가 발생했습니다.',
+        description: errorMessage,
       });
     }
   };

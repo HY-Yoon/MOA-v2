@@ -2,7 +2,8 @@ namespace Api {
   interface Response<T> {
     success: boolean;
     data: T | null;
-    message: string;
+    message: string | null;
+    code?: string | null;
   }
 
   interface ListResponse<T> {
