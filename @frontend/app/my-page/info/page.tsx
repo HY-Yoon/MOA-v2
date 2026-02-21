@@ -6,7 +6,6 @@ import { Button } from '@/components/atoms/button';
 import { Card, CardContent } from '@/components/atoms/card';
 import { UserRole } from '@shared/enums';
 import { useMutation } from '@tanstack/react-query';
-import { deleteShow } from '@/lib/api/admin/show';
 import { deleteUser } from '@/lib/api/auth/auth';
 import { useAlert } from '@/components/molecules/AlertContext';
 
@@ -46,9 +45,7 @@ export default function MyPage() {
     });
     if (!confirmed) return;
 
-    // TODO: 회원탈퇴 API 확인
-    // await onDeleteUser();
-    console.log('회원 탈퇴');
+    await onDeleteUser();
     await logout();
   }
 
