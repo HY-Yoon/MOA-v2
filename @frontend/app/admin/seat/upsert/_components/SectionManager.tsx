@@ -24,7 +24,7 @@ export default function SectionManager({ sections, onSectionsChange }: Props) {
       id: `section-${Date.now()}`,
       name: newSectionName.trim(),
       color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
-      price: newSectionPrice ? Number(newSectionPrice) : undefined,
+      price: newSectionPrice === '' ? undefined : Number(newSectionPrice),
     };
 
     onSectionsChange([...sections, newSection]);
@@ -115,14 +115,15 @@ export default function SectionManager({ sections, onSectionsChange }: Props) {
             />
             <Input
               type="number"
-              value={section.price || ''}
+              value={section.price ?? ''}
               onChange={(e) =>
                 handleUpdateSection(section.id, {
-                  price: e.target.value ? Number(e.target.value) : undefined,
+                  price: e.target.value === '' ? undefined : Number(e.target.value),
                 })
               }
               className="w-24"
               placeholder="가격"
+              min="0"
             />
             <Button
               type="button"
@@ -155,6 +156,7 @@ export default function SectionManager({ sections, onSectionsChange }: Props) {
             onChange={(e) => setNewSectionPrice(e.target.value)}
             placeholder="가격"
             className="w-24"
+            min="0"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleAddSection();
             }}

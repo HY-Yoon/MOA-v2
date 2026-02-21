@@ -10,6 +10,7 @@ import { flattenSeatGroupsToSeats } from '@/lib/admin/seat-calculator';
 import { checkDuplicateSeat, createSeat } from '@/lib/api/admin/seat';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -231,9 +232,19 @@ export default function SeatUpsertForm() {
   const totalSeats = editorData
     ? flattenSeatGroupsToSeats(editorData.seatGroups, editorData.canvas.seatRadius).length
     : 0;
+  const isCreatingSeat = createSeatMutation.isPending;
 
   return (
-    <div className="space-y-8">
+    <div className="relative">
+      {isCreatingSeat && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2 rounded-md border bg-white px-4 py-3 shadow-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm font-medium text-slate-700">loading...</span>
+          </div>
+        </div>
+      )}
+
       {/* Step 1: 기본 정보 */}
       <div className="rounded-lg border bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-semibold">1. 기본 정보</h3>
@@ -277,7 +288,7 @@ export default function SeatUpsertForm() {
               type="button"
               onClick={handleCheckDuplicate}
               variant={isValidated ? 'outline' : 'default'}
-              disabled={isValidated}
+              disabled={isValidated || isCreatingSeat}
             >
               {isValidated ? '확인 완료' : '중복 확인'}
             </Button>
@@ -299,10 +310,15 @@ export default function SeatUpsertForm() {
       {/* 제출 버튼 */}
       {isValidated && (
         <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => window.history.back()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.history.back()}
+            disabled={isCreatingSeat}
+          >
             취소
           </Button>
-          <Button type="button" onClick={handleSubmit(onSubmit)}>
+          <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isCreatingSeat}>
             등록
           </Button>
         </div>
