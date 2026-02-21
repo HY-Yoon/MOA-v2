@@ -3,8 +3,9 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { LOGIN_PATH, useAuth } from '@/lib/auth/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { MyPageSideBar } from '@/components/organisms/MyPageSideBar';
+import { HEADER_ROUTES } from '@/constants/route/userRoutes';
 
 export default function MyPageLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function MyPageLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (isLoading) return;
     if (!isLoggedIn) {
-      router.replace(LOGIN_PATH);
+      router.replace(HEADER_ROUTES.LOGIN);
     }
   }, [isLoggedIn, isLoading, router]);
 

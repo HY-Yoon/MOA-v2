@@ -1,5 +1,3 @@
-// FIXME: 파일 위치 애매... 재확인 필요- sm
-
 import dayjs from 'dayjs';
 
 /**

@@ -13,6 +13,8 @@ import {
 } from '@/components/atoms';
 import { AlertCircleIcon } from 'lucide-react';
 
+const ENV_PARAM = process.env.NODE_ENV === 'production' ? 'prod' : 'local';
+
 const SOCIAL_PROVIDERS = [
   {
     id: 'google',
@@ -88,7 +90,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <div className="bg-muted/30 flex h-[calc(100vh-3.75rem)] flex-col items-center justify-center px-4 py-12">
-      <div className="flex w-full max-w-md -translate-y-[1.875rem] flex-col items-stretch gap-4">
+      <div className="flex w-full max-w-md -translate-y-7.5 flex-col items-stretch gap-4">
         {errorMessage && (
           <Alert variant="destructive">
             <AlertCircleIcon />
@@ -113,7 +115,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   asChild
                 >
                   <a
-                    href={provider.href}
+                    href={`${provider.href}?env=${ENV_PARAM}`}
                     className="relative flex h-12 min-h-12 w-full items-center justify-start px-4 py-0"
                   >
                     <span className="flex h-5 w-8 shrink-0 items-center justify-center">

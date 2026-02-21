@@ -34,11 +34,11 @@ axiosInstance.interceptors.response.use(
     console.error('API Error:', error.response?.data || error.message);
 
     if (error.response?.status === 401) {
-      // 로그인 검증인 경우 401 리다이렉트 제외 (/api/auth/verify)
-      const isVerifyRequest =
+      // 로그인 여부 확인은 401 리다이렉트 제외 (users/me)
+      const isAuthCheckRequest =
         error.config?.method?.toLowerCase() === 'get' &&
-        (error.config?.url?.includes('auth/verify') ?? false);
-      if (!isVerifyRequest) {
+        (error.config?.url?.includes('users/me') ?? false);
+      if (!isAuthCheckRequest) {
         globalOnUnauthorized?.();
       }
       return Promise.reject(error);

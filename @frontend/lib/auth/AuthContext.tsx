@@ -28,27 +28,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const LOGIN_PATH = '/login' as const;
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  // FIXME: 로그인 api 수정
-  // const { data: user, isLoading } = useQuery(getAuthUser());
-  const user = {
-    name: '김모아',
-    email: 'moa@moa.com',
-    phone: '010-1234-5678',
-    provider: 'KAKAO',
-    providerId: 'test',
-    role: 'USER' as UserRole,
-  };
+  const { data: user, isLoading } = useQuery(getAuthUser());
 
   const { mutateAsync: logoutMutation } = useMutation(logoutApi());
 
   const clearSessionAndRedirect = useCallback(() => {
-    queryClient.removeQueries({ queryKey: ['auth'] });
-    router.replace(LOGIN_PATH);
+    queryClient.removeQueries({ queryKey: ['auth', 'user'] });
+    router.replace('/');
   }, [router]);
 
   const logout = useCallback(async () => {
@@ -70,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     isLoggedIn: !!user,
-    isLoading: false,
+    isLoading,
     logout,
   };
 
