@@ -235,7 +235,7 @@ export default function SeatUpsertForm() {
   const isCreatingSeat = createSeatMutation.isPending;
 
   return (
-    <div className="relative">
+    <div className="relative flex flex-col gap-4">
       {isCreatingSeat && (
         <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
           <div className="flex items-center gap-2 rounded-md border bg-white px-4 py-3 shadow-sm">
