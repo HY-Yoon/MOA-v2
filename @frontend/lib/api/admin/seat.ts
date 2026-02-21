@@ -1,8 +1,7 @@
 import { axiosInstance } from '@/lib/api-client';
 
 // 임시: 로컬 백엔드 대신 배포 도메인 직접 호출
-const SEAT_API_ORIGIN = 'https://registered-rozalin-moa-v2-65e6ffe7.koyeb.app';
-const BASE_URL = `${SEAT_API_ORIGIN}/api/v1/admin/seat-maps`;
+const BASE_URL = '/api/v1/admin/seat-maps';
 
 // 좌석 배치도 목록 조회
 export const getSeatMapList = (params: Seat.ListParams) => ({

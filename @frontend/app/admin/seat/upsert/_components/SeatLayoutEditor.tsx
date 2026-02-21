@@ -145,6 +145,16 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
   // ============================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
+        target?.isContentEditable;
+
+      // 입력 필드 포커스 중에는 에디터 단축키를 무시
+      if (isEditableTarget) return;
+
       // Cmd/Ctrl + Z: 실행 취소 (TODO: Undo/Redo 구현 시)
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();

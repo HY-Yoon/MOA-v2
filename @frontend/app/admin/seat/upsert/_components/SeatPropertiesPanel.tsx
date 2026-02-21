@@ -98,7 +98,7 @@ export default function SeatPropertiesPanel({ element, sections, onUpdate, onDel
                         style={{ backgroundColor: section.color }}
                       />
                       {section.name}
-                      {section.price && ` (${section.price.toLocaleString()}원)`}
+                      {section.price != null && ` (${section.price.toLocaleString()}원)`}
                     </div>
                   </SelectItem>
                 ))}
