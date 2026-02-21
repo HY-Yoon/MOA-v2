@@ -151,6 +151,7 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
         target?.tagName === 'TEXTAREA' ||
         target?.tagName === 'SELECT' ||
         target?.isContentEditable;
+      const hasModifierKey = e.metaKey || e.ctrlKey || e.altKey;
 
       // 입력 필드 포커스 중에는 에디터 단축키를 무시
       if (isEditableTarget) return;
@@ -183,49 +184,26 @@ export default function SeatLayoutEditor({ onLayoutChange, initialData }: Props)
       }
 
       // V: 선택 모드
-      if (e.key === 'v' || e.key === 'V') {
+      if (!hasModifierKey && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault();
         setMode(EDITOR_MODES.SELECT);
       }
-
-      // R: 직선 행 추가
-      if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        setMode(EDITOR_MODES.ADD_SEAT_GROUP);
-      }
-
-      // C: 곡선 행 추가
-      if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault();
-        setMode(EDITOR_MODES.ADD_CURVED_GROUP);
-      }
-
-      // S: 무대 추가
-      if (e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        setMode(EDITOR_MODES.ADD_STAGE);
-      }
-
-      // E: 입구 추가
-      if (e.key === 'e' || e.key === 'E') {
-        e.preventDefault();
-        setMode(EDITOR_MODES.ADD_ENTRANCE);
-      }
+      
 
       // +: Zoom In
-      if (e.key === '+' || e.key === '=') {
+      if (!hasModifierKey && (e.key === '+' || e.key === '=')) {
         e.preventDefault();
         setZoom((z) => Math.min(2, z + 0.1));
       }
 
       // -: Zoom Out
-      if (e.key === '-' || e.key === '_') {
+      if (!hasModifierKey && (e.key === '-' || e.key === '_')) {
         e.preventDefault();
         setZoom((z) => Math.max(0.5, z - 0.1));
       }
 
       // 0: Zoom Reset
-      if (e.key === '0') {
+      if (!hasModifierKey && e.key === '0') {
         e.preventDefault();
         setZoom(1);
       }
