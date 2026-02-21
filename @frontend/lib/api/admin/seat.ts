@@ -1,24 +1,68 @@
 import { axiosInstance } from '@/lib/api-client';
 
+// 임시: 로컬 백엔드 대신 배포 도메인 직접 호출
+const SEAT_API_ORIGIN = 'https://registered-rozalin-moa-v2-65e6ffe7.koyeb.app';
+const BASE_URL = `${SEAT_API_ORIGIN}/api/v1/admin/seat-maps`;
+
+// 좌석 배치도 목록 조회
+export const getSeatMapList = (params: Seat.ListParams) => ({
+  queryKey: ['admin', 'seat', 'list', params],
+  queryFn: async () => {
+    const response = await axiosInstance.get<Api.Response<Api.ListResponse<Seat.List>>>(BASE_URL, { params });
+    return response?.data.data;
+  },
+});
+
 // 좌석 중복 확인
 export async function checkDuplicateSeat(request: Seat.CheckDuplicateRequest) {
-  const response = await axiosInstance.post<Api.Response<Seat.CheckDuplicateResponse>>(
-    '/api/seats/check-duplicate',
-    request,
+  const response = await axiosInstance.get<Api.Response<Seat.CheckDuplicateResponse>>(
+    `${BASE_URL}/duplicate`,
+    { params: request },
   );
-  return response.data;
+  return response?.data;
 }
 
 // 좌석 등록
 export async function createSeat(request: Seat.CreateSeatRequest) {
-  const response = await axiosInstance.post<Api.Response<{ seatId: number }>>(
-    '/api/seats',
-    request,
+  const normalizedSections = request.layoutData.sections.map((section) => ({
+    sectionId: section.sectionId.trim(),
+    name: section.name.trim(),
+    color: section.color,
+    price: Math.max(0, Math.round(section.price ?? 0)),
+  }));
+
+  const payload = {
+    region: request.region.trim(),
+    venueName: request.venueName.trim(),
+    hallName: request.hallName.trim(),
+    canvas: {
+      ...request.layoutData.canvas,
+      rowGap: 20,
+      columnGap: 20,
+    },
+    sections: normalizedSections,
+    seats: request.layoutData.seats.map((seat) => ({
+      seatId: seat.seatId.trim(),
+      sectionId: (seat.sectionId ?? '').trim(),
+      row: seat.row.trim(),
+      number: Math.round(seat.number),
+      x: Math.round(seat.x),
+      y: Math.round(seat.y),
+    })),
+  };
+
+  const response = await axiosInstance.post<Api.Response<{ seatMapId: string }>>(
+    BASE_URL,
+    payload,
+    {
+      timeout: 60000,
+    },
   );
-  return response.data;
+  return response?.data;
 }
 
-// 좌석 목록 조회
+// TODO: seat-map 상세/수정/삭제 API 스펙 확정 후 정리
+// 기존 seat API
 export async function getSeats(params?: {
   region?: string;
   venueName?: string;

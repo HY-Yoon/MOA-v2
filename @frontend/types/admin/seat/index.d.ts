@@ -106,6 +106,7 @@ declare namespace Seat {
         height: number;
         seatRadius: number;
       };
+      sections: SectionRequest[];
       seats: SeatRequest[];
       totalSeats: number;
     };
@@ -121,6 +122,23 @@ declare namespace Seat {
   interface CheckDuplicateResponse {
     isDuplicate: boolean;
     message?: string;
+  }
+
+  interface ListParams {
+    page: number;
+    size: number;
+    region?: string;
+    venueName?: string;
+    hallName?: string;
+  }
+
+  interface List {
+    seatMapId: string;
+    region: string;
+    venueName: string;
+    hallName: string;
+    createdAt: string;
+    updatedAt: string;
   }
 
   // 좌석 등록 폼 데이터
