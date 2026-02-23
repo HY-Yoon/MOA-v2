@@ -66,8 +66,6 @@ export default function MyPage() {
       </Card>
 
       <div className="mt-8 flex justify-end gap-2">
-        {/*TODO: 회원정보 수정*/}
-        <Button variant="outline">회원정보수정</Button>
         <Button variant="secondary" onClick={handleDeleteUser}>
           회원 탈퇴
         </Button>
