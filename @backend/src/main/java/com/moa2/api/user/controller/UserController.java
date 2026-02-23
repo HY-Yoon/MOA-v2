@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
+import com.moa2.global.model.SocialProvider;
 
 @Slf4j
 @RestController
@@ -25,8 +25,9 @@ public class UserController implements UserControllerDocs {
     @Override
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<AuthDto.UserInfoResponse>> getMyInfo() {
-        String email = getAuthenticatedUserEmail();
-        AuthDto.UserInfoResponse response = userService.getMyInfo(email);
+        UserPrincipal userPrincipal = getAuthenticatedUserPrincipal();
+        SocialProvider provider = SocialProvider.valueOf(userPrincipal.getProvider());
+        AuthDto.UserInfoResponse response = userService.getMyInfo(userPrincipal.getEmail(), provider);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -34,8 +35,9 @@ public class UserController implements UserControllerDocs {
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<UserDto.UserDeleteResponse>> deleteMyAccount() {
         try {
-            String email = getAuthenticatedUserEmail();
-            UserDto.UserDeleteResponse response = userService.deleteMyAccount(email);
+            UserPrincipal userPrincipal = getAuthenticatedUserPrincipal();
+            SocialProvider provider = SocialProvider.valueOf(userPrincipal.getProvider());
+            UserDto.UserDeleteResponse response = userService.deleteMyAccount(userPrincipal.getEmail(), provider);
             return ResponseEntity.ok(ApiResponse.success(response, response.message()));
 
         } catch (IllegalStateException e) {
@@ -48,8 +50,7 @@ public class UserController implements UserControllerDocs {
         }
     }
 
-
-    private String getAuthenticatedUserEmail() {
+    private UserPrincipal getAuthenticatedUserPrincipal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated()
@@ -59,9 +60,9 @@ public class UserController implements UserControllerDocs {
 
         Object principalObj = authentication.getPrincipal();
         if (principalObj instanceof UserPrincipal userPrincipal) {
-            return userPrincipal.getEmail();
+            return userPrincipal;
         }
 
-        return principalObj.toString();
+        throw new IllegalStateException("유효하지 않은 인증 정보입니다.");
     }
 }
