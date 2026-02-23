@@ -118,44 +118,44 @@ public class AuthController implements AuthControllerDocs {
     // ResponseEntity.ok(ApiResponse.success(AuthDto.UserInfoResponse.from(user)));
     // }
 
-    @Override
-    @GetMapping("/verify")
-    public ResponseEntity<ApiResponse<AuthDto.TokenVerifyResponse>> verifyToken(@RequestParam String token) {
-
-        if (!jwtTokenProvider.validateAccessToken(token)) {
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.success(AuthDto.TokenVerifyResponse.fail("유효하지 않은 토큰입니다.")));
-        }
-
-        String email = jwtTokenProvider.getEmailFromAccessToken(token);
-        User user = null;
-
-        try {
-            String providerStr = jwtTokenProvider.getProviderFromAccessToken(token);
-            if (providerStr != null && !providerStr.isEmpty()) {
-                try {
-                    SocialProvider socialProvider = SocialProvider.valueOf(providerStr);
-                    user = userRepository.findByEmailAndSocialProvider(email, socialProvider).orElse(null);
-                } catch (IllegalArgumentException e) {
-                    log.warn("알 수 없는 provider 값: {}", providerStr);
-                }
-            }
-        } catch (Exception e) {
-            log.warn("토큰에서 provider 추출 실패: {}", e.getMessage());
-        }
-
-        if (user == null) {
-            user = userRepository.findByEmail(email).orElse(null);
-        }
-
-        if (user == null) {
-            return ResponseEntity.status(404)
-                    .body(ApiResponse.success(AuthDto.TokenVerifyResponse.fail("사용자를 찾을 수 없습니다.")));
-        }
-
-        return ResponseEntity
-                .ok(ApiResponse.success(AuthDto.TokenVerifyResponse.success(AuthDto.UserInfoResponse.from(user))));
-    }
+//    @Override
+//    @GetMapping("/verify")
+//    public ResponseEntity<ApiResponse<AuthDto.TokenVerifyResponse>> verifyToken(@RequestParam String token) {
+//
+//        if (!jwtTokenProvider.validateAccessToken(token)) {
+//            return ResponseEntity.status(401)
+//                    .body(ApiResponse.success(AuthDto.TokenVerifyResponse.fail("유효하지 않은 토큰입니다.")));
+//        }
+//
+//        String email = jwtTokenProvider.getEmailFromAccessToken(token);
+//        User user = null;
+//
+//        try {
+//            String providerStr = jwtTokenProvider.getProviderFromAccessToken(token);
+//            if (providerStr != null && !providerStr.isEmpty()) {
+//                try {
+//                    SocialProvider socialProvider = SocialProvider.valueOf(providerStr);
+//                    user = userRepository.findByEmailAndSocialProvider(email, socialProvider).orElse(null);
+//                } catch (IllegalArgumentException e) {
+//                    log.warn("알 수 없는 provider 값: {}", providerStr);
+//                }
+//            }
+//        } catch (Exception e) {
+//            log.warn("토큰에서 provider 추출 실패: {}", e.getMessage());
+//        }
+//
+//        if (user == null) {
+//            user = userRepository.findByEmail(email).orElse(null);
+//        }
+//
+//        if (user == null) {
+//            return ResponseEntity.status(404)
+//                    .body(ApiResponse.success(AuthDto.TokenVerifyResponse.fail("사용자를 찾을 수 없습니다.")));
+//        }
+//
+//        return ResponseEntity
+//                .ok(ApiResponse.success(AuthDto.TokenVerifyResponse.success(AuthDto.UserInfoResponse.from(user))));
+//    }
 
     @Override
     @PostMapping("/refresh")

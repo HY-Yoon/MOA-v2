@@ -28,19 +28,19 @@ public interface AuthControllerDocs {
         // @Parameter(hidden = true) @AuthenticationPrincipal OAuth2User oAuth2User,
         // HttpServletRequest request);
 
-        @Operation(summary = "JWT 토큰 검증", description = """
-                        Access Token의 유효성을 검증하고 사용자 정보를 반환합니다.
-
-                        **처리 내용:**
-                        1. 토큰 서명 및 만료 여부 검증
-                        2. 토큰 내 사용자 정보(이메일, 권한) 추출
-
-                        **반환:**
-                        - 유효한 경우: valid=true, 사용자 정보 포함
-                        - 유효하지 않은 경우: valid=false, 에러 메시지 포함
-                        """)
-        ResponseEntity<ApiResponse<AuthDto.TokenVerifyResponse>> verifyToken(
-                        @Parameter(description = "Access Token", required = true) @RequestParam String token);
+//        @Operation(summary = "JWT 토큰 검증", description = """
+//                        Access Token의 유효성을 검증하고 사용자 정보를 반환합니다.
+//
+//                        **처리 내용:**
+//                        1. 토큰 서명 및 만료 여부 검증
+//                        2. 토큰 내 사용자 정보(이메일, 권한) 추출
+//
+//                        **반환:**
+//                        - 유효한 경우: valid=true, 사용자 정보 포함
+//                        - 유효하지 않은 경우: valid=false, 에러 메시지 포함
+//                        """)
+//        ResponseEntity<ApiResponse<AuthDto.TokenVerifyResponse>> verifyToken(
+//                        @Parameter(description = "Access Token", required = true) @RequestParam String token);
 
         @Operation(summary = "Access Token 갱신", description = """
                         Refresh Token을 사용하여 새로운 Access Token을 발급합니다.
