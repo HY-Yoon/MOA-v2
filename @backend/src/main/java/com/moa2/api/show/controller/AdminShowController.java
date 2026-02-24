@@ -89,9 +89,11 @@ public class AdminShowController implements AdminShowControllerDocs {
         @Override
         @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         public ResponseEntity<ApiResponse<ShowDto.CreateResponse>> createShow(
-                        @RequestPart(value = "data", required = true) @Valid ShowDto.CreateRequest request,
+                        @RequestPart("data") String dataJson,
                         @RequestPart("poster") MultipartFile poster,
                         @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages) {
+
+                ShowDto.CreateRequest request = jsonDataParser.parseAndValidate(dataJson, ShowDto.CreateRequest.class);
 
                 ShowDto.CreateResponse result = adminShowService.createShow(request, poster, detailImages);
                 return ResponseEntity.status(HttpStatus.CREATED)
