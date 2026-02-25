@@ -60,10 +60,7 @@ public class ReservationFacade {
         ReservationDtoV2.ReserveResponse response = reservationServiceV2.reserve(
                 userId,
                 request.scheduleId(),
-                request.seatIds(),
-                request.bookerName(),
-                request.bookerPhone(),
-                request.bookerEmail());
+                request.scheduleSeatIds());
 
         // 5. 토큰 소진 (재사용 방지)
         tokenService.consumeToken(token);

@@ -1,10 +1,13 @@
 package com.moa2.api.reservation.service.v2;
 
+import com.moa2.api.reservation.domain.entity.Payment;
 import com.moa2.api.reservation.domain.entity.Reservation;
 import com.moa2.api.reservation.domain.entity.ReservationSeat;
+import com.moa2.api.reservation.domain.repository.PaymentRepository;
 import com.moa2.api.reservation.domain.repository.ReservationRepository;
 import com.moa2.api.reservation.domain.repository.ReservationSeatRepository;
 import com.moa2.api.reservation.dto.ReservationDtoV2;
+import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.show.domain.entity.ScheduleSeat;
 import com.moa2.api.show.domain.entity.ShowSchedule;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
@@ -17,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +32,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.springframework.context.annotation.Profile;
-
 /**
  * V2: Redisson 분산 락 기반 예매 서비스
- * - 좌석 선점 + 예약 생성을 한 트랜잭션에서 처리
+ * - 좌석 선점 + 예약 생성 + Payment(PENDING) 생성을 한 트랜잭션에서 처리
  * - Redis 분산 락으로 동시성 제어
  */
 @Slf4j
@@ -46,6 +48,7 @@ public class ReservationServiceV2 {
     private final ScheduleSeatRepository scheduleSeatRepository;
     private final ReservationRepository reservationRepository;
     private final ReservationSeatRepository reservationSeatRepository;
+    private final PaymentRepository paymentRepository;
     private final ShowScheduleRepository showScheduleRepository;
     private final UserRepository userRepository;
 
@@ -58,24 +61,19 @@ public class ReservationServiceV2 {
     /**
      * 예약 처리 (분산 락 적용)
      * - scheduleId의 seatIds에 대해 Redisson 락 획득
-     * - 좌석 상태 확인 → 선점 → 예약 생성
+     * - 좌석 상태 확인 → 선점 → 예약 생성 → Payment(PENDING) 생성
      *
-     * @param userId      사용자 ID
-     * @param scheduleId  스케줄 ID
-     * @param seatIds     좌석 ID 목록
-     * @param bookerName  예매자 이름
-     * @param bookerPhone 예매자 연락처
-     * @param bookerEmail 예매자 이메일
-     * @return 예매 결과
+     * @param userId     사용자 ID
+     * @param scheduleId 스케줄 ID
+     * @param seatIds    좌석 ID 목록
+     * @param bookerName 예매자 이름
+     * @return 예매 결과 (orderId 포함)
      */
     @Transactional
     public ReservationDtoV2.ReserveResponse reserve(
             Long userId,
             Long scheduleId,
-            List<Long> seatIds,
-            String bookerName,
-            String bookerPhone,
-            String bookerEmail) {
+            List<Long> seatIds) {
         log.info("V2 예매 시작 - userId: {}, scheduleId: {}, seatIds: {}", userId, scheduleId, seatIds);
 
         // 1. 사용자 및 스케줄 조회
@@ -91,6 +89,7 @@ public class ReservationServiceV2 {
 
         List<ScheduleSeat> reservedSeats = new ArrayList<>();
         List<RLock> acquiredLocks = new ArrayList<>();
+        List<String> conflictSeatNumbers = new ArrayList<>();
         int totalAmount = 0;
 
         try {
@@ -104,7 +103,8 @@ public class ReservationServiceV2 {
 
                     if (!acquired) {
                         log.warn("좌석 락 획득 실패: seatId={}", seatId);
-                        throw new IllegalStateException("좌석 선점 중입니다. 잠시 후 다시 시도해주세요.");
+                        conflictSeatNumbers.add(String.valueOf(seatId));
+                        continue;
                     }
 
                     acquiredLocks.add(lock);
@@ -114,7 +114,9 @@ public class ReservationServiceV2 {
                     String cachedStatus = redisTemplate.opsForValue().get(statusKey);
 
                     if ("RESERVED".equals(cachedStatus) || "SOLD".equals(cachedStatus)) {
-                        throw new IllegalStateException("이미 선점된 좌석입니다: " + seatId);
+                        // 요청한 seatId 그대로 충돌 목록에 추가
+                        conflictSeatNumbers.add(String.valueOf(seatId));
+                        continue;
                     }
 
                     // DB 확인 (Double Check)
@@ -122,7 +124,9 @@ public class ReservationServiceV2 {
                             .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + seatId));
 
                     if (scheduleSeat.getStatus() != SeatStatus.AVAILABLE) {
-                        throw new IllegalStateException("이미 선점된 좌석입니다: " + seatId);
+                        // 요청한 seatId 그대로 충돌 목록에 추가
+                        conflictSeatNumbers.add(String.valueOf(seatId));
+                        continue;
                     }
 
                     // 스케줄 검증
@@ -150,6 +154,11 @@ public class ReservationServiceV2 {
                 }
             }
 
+            // 충돌된 좌석이 있으면 SeatConflictException 발생
+            if (!conflictSeatNumbers.isEmpty()) {
+                throw new SeatConflictException(conflictSeatNumbers);
+            }
+
             // 4. 예약 생성
             String reservationNumber = generateReservationNumber();
             LocalDateTime paymentDeadline = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
@@ -161,9 +170,9 @@ public class ReservationServiceV2 {
                     .reservationNumber(reservationNumber)
                     .totalAmount(totalAmount)
                     .seatCount(reservedSeats.size())
-                    .bookerName(bookerName)
-                    .bookerPhone(bookerPhone)
-                    .bookerEmail(bookerEmail)
+                    .bookerName(user.getName())
+                    .bookerPhone(user.getPhone())
+                    .bookerEmail(user.getEmail())
                     .build();
 
             reservationRepository.save(reservation);
@@ -179,18 +188,28 @@ public class ReservationServiceV2 {
                 reservationSeatRepository.save(reservationSeat);
             }
 
-            log.info("V2 예매 완료 - reservationId: {}, reservationNumber: {}",
-                    reservation.getId(), reservationNumber);
+            // 6. Payment(PENDING) 생성 - MockPayment 및 실제 결제 연동용
+            String orderId = generateOrderId();
+            Payment payment = Payment.builder()
+                    .reservation(reservation)
+                    .orderId(orderId)
+                    .amount(totalAmount)
+                    .build();
+            paymentRepository.save(payment);
+
+            log.info("V2 예매 완료 - reservationId: {}, reservationNumber: {}, orderId: {}",
+                    reservation.getId(), reservationNumber, orderId);
 
             return ReservationDtoV2.ReserveResponse.success(
                     reservation.getId(),
                     reservationNumber,
+                    orderId,
                     reservedSeats.size(),
                     totalAmount,
                     paymentDeadline);
 
         } finally {
-            // 6. 락 해제 (항상 실행)
+            // 7. 락 해제 (항상 실행)
             for (RLock lock : acquiredLocks) {
                 try {
                     if (lock.isHeldByCurrentThread()) {
@@ -210,5 +229,13 @@ public class ReservationServiceV2 {
         String date = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
         String random = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         return "RES-" + date + "-" + random;
+    }
+
+    /**
+     * 결제 주문 ID 생성 (MockPaymentController 및 실제 결제 연동용)
+     * 영문 대소문자, 숫자, -, _, = 로 구성된 6~64자
+     */
+    private String generateOrderId() {
+        return "MOA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
     }
 }

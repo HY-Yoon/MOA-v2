@@ -177,10 +177,7 @@ class ReservationConcurrencyTest {
                     reservationServiceV2.reserve(
                             userId,
                             scheduleId,
-                            List.of(seatId),
-                            "Booker",
-                            "010-1234-5678",
-                            "booker@test.com");
+                            List.of(seatId));
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     // 예매 실패 (락 획득 실패 or 이미 예매됨)

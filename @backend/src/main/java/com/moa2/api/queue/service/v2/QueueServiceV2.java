@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import org.springframework.context.annotation.Profile;
 
 /**
@@ -68,10 +69,11 @@ public class QueueServiceV2 {
             // 이미 대기 중 - 현재 위치 반환
             Long rank = redisTemplate.opsForZSet().rank(queueKey, userIdStr);
             long position = (rank != null) ? rank + 1 : 1;
+            long total = Optional.ofNullable(redisTemplate.opsForZSet().size(queueKey)).orElse(0L);
             long estimatedWait = calculateWaitTimeSeconds(position);
 
             log.info("이미 대기열에 등록됨 - userId: {}, position: {}", userId, position);
-            return QueueDtoV2.EnterResponse.alreadyWaiting(position, estimatedWait);
+            return QueueDtoV2.EnterResponse.waiting(position, total, estimatedWait);
         }
 
         // 4. 대기열에 추가
@@ -84,6 +86,7 @@ public class QueueServiceV2 {
         // 6. 내 순위 확인
         Long rank = redisTemplate.opsForZSet().rank(queueKey, userIdStr);
         long position = (rank != null) ? rank + 1 : 1;
+        long total = Optional.ofNullable(redisTemplate.opsForZSet().size(queueKey)).orElse(0L);
 
         // 7. 첫 번째 사람이면 즉시 토큰 발급
         if (position == 1) {
@@ -100,7 +103,7 @@ public class QueueServiceV2 {
         log.info("대기열 등록 완료 - userId: {}, position: {}, estimatedWait: {}초",
                 userId, position, estimatedWait);
 
-        return QueueDtoV2.EnterResponse.waiting(position, estimatedWait);
+        return QueueDtoV2.EnterResponse.waiting(position, total, estimatedWait);
     }
 
     /**
@@ -136,10 +139,11 @@ public class QueueServiceV2 {
 
         // 3. WAITING 상태
         long position = rank + 1;
+        long total = Optional.ofNullable(redisTemplate.opsForZSet().size(queueKey)).orElse(0L);
         long estimatedWait = calculateWaitTimeSeconds(position);
 
-        log.debug("대기 중 - position: {}, estimatedWait: {}초", position, estimatedWait);
-        return QueueDtoV2.StatusResponse.waiting(position, estimatedWait);
+        log.debug("대기 중 - position: {}, total: {}, estimatedWait: {}초", position, total, estimatedWait);
+        return QueueDtoV2.StatusResponse.waiting(position, total, estimatedWait);
     }
 
     /**

@@ -3,12 +3,15 @@ package com.moa2.global.config;
 import com.moa2.global.interceptor.QueueReadyInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * 대기열 인터셉터 설정
+ * V1: 대기열 인터셉터 설정 (DB 기반)
+ * V2에서는 QueueTokenInterceptorConfig을 사용
  */
+@Profile("v1")
 @Configuration
 @RequiredArgsConstructor
 public class QueueInterceptorConfig implements WebMvcConfigurer {
@@ -22,8 +25,6 @@ public class QueueInterceptorConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/api/v1/schedules/*/seats",
                         "/api/v1/schedules/*/seats/lock",
-                        "/api/v1/schedules/*/seats/unlock"
-                );
+                        "/api/v1/schedules/*/seats/unlock");
     }
 }
-

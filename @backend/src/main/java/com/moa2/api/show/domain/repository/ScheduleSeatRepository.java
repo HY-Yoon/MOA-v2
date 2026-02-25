@@ -64,15 +64,15 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
                      @Param("scheduleSeatIds") List<Long> scheduleSeatIds);
 
        /**
-        * 만료된 좌석 선점 해제
-        * (LOCKED 상태이면서 lockedUntil이 지난 좌석들)
+        * 만료된 좌석 선점/예약 해제
+        * (LOCKED 또는 RESERVED 상태이면서 lockedUntil이 지난 좌석들)
         */
        @Modifying
        @Query("UPDATE ScheduleSeat ss " +
                      "SET ss.status = 'AVAILABLE', " +
                      "ss.lockedByUserId = null, " +
                      "ss.lockedUntil = null " +
-                     "WHERE ss.status = 'LOCKED' " +
+                     "WHERE ss.status IN ('LOCKED', 'RESERVED') " +
                      "AND ss.lockedUntil < :now")
        int releaseExpiredLocks(@Param("now") LocalDateTime now);
 

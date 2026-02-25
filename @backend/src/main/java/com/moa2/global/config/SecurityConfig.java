@@ -7,6 +7,7 @@ import com.moa2.global.handler.OAuth2SuccessHandler;
 import com.moa2.global.security.JwtAuthenticationEntryPoint;
 import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.security.JwtAuthenticationFilter;
+import com.moa2.global.security.QueueTokenFilter;
 import com.moa2.api.auth.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -49,6 +50,10 @@ public class SecurityConfig {
         private final UserRepository userRepository;
         private final RefreshTokenRepository refreshTokenRepository;
         private final ClientRegistrationRepository clientRegistrationRepository;
+
+        // V2 프로필에서만 주입됨 (V1에서는 null)
+        @org.springframework.beans.factory.annotation.Autowired(required = false)
+        private QueueTokenFilter queueTokenFilter;
 
         // CORS 설정
         @Value("${security.cors.allowed-origins}")
@@ -187,6 +192,7 @@ public class SecurityConfig {
                                                                 "/actuator/**",
                                                                 "/actuator/health",
                                                                 "/api/v1/shows/**",
+                                                                "/api/v2/schedules/**",
                                                                 "/api/test/**",
                                                                 "/api/v1/payment/**")
                                                 .permitAll()
@@ -210,8 +216,14 @@ public class SecurityConfig {
                                                 .failureHandler(oAuth2FailureHandler))
 
                                 // JWT 인증 필터 추가 (OAuth2 필터 이후에 실행)
-                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
+                // V2: 대기열 토큰 사전 검증 필터 (JWT 인증 후, 컨트롤러 전에 실행)
+                if (queueTokenFilter != null) {
+                        http.addFilterAfter(queueTokenFilter, JwtAuthenticationFilter.class);
+                }
+
+                http
                                 // 인증 실패 시 401 처리
                                 .exceptionHandling(exception -> exception
                                                 .authenticationEntryPoint(jwtAuthenticationEntryPoint));
