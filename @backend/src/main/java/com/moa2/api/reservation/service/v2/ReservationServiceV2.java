@@ -1,19 +1,9 @@
 package com.moa2.api.reservation.service.v2;
 
-import com.moa2.api.reservation.domain.entity.Payment;
-import com.moa2.api.reservation.domain.entity.Reservation;
-import com.moa2.api.reservation.domain.entity.ReservationSeat;
-import com.moa2.api.reservation.domain.repository.PaymentRepository;
-import com.moa2.api.reservation.domain.repository.ReservationRepository;
-import com.moa2.api.reservation.domain.repository.ReservationSeatRepository;
 import com.moa2.api.reservation.dto.ReservationDtoV2;
 import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.show.domain.entity.ScheduleSeat;
-import com.moa2.api.show.domain.entity.ShowSchedule;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
-import com.moa2.api.show.domain.repository.ShowScheduleRepository;
-import com.moa2.api.user.domain.entity.User;
-import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.model.SeatStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,19 +13,23 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
  * V2: Redisson 분산 락 기반 예매 서비스
- * - 좌석 선점 + 예약 생성 + Payment(PENDING) 생성을 한 트랜잭션에서 처리
- * - Redis 분산 락으로 동시성 제어
+ *
+ * [트랜잭션 분리 설계]
+ * reserve()              : 트랜잭션 없음 - Redis 분산 락 획득/해제만 담당
+ * ReservationPersistService : @Transactional - DB 쓰기(예약, 좌석 상태, 결제)만 담당
+ *
+ * 이렇게 분리하는 이유:
+ * - reserve()에 @Transactional이 걸려 있으면, 락 대기(최대 3초) 동안
+ *   DB 커넥션을 아무 일 없이 물고 있게 됨
+ * - 동시 요청 수백 건이 몰리면 HikariCP 커넥션 풀이 고갈 → 500 에러 폭발
+ * - DB 커넥션은 "진짜 DB에 쓸 때만" 짧게 사용하도록 별도 클래스로 분리
  */
 @Slf4j
 @Profile("v2")
@@ -46,11 +40,7 @@ public class ReservationServiceV2 {
     private final RedissonClient redissonClient;
     private final RedisTemplate<String, String> redisTemplate;
     private final ScheduleSeatRepository scheduleSeatRepository;
-    private final ReservationRepository reservationRepository;
-    private final ReservationSeatRepository reservationSeatRepository;
-    private final PaymentRepository paymentRepository;
-    private final ShowScheduleRepository showScheduleRepository;
-    private final UserRepository userRepository;
+    private final ReservationPersistService reservationPersistService;
 
     @Value("${queue.token.ttl-minutes:5}")
     private int lockTtlMinutes;
@@ -59,31 +49,17 @@ public class ReservationServiceV2 {
     private static final String SEAT_STATUS_PREFIX = "seat:status:";
 
     /**
-     * 예약 처리 (분산 락 적용)
-     * - scheduleId의 seatIds에 대해 Redisson 락 획득
-     * - 좌석 상태 확인 → 선점 → 예약 생성 → Payment(PENDING) 생성
-     *
-     * @param userId     사용자 ID
-     * @param scheduleId 스케줄 ID
-     * @param seatIds    좌석 ID 목록
-     * @param bookerName 예매자 이름
-     * @return 예매 결과 (orderId 포함)
+     * 예약 처리 (분산 락 적용, 트랜잭션 없음)
+     * - Redis 분산 락으로 좌석 동시성 제어
+     * - DB 커넥션은 saveReservationData()에서만 사용
      */
-    @Transactional
     public ReservationDtoV2.ReserveResponse reserve(
             Long userId,
             Long scheduleId,
             List<Long> seatIds) {
         log.info("V2 예매 시작 - userId: {}, scheduleId: {}, seatIds: {}", userId, scheduleId, seatIds);
 
-        // 1. 사용자 및 스케줄 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
-
-        ShowSchedule schedule = showScheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다"));
-
-        // 2. 좌석 ID 정렬 (데드락 방지)
+        // 1. 좌석 ID 정렬 (데드락 방지)
         List<Long> sortedSeatIds = new ArrayList<>(seatIds);
         sortedSeatIds.sort(Long::compareTo);
 
@@ -93,13 +69,13 @@ public class ReservationServiceV2 {
         int totalAmount = 0;
 
         try {
-            // 3. 각 좌석에 대해 분산 락 획득 및 선점
+            // 2. 각 좌석에 대해 Redis 분산 락 획득 및 검증
             for (Long seatId : sortedSeatIds) {
                 RLock lock = redissonClient.getLock(SEAT_LOCK_PREFIX + seatId);
 
                 try {
-                    // 10초 대기, 5초 후 자동 해제
-                    boolean acquired = lock.tryLock(10, 5, TimeUnit.SECONDS);
+                    // 3초 대기, 5초 후 자동 해제 (기존 10초 → 3초로 단축)
+                    boolean acquired = lock.tryLock(3, 5, TimeUnit.SECONDS);
 
                     if (!acquired) {
                         log.warn("좌석 락 획득 실패: seatId={}", seatId);
@@ -109,43 +85,35 @@ public class ReservationServiceV2 {
 
                     acquiredLocks.add(lock);
 
-                    // Redis 캐시 확인 (빠른 중복 체크)
+                    // Redis 캐시 확인 (빠른 중복 체크 - DB 접근 없이)
                     String statusKey = SEAT_STATUS_PREFIX + seatId;
                     String cachedStatus = redisTemplate.opsForValue().get(statusKey);
 
                     if ("RESERVED".equals(cachedStatus) || "SOLD".equals(cachedStatus)) {
-                        // 요청한 seatId 그대로 충돌 목록에 추가
                         conflictSeatNumbers.add(String.valueOf(seatId));
                         continue;
                     }
 
-                    // DB 확인 (Double Check)
+                    // Redis 캐시 업데이트 (선점 표시)
+                    redisTemplate.opsForValue().set(statusKey, "RESERVED", lockTtlMinutes, TimeUnit.MINUTES);
+
+                    // 좌석 엔티티 조회 (트랜잭션 밖이므로 detached 상태)
                     ScheduleSeat scheduleSeat = scheduleSeatRepository.findById(seatId)
                             .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + seatId));
 
                     if (scheduleSeat.getStatus() != SeatStatus.AVAILABLE) {
-                        // 요청한 seatId 그대로 충돌 목록에 추가
                         conflictSeatNumbers.add(String.valueOf(seatId));
+                        // Redis 캐시 롤백
+                        redisTemplate.delete(statusKey);
                         continue;
                     }
 
-                    // 스케줄 검증
                     if (!scheduleSeat.getSchedule().getId().equals(scheduleId)) {
                         throw new IllegalArgumentException("해당 스케줄의 좌석이 아닙니다: " + seatId);
                     }
 
-                    // Redis 캐시 업데이트
-                    redisTemplate.opsForValue().set(statusKey, "RESERVED", lockTtlMinutes, TimeUnit.MINUTES);
-
-                    // 좌석 선점 (DB 상태 변경)
-                    LocalDateTime lockedUntil = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
-                            .plusMinutes(lockTtlMinutes);
-                    scheduleSeat.lock(userId, lockedUntil);
-                    scheduleSeat.reserve();
-
                     reservedSeats.add(scheduleSeat);
                     totalAmount += scheduleSeat.getGrade().getPrice();
-
                     log.debug("좌석 선점 성공: seatId={}", seatId);
 
                 } catch (InterruptedException e) {
@@ -159,57 +127,11 @@ public class ReservationServiceV2 {
                 throw new SeatConflictException(conflictSeatNumbers);
             }
 
-            // 4. 예약 생성
-            String reservationNumber = generateReservationNumber();
-            LocalDateTime paymentDeadline = LocalDateTime.now(ZoneId.of("Asia/Seoul"))
-                    .plusMinutes(lockTtlMinutes);
-
-            Reservation reservation = Reservation.builder()
-                    .user(user)
-                    .showSchedule(schedule)
-                    .reservationNumber(reservationNumber)
-                    .totalAmount(totalAmount)
-                    .seatCount(reservedSeats.size())
-                    .bookerName(user.getName())
-                    .bookerPhone(user.getPhone())
-                    .bookerEmail(user.getEmail())
-                    .build();
-
-            reservationRepository.save(reservation);
-
-            // 5. 예약 좌석 연결
-            for (ScheduleSeat scheduleSeat : reservedSeats) {
-                ReservationSeat reservationSeat = ReservationSeat.builder()
-                        .reservation(reservation)
-                        .seat(scheduleSeat.getSeat())
-                        .scheduleSeatId(scheduleSeat.getId())
-                        .price(scheduleSeat.getGrade().getPrice())
-                        .build();
-                reservationSeatRepository.save(reservationSeat);
-            }
-
-            // 6. Payment(PENDING) 생성 - MockPayment 및 실제 결제 연동용
-            String orderId = generateOrderId();
-            Payment payment = Payment.builder()
-                    .reservation(reservation)
-                    .orderId(orderId)
-                    .amount(totalAmount)
-                    .build();
-            paymentRepository.save(payment);
-
-            log.info("V2 예매 완료 - reservationId: {}, reservationNumber: {}, orderId: {}",
-                    reservation.getId(), reservationNumber, orderId);
-
-            return ReservationDtoV2.ReserveResponse.success(
-                    reservation.getId(),
-                    reservationNumber,
-                    orderId,
-                    reservedSeats.size(),
-                    totalAmount,
-                    paymentDeadline);
+            // 3. DB 저장 (여기서만 트랜잭션 + DB 커넥션 사용!)
+            return reservationPersistService.saveReservationData(userId, scheduleId, reservedSeats, totalAmount, lockTtlMinutes);
 
         } finally {
-            // 7. 락 해제 (항상 실행)
+            // 4. 락 해제 (항상 실행)
             for (RLock lock : acquiredLocks) {
                 try {
                     if (lock.isHeldByCurrentThread()) {
@@ -220,22 +142,5 @@ public class ReservationServiceV2 {
                 }
             }
         }
-    }
-
-    /**
-     * 예매 번호 생성
-     */
-    private String generateReservationNumber() {
-        String date = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String random = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-        return "RES-" + date + "-" + random;
-    }
-
-    /**
-     * 결제 주문 ID 생성 (MockPaymentController 및 실제 결제 연동용)
-     * 영문 대소문자, 숫자, -, _, = 로 구성된 6~64자
-     */
-    private String generateOrderId() {
-        return "MOA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
     }
 }

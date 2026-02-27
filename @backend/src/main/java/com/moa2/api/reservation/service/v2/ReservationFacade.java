@@ -6,7 +6,6 @@ import com.moa2.global.token.TokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.context.annotation.Profile;
 
@@ -32,7 +31,6 @@ public class ReservationFacade {
      * @param request 예매 요청 정보
      * @return 예매 결과
      */
-    @Transactional
     public ReservationDtoV2.ReserveResponse reserve(
             String token,
             Long userId,
