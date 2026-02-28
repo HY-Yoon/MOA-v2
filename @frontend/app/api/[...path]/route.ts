@@ -9,16 +9,32 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
     const pathString = path.join('/');
     const url = new URL(request.url);
 
+    const contentType = request.headers.get('content-type') ?? 'application/json';
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+    };
+    const authHeader = request.headers.get('authorization');
+    const cookie = request.headers.get('cookie');
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (cookie) headers['Cookie'] = cookie;
+
     const fetchOptions: RequestInit = {
       method: request.method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     };
 
+    let bodySizeBytes = 0;
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
       const body = await request.text();
       if (body) {
+        // 이미지 등록 파일 용량 체크
+        bodySizeBytes = Buffer.byteLength(body, 'utf8');
+        if (bodySizeBytes > 0) {
+          const mb = (bodySizeBytes / 1024 / 1024).toFixed(2);
+          console.log(
+            `[Proxy] ${request.method} /api/${pathString} size: ${bodySizeBytes.toLocaleString()} bytes (${mb} MB) / type: ${contentType.slice(0, 30)} ...`,
+          );
+        }
         fetchOptions.body = body;
       }
     }
