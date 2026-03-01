@@ -1,6 +1,7 @@
 package com.moa2.api.reservation.service.v2;
 
 import com.moa2.api.reservation.dto.ReservationDtoV2;
+import com.moa2.api.reservation.dto.ReservationRequestEvent;
 import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.show.domain.entity.ScheduleSeat;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
@@ -16,20 +17,17 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * V2: Redisson 분산 락 기반 예매 서비스
+ * V2: Redisson 분산 락 기반 예매 서비스 (Kafka 비동기 처리)
  *
- * [트랜잭션 분리 설계]
- * reserve()              : 트랜잭션 없음 - Redis 분산 락 획득/해제만 담당
- * ReservationPersistService : @Transactional - DB 쓰기(예약, 좌석 상태, 결제)만 담당
- *
- * 이렇게 분리하는 이유:
- * - reserve()에 @Transactional이 걸려 있으면, 락 대기(최대 3초) 동안
- *   DB 커넥션을 아무 일 없이 물고 있게 됨
- * - 동시 요청 수백 건이 몰리면 HikariCP 커넥션 풀이 고갈 → 500 에러 폭발
- * - DB 커넥션은 "진짜 DB에 쓸 때만" 짧게 사용하도록 별도 클래스로 분리
+ * [Kafka 도입 후 흐름]
+ * 1. Redis 분산 락 획득 + 좌석 유효성 검증
+ * 2. Kafka에 예매 이벤트 발행 (DB 커넥션 점유 없음)
+ * 3. 즉시 202 Accepted 응답
+ * 4. Consumer가 비동기로 DB 저장 (ReservationPersistService)
  */
 @Slf4j
 @Profile("v2")
@@ -40,7 +38,7 @@ public class ReservationServiceV2 {
     private final RedissonClient redissonClient;
     private final RedisTemplate<String, String> redisTemplate;
     private final ScheduleSeatRepository scheduleSeatRepository;
-    private final ReservationPersistService reservationPersistService;
+    private final ReservationKafkaProducer kafkaProducer;
 
     @Value("${queue.token.ttl-minutes:5}")
     private int lockTtlMinutes;
@@ -49,11 +47,11 @@ public class ReservationServiceV2 {
     private static final String SEAT_STATUS_PREFIX = "seat:status:";
 
     /**
-     * 예약 처리 (분산 락 적용, 트랜잭션 없음)
+     * 예약 처리 (분산 락 + Kafka 비동기 발행)
      * - Redis 분산 락으로 좌석 동시성 제어
-     * - DB 커넥션은 saveReservationData()에서만 사용
+     * - Kafka에 이벤트 발행 후 즉시 응답 (DB 커넥션 사용 없음)
      */
-    public ReservationDtoV2.ReserveResponse reserve(
+    public ReservationDtoV2.ReserveAcceptedResponse reserve(
             Long userId,
             Long scheduleId,
             List<Long> seatIds) {
@@ -63,10 +61,12 @@ public class ReservationServiceV2 {
         List<Long> sortedSeatIds = new ArrayList<>(seatIds);
         sortedSeatIds.sort(Long::compareTo);
 
-        List<ScheduleSeat> reservedSeats = new ArrayList<>();
+        List<Long> validatedSeatIds = new ArrayList<>();
         List<RLock> acquiredLocks = new ArrayList<>();
         List<String> conflictSeatNumbers = new ArrayList<>();
         int totalAmount = 0;
+
+        String eventId = UUID.randomUUID().toString();
 
         try {
             // 2. 각 좌석에 대해 Redis 분산 락 획득 및 검증
@@ -74,7 +74,7 @@ public class ReservationServiceV2 {
                 RLock lock = redissonClient.getLock(SEAT_LOCK_PREFIX + seatId);
 
                 try {
-                    // 3초 대기, 5초 후 자동 해제 (기존 10초 → 3초로 단축)
+                    // 3초 대기, 5초 후 자동 해제
                     boolean acquired = lock.tryLock(3, 5, TimeUnit.SECONDS);
 
                     if (!acquired) {
@@ -89,22 +89,18 @@ public class ReservationServiceV2 {
                     String statusKey = SEAT_STATUS_PREFIX + seatId;
                     String cachedStatus = redisTemplate.opsForValue().get(statusKey);
 
-                    if ("RESERVED".equals(cachedStatus) || "SOLD".equals(cachedStatus)) {
+                    if ("RESERVED".equals(cachedStatus) || "SOLD".equals(cachedStatus)
+                            || "PENDING_KAFKA".equals(cachedStatus) || "CONFIRMED".equals(cachedStatus)) {
                         conflictSeatNumbers.add(String.valueOf(seatId));
                         continue;
                     }
 
-                    // Redis 캐시 업데이트 (선점 표시)
-                    redisTemplate.opsForValue().set(statusKey, "RESERVED", lockTtlMinutes, TimeUnit.MINUTES);
-
-                    // 좌석 엔티티 조회 (트랜잭션 밖이므로 detached 상태)
+                    // 좌석 엔티티 조회 (유효성 검증용)
                     ScheduleSeat scheduleSeat = scheduleSeatRepository.findById(seatId)
                             .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + seatId));
 
                     if (scheduleSeat.getStatus() != SeatStatus.AVAILABLE) {
                         conflictSeatNumbers.add(String.valueOf(seatId));
-                        // Redis 캐시 롤백
-                        redisTemplate.delete(statusKey);
                         continue;
                     }
 
@@ -112,9 +108,12 @@ public class ReservationServiceV2 {
                         throw new IllegalArgumentException("해당 스케줄의 좌석이 아닙니다: " + seatId);
                     }
 
-                    reservedSeats.add(scheduleSeat);
+                    // Redis 캐시: PENDING_KAFKA 상태로 설정 (Consumer 처리 전까지 유지)
+                    redisTemplate.opsForValue().set(statusKey, "PENDING_KAFKA", 10, TimeUnit.MINUTES);
+
+                    validatedSeatIds.add(seatId);
                     totalAmount += scheduleSeat.getGrade().getPrice();
-                    log.debug("좌석 선점 성공: seatId={}", seatId);
+                    log.debug("좌석 검증 성공: seatId={}", seatId);
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -127,11 +126,38 @@ public class ReservationServiceV2 {
                 throw new SeatConflictException(conflictSeatNumbers);
             }
 
-            // 3. DB 저장 (여기서만 트랜잭션 + DB 커넥션 사용!)
-            return reservationPersistService.saveReservationData(userId, scheduleId, reservedSeats, totalAmount, lockTtlMinutes);
+            // 3. Kafka 이벤트 발행 (DB 커넥션 사용 없이 비동기 처리!)
+            ReservationRequestEvent event = ReservationRequestEvent.builder()
+                    .eventId(eventId)
+                    .userId(userId)
+                    .scheduleId(scheduleId)
+                    .scheduleSeatIds(validatedSeatIds)
+                    .totalAmount(totalAmount)
+                    .lockTtlMinutes(lockTtlMinutes)
+                    .build();
+
+            try {
+                kafkaProducer.send(event);
+            } catch (Exception e) {
+                // ★ Producer 실패 시 보상 트랜잭션: Redis 상태 롤백
+                log.error("Kafka 이벤트 발행 실패 - 보상 트랜잭션 실행", e);
+                for (Long seatId : validatedSeatIds) {
+                    redisTemplate.delete(SEAT_STATUS_PREFIX + seatId);
+                }
+                throw new RuntimeException("예매 처리 중 오류가 발생했습니다. 다시 시도해주세요.", e);
+            }
+
+            // 4. 예매 상태: PENDING (폴링용)
+            redisTemplate.opsForValue().set(
+                    "reservation:status:" + eventId, "PENDING", 30, TimeUnit.MINUTES);
+
+            log.info("V2 Kafka 예매 이벤트 발행 완료 - eventId: {}", eventId);
+
+            // 5. 202 Accepted 응답 (DB 저장은 Consumer가 비동기 처리)
+            return ReservationDtoV2.ReserveAcceptedResponse.of(eventId);
 
         } finally {
-            // 4. 락 해제 (항상 실행)
+            // 6. 락 해제 (항상 실행)
             for (RLock lock : acquiredLocks) {
                 try {
                     if (lock.isHeldByCurrentThread()) {

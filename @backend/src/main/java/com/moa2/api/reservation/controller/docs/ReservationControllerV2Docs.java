@@ -36,18 +36,14 @@ public interface ReservationControllerV2Docs {
       5. 토큰 소진 (재사용 방지)
       """)
   @ApiResponses(value = {
-      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "예매 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "예매 접수 완료 (비동기 처리 진행)", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
           {
             "success": true,
             "data": {
-              "reservationId": 1234,
-              "reservationNumber": "RES-20260203-A1B2C3",
-              "orderId": "MOA-abc123def456ghi789jk",
-              "seatCount": 2,
-              "totalAmount": 100000,
-              "paymentDeadline": "2026-02-03T11:00:00",
-              "message": "좌석 선점 완료! 11:00:00까지 결제해주세요."
-            }
+              "eventId": "7c0a4b26-fcf3-463a-a752-c78603a0eb96",
+              "message": "예매가 접수되었습니다. 잠시 후 확인해주세요."
+            },
+            "message": null
           }
           """))),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "예매 실패", content = @Content(mediaType = "application/json", examples = {
@@ -90,4 +86,54 @@ public interface ReservationControllerV2Docs {
             "scheduleSeatIds": [101, 102]
           }
           """))) ReservationDtoV2.ReserveRequest request);
+
+  @Operation(summary = "예매 처리 상태 조회 (폴링)", description = """
+      Kafka 비동기 처리 상태를 확인합니다. `eventId`를 사용하여 1~2초 간격으로 폴링합니다.
+      상태가 `COMPLETED`가 되면 예매 완료 결과 정보(`result`)가 포함되어 응답됩니다.
+      """)
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json", examples = {
+          @ExampleObject(name = "처리 중 (PENDING)", value = """
+              {
+                "success": true,
+                "data": {
+                  "eventId": "7c0a4b26-fcf3-463a-a752-c78603a0eb96",
+                  "status": "PENDING"
+                },
+                "message": null
+              }
+              """),
+          @ExampleObject(name = "처리 완료 (COMPLETED)", value = """
+              {
+                "success": true,
+                "data": {
+                  "eventId": "7c0a4b26-fcf3-463a-a752-c78603a0eb96",
+                  "status": "COMPLETED",
+                  "result": {
+                    "reservationId": 1234,
+                    "reservationNumber": "RES-20260203-A1B2C3",
+                    "orderId": "MOA-abc123def456ghi789jk",
+                    "seatCount": 2,
+                    "totalAmount": 100000,
+                    "paymentDeadline": "2026-02-03T11:00:00",
+                    "message": "좌석 선점 완료! 11:00:00까지 결제해주세요."
+                  }
+                },
+                "message": null
+              }
+              """)
+      })),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "이벤트 없음", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+          {
+            "success": false,
+            "data": {
+              "eventId": "unknown-id",
+              "status": "NOT_FOUND"
+            },
+            "message": "해당 예매 이벤트를 찾을 수 없습니다."
+          }
+          """)))
+  })
+  ResponseEntity<?> getReservationStatus(
+      @Parameter(description = "예매 이벤트 ID", required = true) String eventId);
 }

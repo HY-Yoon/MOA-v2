@@ -54,6 +54,12 @@ public class QueueTokenFilter extends OncePerRequestFilter {
             return;
         }
 
+        // status 조회 API는 대기열 토큰 없이 접근 가능하도록 예외 처리
+        if (pathMatcher.match("/api/v2/reservations/status/**", uri)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         // 1. X-Queue-Token 헤더 확인
         String token = request.getHeader(QUEUE_TOKEN_HEADER);
         if (token == null || token.isBlank()) {

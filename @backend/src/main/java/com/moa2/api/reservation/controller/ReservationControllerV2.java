@@ -10,15 +10,21 @@ import com.moa2.global.dto.ErrorResponse;
 import com.moa2.global.model.ErrorCode;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 /**
  * V2: Redis 기반 예매 컨트롤러
@@ -41,12 +47,14 @@ public class ReservationControllerV2 implements ReservationControllerV2Docs {
 
     private final ReservationFacade reservationFacade;
     private final UserRepository userRepository;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
 
     /**
      * 좌석 예매
      * - X-Queue-Token 헤더로 토큰 전달
      */
-    @Override
+    @Operation(summary = "V2 좌석 예매", description = "Redis 기반 예매 API입니다. 비동기 처리를 위해 202 Accepted를 반환하고, 상태 확인용 eventId를 제공합니다.")
     @PostMapping("/reserve")
     public ResponseEntity<?> reserve(
             @RequestHeader("X-Queue-Token") String token,
@@ -54,8 +62,10 @@ public class ReservationControllerV2 implements ReservationControllerV2Docs {
 
         try {
             Long userId = getAuthenticatedUserId();
-            ReservationDtoV2.ReserveResponse response = reservationFacade.reserve(token, userId, request);
-            return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
+            ReservationDtoV2.ReserveAcceptedResponse response = reservationFacade.reserve(token, userId, request);
+            // Kafka 비동기 처리: 202 Accepted 응답
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(com.moa2.global.dto.ApiResponse.success(response));
 
         } catch (SeatConflictException e) {
             // 좌석 충돌: 충돌 좌석 목록을 data에 포함
@@ -80,6 +90,45 @@ public class ReservationControllerV2 implements ReservationControllerV2Docs {
                     .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
                             ErrorResponse.of(ErrorCode.BAD_REQUEST)));
         }
+    }
+
+    /**
+     * 예매 처리 상태 폴링 API
+     * - 클라이언트가 1~2초 간격으로 호출하여 비동기 처리 상태 확인
+     * - PENDING: 아직 처리 중
+     * - COMPLETED: DB 저장 완료 → 결제 페이지로 이동 가능
+     * - FAILED: 처리 실패 → 재시도 안내
+     */
+    @Operation(summary = "예매 처리 상태 조회 (폴링)", description = "Kafka 비동기 처리 상태를 확인합니다.")
+    @GetMapping("/status/{eventId}")
+    public ResponseEntity<?> getReservationStatus(@PathVariable String eventId) {
+        String statusKey = "reservation:status:" + eventId;
+        String status = redisTemplate.opsForValue().get(statusKey);
+
+        if (status == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(com.moa2.global.dto.ApiResponse.error(
+                            "해당 예매 이벤트를 찾을 수 없습니다.",
+                            Map.of("eventId", eventId, "status", "NOT_FOUND")));
+        }
+
+        if ("COMPLETED".equals(status)) {
+            String resultKey = "reservation:result:" + eventId;
+            String resultJson = redisTemplate.opsForValue().get(resultKey);
+
+            if (resultJson != null) {
+                try {
+                    Object resultObj = objectMapper.readValue(resultJson, Object.class);
+                    return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(
+                            Map.of("eventId", eventId, "status", status, "result", resultObj)));
+                } catch (Exception e) {
+                    log.error("예매 결과 JSON 파싱 실패: {}", e.getMessage());
+                }
+            }
+        }
+
+        return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(
+                Map.of("eventId", eventId, "status", status)));
     }
 
     /**

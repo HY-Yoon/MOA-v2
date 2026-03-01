@@ -31,7 +31,7 @@ public class ReservationFacade {
      * @param request 예매 요청 정보
      * @return 예매 결과
      */
-    public ReservationDtoV2.ReserveResponse reserve(
+    public ReservationDtoV2.ReserveAcceptedResponse reserve(
             String token,
             Long userId,
             ReservationDtoV2.ReserveRequest request) {
@@ -54,8 +54,8 @@ public class ReservationFacade {
             throw new IllegalArgumentException("해당 스케줄에 사용할 수 없는 토큰입니다");
         }
 
-        // 4. 예매 처리 (Redisson 분산 락)
-        ReservationDtoV2.ReserveResponse response = reservationServiceV2.reserve(
+        // 4. 예매 처리 (Redisson 분산 락, Kafka 이벤트 발행)
+        ReservationDtoV2.ReserveAcceptedResponse response = reservationServiceV2.reserve(
                 userId,
                 request.scheduleId(),
                 request.scheduleSeatIds());
@@ -63,7 +63,7 @@ public class ReservationFacade {
         // 5. 토큰 소진 (재사용 방지)
         tokenService.consumeToken(token);
 
-        log.info("V2 예매 Facade 완료 - reservationId: {}", response.reservationId());
+        log.info("V2 예매 Facade 완료 - 비동기 접수 eventId: {}", response.eventId());
 
         return response;
     }

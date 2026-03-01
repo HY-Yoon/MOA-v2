@@ -53,8 +53,8 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
 
-    // Kafka 주석 처리
-    // implementation("org.springframework.boot:spring-boot-starter-kafka")
+    // Kafka (비동기 예매 처리)
+    implementation("org.springframework.kafka:spring-kafka")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
 

@@ -72,4 +72,22 @@ public class ReservationDtoV2 {
                                         .build();
                 }
         }
+
+        /**
+         * 비동기 예매 접수 응답 DTO (Kafka 연동용)
+         */
+        @Builder
+        @Schema(description = "V2 202 Accepted 응답 (비동기 처리 접수)")
+        public record ReserveAcceptedResponse(
+                        @Schema(description = "이벤트 ID (폴링용)", example = "7510cded-52fa-47a8-8d87-0762eb008bda") String eventId,
+                        
+                        @Schema(description = "메시지", example = "예매가 접수되었습니다. 잠시 후 확인해주세요.") String message) {
+            
+                public static ReserveAcceptedResponse of(String eventId) {
+                        return ReserveAcceptedResponse.builder()
+                                        .eventId(eventId)
+                                        .message("예매가 접수되었습니다. 잠시 후 확인해주세요.")
+                                        .build();
+                }
+        }
 }
