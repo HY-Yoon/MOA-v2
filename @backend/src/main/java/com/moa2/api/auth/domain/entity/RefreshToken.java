@@ -1,75 +1,43 @@
 package com.moa2.api.auth.domain.entity;
 
-import com.moa2.api.auth.domain.converter.RefreshTokenConverter;
-import com.moa2.global.entity.BaseTimeEntity;
-import com.moa2.global.model.SocialProvider;
-import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Builder;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.TimeToLive;
+import org.springframework.data.redis.core.index.Indexed;
 
 /**
- * Refresh Token 엔티티
- * DB에 저장하여 Access Token 갱신에 사용
- * 나중에 Redis로 마이그레이션 가능하도록 단순한 구조로 설계
+ * Refresh Token Redis 엔티티
+ *
+ * [변경 이유]
+ * 기존 JPA(DB) 방식에서 Redis 방식으로 마이그레이션.
+ * - TTL 자동 관리 (만료 시 Redis가 알아서 삭제)
+ * - 고성능 I/O (JWT 검증 시 DB 부하 없음)
+ * - 토큰 무효화(로그아웃) 지원 유지
+ *
+ * [저장 키 구조]
+ * refresh_token:{token값}  →  email + provider 정보 저장
+ * 인덱스: email + provider 조합으로 조회/삭제 가능
  */
-@Entity
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "refresh_tokens", indexes = {
-    @Index(name = "idx_refresh_token_user_email", columnList = "user_email"),
-    @Index(name = "idx_refresh_token_token", columnList = "token"),
-    @Index(name = "idx_refresh_token_email_provider", columnList = "user_email,social_provider")
-})
-public class RefreshToken extends BaseTimeEntity {
+@AllArgsConstructor
+@RedisHash("refresh_token")
+public class RefreshToken {
 
+    /** Refresh Token JWT 문자열 (PK) */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, unique = true, length = 500)
-    @Convert(converter = RefreshTokenConverter.class)
     private String token;
 
-    @Column(name = "user_email", nullable = false)
+    /** 사용자 이메일 */
+    @Indexed
     private String userEmail;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "social_provider", nullable = false)
-    private SocialProvider socialProvider;
+    /** 소셜 제공자 이름 (예: KAKAO, GOOGLE) */
+    @Indexed
+    private String socialProvider;
 
-    @Column(name = "expiry_date", nullable = false)
-    private LocalDateTime expiryDate;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Builder
-    public RefreshToken(String token, String userEmail, SocialProvider socialProvider, LocalDateTime expiryDate) {
-        this.token = token;
-        this.userEmail = userEmail;
-        this.socialProvider = socialProvider;
-        this.expiryDate = expiryDate;
-        this.createdAt = LocalDateTime.now();
-    }
-
-    /**
-     * Refresh Token이 만료되었는지 확인
-     * @return 만료 여부
-     */
-    public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiryDate);
-    }
-
-    /**
-     * Refresh Token 갱신 (만료 시간 업데이트)
-     * @param newExpiryDate 새로운 만료 시간
-     */
-    public void updateExpiryDate(LocalDateTime newExpiryDate) {
-        this.expiryDate = newExpiryDate;
-    }
+    /** TTL (초): 기본 14일 */
+    @TimeToLive
+    private long ttl;
 }
-

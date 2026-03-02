@@ -9,6 +9,7 @@ import com.moa2.global.dto.PageResponse;
 import com.moa2.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
+@Profile("v1")
 @RequestMapping("/api/v1/reservations")
 @RequiredArgsConstructor
 public class ReservationController implements ReservationControllerDocs {

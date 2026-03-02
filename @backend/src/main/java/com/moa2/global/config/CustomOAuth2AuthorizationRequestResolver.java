@@ -1,9 +1,9 @@
 package com.moa2.global.config;
 
-import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
@@ -21,7 +21,6 @@ public class CustomOAuth2AuthorizationRequestResolver implements OAuth2Authoriza
     private final OAuth2AuthorizationRequestResolver defaultResolver;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
@@ -42,22 +41,30 @@ public class CustomOAuth2AuthorizationRequestResolver implements OAuth2Authoriza
             return null;
         }
 
-//        Map<String, Object> additionalParameters = new HashMap<>(authorizationRequest.getAdditionalParameters());
-//
-//        // 제공자별 파라미터 설정
-//        String registrationId = authorizationRequest.getAttribute("registration_id");
-//        if (registrationId != null) {
-//            if ("google".equals(registrationId)) {
-//                    additionalParameters.put("prompt", "consent");
-//            } else if ("naver".equals(registrationId)) {
-//                    additionalParameters.put("auth_type", "reprompt");
-//            }
-//        } else {
-//                additionalParameters.put("prompt", "consent");
-//        }
+        // 프론트엔드 환경 파라미터 저장 (local or prod)
+        String env = request.getParameter("env");
+        if (env != null) {
+            HttpSession session = request.getSession();
+            session.setAttribute("oauth2_env", env);
+        }
+
+        // Map<String, Object> additionalParameters = new
+        // HashMap<>(authorizationRequest.getAdditionalParameters());
+        //
+        // // 제공자별 파라미터 설정
+        // String registrationId = authorizationRequest.getAttribute("registration_id");
+        // if (registrationId != null) {
+        // if ("google".equals(registrationId)) {
+        // additionalParameters.put("prompt", "consent");
+        // } else if ("naver".equals(registrationId)) {
+        // additionalParameters.put("auth_type", "reprompt");
+        // }
+        // } else {
+        // additionalParameters.put("prompt", "consent");
+        // }
 
         return OAuth2AuthorizationRequest.from(authorizationRequest)
-//                .additionalParameters(additionalParameters)
+                // .additionalParameters(additionalParameters)
                 .redirectUri(authorizationRequest.getRedirectUri())
                 .build();
     }
