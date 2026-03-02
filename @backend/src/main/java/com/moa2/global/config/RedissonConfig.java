@@ -30,7 +30,9 @@ public class RedissonConfig {
     public RedissonClient redissonClient() {
         Config config = new Config();
 
-        String address = "redis://" + host + ":" + port;
+        // Upstash 등 클라우드 Redis는 TLS(rediss://) 필수, 로컬은 redis://
+        String scheme = (password != null && !password.isBlank()) ? "rediss://" : "redis://";
+        String address = scheme + host + ":" + port;
 
         config.useSingleServer()
                 .setAddress(address)
