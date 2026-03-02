@@ -12,49 +12,28 @@ import org.springframework.context.annotation.Profile;
 /**
  * V2: Redisson 분산 락 설정
  * - 좌석 선점 시 분산 환경에서 동시성 제어
+ * - 운영(prod): REDIS_URL 환경변수 (rediss://default:password@host:port)
+ * - 로컬: redis://localhost:6379
  */
 @Configuration
 @Profile("v2")
 public class RedissonConfig {
 
-    @Value("${spring.data.redis.host:localhost}")
-    private String host;
-
-    @Value("${spring.data.redis.port:6379}")
-    private int port;
-
-    @Value("${spring.data.redis.username:}")
-    private String username;
-
-    @Value("${spring.data.redis.password:}")
-    private String password;
+    @Value("${REDIS_URL:redis://localhost:6379}")
+    private String redisUrl;
 
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();
 
-        // Upstash 등 클라우드 Redis는 TLS(rediss://) 필수, 로컬은 redis://
-        String scheme = (password != null && !password.isBlank()) ? "rediss://" : "redis://";
-        String address = scheme + host + ":" + port;
-
         config.useSingleServer()
-                .setAddress(address)
+                .setAddress(redisUrl)
                 .setConnectionPoolSize(50)
                 .setConnectionMinimumIdleSize(10)
                 .setConnectTimeout(10000)
                 .setTimeout(3000)
                 .setRetryAttempts(3)
                 .setRetryInterval(1500);
-
-        // 사용자명이 설정된 경우 (Upstash: "default")
-        if (username != null && !username.isBlank()) {
-            config.useSingleServer().setUsername(username);
-        }
-
-        // 비밀번호가 설정된 경우
-        if (password != null && !password.isBlank()) {
-            config.useSingleServer().setPassword(password);
-        }
 
         return Redisson.create(config);
     }

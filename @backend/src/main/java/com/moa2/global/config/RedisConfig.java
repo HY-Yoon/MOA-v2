@@ -6,49 +6,57 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.net.URI;
 
 /**
  * V2: Redis Configuration
  * - RedisAutoConfiguration is always excluded (see Moa2Application.java)
  * - This class manually creates Redis beans only when 'v2' profile is active
+ * - 운영(prod): REDIS_URL 환경변수 (rediss://default:password@host:port)
+ * - 로컬: redis://localhost:6379
  */
 @Configuration
 @Profile("v2")
 public class RedisConfig {
 
-    @Value("${spring.data.redis.host:localhost}")
-    private String host;
-
-    @Value("${spring.data.redis.port:6379}")
-    private int port;
-
-    @Value("${spring.data.redis.username:}")
-    private String username;
-
-    @Value("${spring.data.redis.password:}")
-    private String password;
+    @Value("${REDIS_URL:redis://localhost:6379}")
+    private String redisUrl;
 
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
-        if (username != null && !username.isBlank()) {
-            config.setUsername(username);
-        }
-        if (password != null && !password.isBlank()) {
-            config.setPassword(password);
+        URI uri = URI.create(redisUrl);
+
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(uri.getHost());
+        config.setPort(uri.getPort());
+
+        // URI에서 username:password 추출 (rediss://default:password@host:port)
+        String userInfo = uri.getUserInfo();
+        if (userInfo != null) {
+            String[] parts = userInfo.split(":", 2);
+            if (parts.length == 2) {
+                config.setUsername(parts[0]);
+                config.setPassword(parts[1]);
+            } else {
+                config.setPassword(parts[0]);
+            }
         }
 
-        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
+        // rediss:// 스킴이면 TLS(SSL) 활성화
+        boolean useSsl = "rediss".equalsIgnoreCase(uri.getScheme());
 
-        // Upstash 등 클라우드 Redis는 TLS(SSL) 필수
-        if (password != null && !password.isBlank()) {
-            factory.setUseSsl(true);
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientConfigBuilder =
+                LettuceClientConfiguration.builder();
+        if (useSsl) {
+            clientConfigBuilder.useSsl().disablePeerVerification();
         }
 
-        return factory;
+        return new LettuceConnectionFactory(config, clientConfigBuilder.build());
     }
 
     @Bean
