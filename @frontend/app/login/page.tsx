@@ -82,11 +82,17 @@ type LoginPageProps = {
   searchParams: Promise<{ error?: string; message?: string | string[] }>;
 };
 
+const AUTH_CALLBACK_MESSAGES: Record<string, string> = {
+  invalid: '인증 코드가 없거나 유효하지 않습니다. 다시 시도해 주세요.',
+  failed: '로그인 실패했습니다. 다시 시도해 주세요.',
+};
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const rawMessage = params?.message;
-  const errorMessage =
+  const messageKey =
     rawMessage == null ? null : Array.isArray(rawMessage) ? rawMessage[0] : rawMessage;
+  const errorMessage = messageKey ? (AUTH_CALLBACK_MESSAGES[messageKey] ?? messageKey) : null;
 
   return (
     <div className="bg-muted/30 flex h-[calc(100vh-3.75rem)] flex-col items-center justify-center px-4 py-12">
