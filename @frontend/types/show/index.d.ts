@@ -8,7 +8,10 @@ namespace ShowCatalog {
     page: number;
     size: number;
     genre?: Genre;
+    region?: Region;
     keyword?: string;
+    startDate?: string;
+    endDate?: string;
     orderBy?: string;
     orderDirection?: 'asc' | 'desc';
   }
