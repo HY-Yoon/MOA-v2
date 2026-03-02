@@ -21,7 +21,11 @@ import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 
-export default function ShowList() {
+interface ShowListProps {
+  showRank?: boolean;
+}
+
+export default function ShowList({ showRank = false }: ShowListProps) {
   const CONTENT_MIN_HEIGHT_CLASS = 'min-h-[560px]';
   const [selectedGenre, setSelectedGenre] = useState<ShowCatalog.Genre | 'ALL'>('ALL');
 
@@ -39,7 +43,10 @@ export default function ShowList() {
 
   const { data, isFetching } = useQuery(getShowCatalogList(params));
   const shows = data?.content ?? [];
-  const displayedShows = shows;
+  const displayedShows =
+    selectedGenre === 'ALL'
+      ? shows
+      : shows.filter((show) => show.genre === selectedGenre);
 
   const getRegionLabel = (region: ShowCatalog.List['location']['region']) => {
     if (typeof region === 'string' && region in REGION_LABELS) {
@@ -101,20 +108,36 @@ export default function ShowList() {
             className="w-full px-8"
           >
           <CarouselContent>
-            {displayedShows.map((show) => (
+            {displayedShows.map((show, index) => (
               <CarouselItem key={show.id} className="basis-full md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                 <Card className="h-full gap-3 py-0">
                   <div className="relative aspect-3/4 w-full overflow-hidden rounded-t-xl bg-slate-100">
                     {show.posterUrl ? (
-                      <Image
-                        src={show.posterUrl}
-                        alt={show.title}
-                        fill
-                        className="object-cover"
-                      />
+                      <>
+                        <Image
+                          src={show.posterUrl}
+                          alt={show.title}
+                          fill
+                          className="z-0 object-cover"
+                        />
+                        {showRank && (
+                          <div
+                            className="pointer-events-none absolute inset-0 z-1"
+                            style={{
+                              background:
+                                'linear-gradient(0deg, rgba(0, 0, 0, .04), rgba(0, 0, 0, .04)), linear-gradient(180deg, transparent 69.07%, rgba(0, 0, 0, .36))',
+                            }}
+                          />
+                        )}
+                      </>
                     ) : (
                       <div className="flex h-full items-center justify-center text-sm text-slate-400">
                         포스터 없음
+                      </div>
+                    )}
+                    {showRank && (
+                      <div className="pointer-events-none absolute bottom-2 left-3 z-10 text-6xl font-black leading-none text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]">
+                        {index + 1}
                       </div>
                     )}
                   </div>

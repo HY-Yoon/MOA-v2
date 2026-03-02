@@ -27,9 +27,9 @@ export default function Home() {
         <div className="container mx-auto px-4">
           {/* Featured Shows */}
           <div className="mb-16">
-            <h2 className="mb-8 text-2xl font-bold">타이틀</h2>
+            <h2 className="mb-8 text-2xl font-bold">장르별 인기공연</h2>
 
-            <ShowList />
+            <ShowList showRank />
           </div>
         </div>
       </section>
