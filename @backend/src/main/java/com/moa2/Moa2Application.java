@@ -5,9 +5,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
+@EnableRedisRepositories(basePackages = "com.moa2.api.auth.domain.repository")
 @SpringBootApplication(exclude = { RedisAutoConfiguration.class })
 public class Moa2Application {
 

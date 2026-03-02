@@ -3,8 +3,7 @@ package com.moa2.global.handler;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.api.auth.dto.OAuthAttributes;
-import com.moa2.global.security.JwtTokenProvider;
-import com.moa2.api.auth.service.RefreshTokenService;
+import com.moa2.api.auth.service.AuthCodeService;
 import com.moa2.global.util.LogMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -12,7 +11,6 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -23,127 +21,102 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * OAuth2 로그인 성공 시 Access Token과 Refresh Token을 생성하고 쿠키에 저장한 후 리다이렉트하는 핸들러
- * Cross-Site 환경(백엔드: Koyeb, 프론트엔드: Local/Vercel)을 지원하기 위해 SameSite=None 설정
+ * OAuth2 로그인 성공 시 일회용 인증 코드(Auth Code)를 발급하고 프론트엔드로 리다이렉트하는 핸들러
+ *
+ * [변경 이유]
+ * 기존에는 로그인 성공 후 JWT 토큰을 Set-Cookie로 구워서 프론트엔드로 리다이렉트 했으나,
+ * 프론트(Vercel)와 백(Koyeb)의 도메인이 달라 브라우저가 서드파티 쿠키를 차단함.
+ *
+ * [변경 내용]
+ * 1. JWT 토큰을 직접 발급하지 않고, 3분짜리 일회용 코드(Auth Code)를 Redis에 저장
+ * 2. 프론트엔드로 리다이렉트할 때 URL에 code만 담아서 전달 (?code=...)
+ * 3. 프론트엔드는 이 코드로 /api/auth/exchange-code API를 호출하여 실제 토큰(JSON)을 교환
+ * 4. 프론트엔드가 자기 도메인에서 직접 HttpOnly 쿠키를 설정하므로 도메인 문제 해결
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-        private final JwtTokenProvider jwtTokenProvider;
-        private final RefreshTokenService refreshTokenService;
-        private final UserRepository userRepository;
+    private final AuthCodeService authCodeService;
+    private final UserRepository userRepository;
 
-        // Cross-Site 쿠키 설정 (환경변수로 제어 가능)
-        @Value("${security.cookie.secure:true}")
-        private boolean cookieSecure;
+    @Value("${app.frontend.local-url:http://localhost:3000}")
+    private String frontendLocalUrl;
 
-        @Value("${security.cookie.same-site:None}")
-        private String cookieSameSite;
+    @Value("${app.frontend.prod-url:https://moa-v2.vercel.app}")
+    private String frontendProdUrl;
 
-        // Frontend URL for redirect
-        @Value("${app.frontend.local-url:http://localhost:3000}")
-        private String frontendLocalUrl;
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+            Authentication authentication) throws IOException {
 
-        @Value("${app.frontend.prod-url:https://moa-v2.vercel.app}")
-        private String frontendProdUrl;
+        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+        User user = null;
 
-        @Override
-        public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-                        Authentication authentication) throws IOException {
+        try {
+            OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
+            String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
 
-                OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-                User user = null;
+            Map<String, Object> attributes = oAuth2User.getAttributes();
+            OAuthAttributes oauthAttributes = OAuthAttributes.of(registrationId, attributes);
 
-                try {
-                        // providerId로 사용자 조회 (가장 정확한 방법)
-                        OAuth2AuthenticationToken oauth2Token = (OAuth2AuthenticationToken) authentication;
-                        String registrationId = oauth2Token.getAuthorizedClientRegistrationId();
+            user = userRepository
+                    .findBySocialProviderAndProviderId(oauthAttributes.getProvider(),
+                            oauthAttributes.getProviderId())
+                    .orElse(null);
 
-                        // OAuthAttributes로 변환하여 providerId 추출
-                        Map<String, Object> attributes = oAuth2User.getAttributes();
-                        OAuthAttributes oauthAttributes = OAuthAttributes.of(registrationId, attributes);
+            if (user == null) {
+                log.error("사용자 정보를 찾을 수 없습니다: {} ({})",
+                        oauthAttributes.getProviderId(), oauthAttributes.getProvider());
+                response.sendRedirect(resolveTargetUrl(request) + "/login?error=user_not_found");
+                return;
+            }
 
-                        // DB에서 사용자 조회 (providerId로 조회 - 가장 정확함)
-                        user = userRepository
-                                        .findBySocialProviderAndProviderId(oauthAttributes.getProvider(),
-                                                        oauthAttributes.getProviderId())
-                                        .orElse(null);
+            log.debug("사용자 조회 성공: {} ({})",
+                    LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
 
-                        if (user == null) {
-                                log.error("사용자 정보를 찾을 수 없습니다: {} ({})",
-                                                oauthAttributes.getProviderId(), oauthAttributes.getProvider());
-                                response.sendRedirect("/api/auth/error?message=사용자 정보를 찾을 수 없습니다.");
-                                return;
-                        }
-
-                        log.debug("사용자 조회 성공: {} ({})",
-                                        LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
-
-                } catch (Exception e) {
-                        log.error("사용자 조회 실패: {}", e.getMessage(), e);
-                        response.sendRedirect("/api/auth/error?message=사용자 정보 조회 중 오류가 발생했습니다.");
-                        return;
-                }
-
-                String email = user.getEmail();
-                if (email == null || email.trim().isEmpty()) {
-                        log.error("사용자 이메일이 없습니다: {}", user.getId());
-                        response.sendRedirect("/api/auth/error?message=이메일 정보를 찾을 수 없습니다.");
-                        return;
-                }
-
-                // Access Token 생성 (provider 정보 포함)
-                String provider = user.getSocialProvider().name();
-                String accessToken = jwtTokenProvider.createAccessToken(email, provider);
-                log.info("Access Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
-
-                // Refresh Token 생성 (provider 정보 포함)
-                String refreshToken = jwtTokenProvider.createRefreshToken(email, provider);
-                log.info("Refresh Token 생성 완료: {} ({})", LogMaskingUtil.maskEmail(email), user.getSocialProvider());
-
-                // Refresh Token을 DB에 저장 (소셜 제공자 포함)
-                refreshTokenService.createRefreshToken(email, refreshToken, user.getSocialProvider());
-
-                ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", accessToken)
-                                .path("/") // 모든 경로에서 쿠키 사용 가능
-                                .httpOnly(true) // JavaScript 접근 차단 (XSS 방지)
-                                .secure(cookieSecure) // HTTPS에서만 전송 (SameSite=None 사용 시 필수)
-                                .sameSite(cookieSameSite) // Cross-Site 요청 허용 (None으로 설정)
-                                .maxAge(30 * 60) // 30분 (초 단위)
-                                .build();
-
-                ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
-                                .path("/") // 모든 경로에서 쿠키 사용 가능
-                                .httpOnly(true) // JavaScript 접근 차단 (XSS 방지)
-                                .secure(cookieSecure) // HTTPS에서만 전송 (SameSite=None 사용 시 필수)
-                                .sameSite(cookieSameSite) // Cross-Site 요청 허용 (None으로 설정)
-                                .maxAge(14 * 24 * 60 * 60) // 14일 (초 단위)
-                                .build();
-
-                // Set-Cookie 헤더에 쿠키 추가
-                response.addHeader("Set-Cookie", accessTokenCookie.toString());
-                response.addHeader("Set-Cookie", refreshTokenCookie.toString());
-
-                log.info("OAuth2 로그인 성공: {} ({}) - Cross-Site Cookie 설정 완료 (SameSite={}, Secure={})",
-                                LogMaskingUtil.maskEmail(email), user.getSocialProvider(), cookieSameSite,
-                                cookieSecure);
-
-                // 프론트엔드 리다이렉트 URL 결정
-                HttpSession session = request.getSession(false);
-                String env = "prod"; // 기본값
-                if (session != null) {
-                        String sessionEnv = (String) session.getAttribute("oauth2_env");
-                        if (sessionEnv != null) {
-                                env = sessionEnv;
-                                session.removeAttribute("oauth2_env");
-                        }
-                }
-
-                String targetUrl = "local".equalsIgnoreCase(env) ? frontendLocalUrl : frontendProdUrl;
-
-                // 성공 페이지로 리다이렉트
-                getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        } catch (Exception e) {
+            log.error("사용자 조회 실패: {}", e.getMessage(), e);
+            response.sendRedirect(resolveTargetUrl(request) + "/login?error=server_error");
+            return;
         }
+
+        String email = user.getEmail();
+        if (email == null || email.trim().isEmpty()) {
+            log.error("사용자 이메일이 없습니다: {}", user.getId());
+            response.sendRedirect(resolveTargetUrl(request) + "/login?error=no_email");
+            return;
+        }
+
+        // 일회용 Auth Code 생성 및 Redis 저장 (JWT 토큰 직접 발급 X)
+        String provider = user.getSocialProvider().name();
+        String authCode = authCodeService.createAuthCode(email, provider);
+
+        log.info("OAuth2 로그인 성공 - Auth Code 발급: {} ({})",
+                LogMaskingUtil.maskEmail(email), user.getSocialProvider());
+
+        // 프론트엔드 리다이렉트 URL 결정
+        String targetBaseUrl = resolveTargetUrl(request);
+
+        // 실제 JWT 토큰 대신 일회용 코드만 URL에 담아 리다이렉트
+        String redirectUrl = targetBaseUrl + "/api/auth/callback?code=" + authCode;
+        getRedirectStrategy().sendRedirect(request, response, redirectUrl);
+    }
+
+    /**
+     * 환경(로컬/배포)에 따라 프론트엔드 기본 URL 반환
+     */
+    private String resolveTargetUrl(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        String env = "prod"; // 기본값
+        if (session != null) {
+            String sessionEnv = (String) session.getAttribute("oauth2_env");
+            if (sessionEnv != null) {
+                env = sessionEnv;
+                session.removeAttribute("oauth2_env");
+            }
+        }
+        return "local".equalsIgnoreCase(env) ? frontendLocalUrl : frontendProdUrl;
+    }
 }

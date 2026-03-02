@@ -93,4 +93,14 @@ public class AuthDto {
     public record RefreshTokenRequest(
             @NotBlank(message = "Refresh Token은 필수입니다.") @Schema(description = "Refresh Token", required = true) String refreshToken) {
     }
+
+    /**
+     * 일회용 코드 → JWT 토큰 교환 요청 DTO
+     * 프론트엔드가 OAuth2 콜백 URL에서 받은 code를 제시하면 실제 JWT 토큰을 반환
+     */
+    @Schema(description = "Auth Code → JWT 토큰 교환 요청")
+    public record ExchangeCodeRequest(
+            @NotBlank(message = "code는 필수입니다.")
+            @Schema(description = "OAuth2 로그인 콜백으로 받은 일회용 인증 코드", required = true, example = "a1b2c3d4e5f6...") String code) {
+    }
 }

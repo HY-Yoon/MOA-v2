@@ -1,7 +1,9 @@
 package com.moa2.api.auth.controller;
 
 import com.moa2.api.auth.controller.docs.AuthControllerDocs;
+import com.moa2.api.auth.domain.entity.AuthCode;
 import com.moa2.api.auth.dto.AuthDto;
+import com.moa2.api.auth.service.AuthCodeService;
 import com.moa2.api.auth.service.RefreshTokenService;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
@@ -11,6 +13,7 @@ import com.moa2.global.security.JwtTokenProvider;
 import com.moa2.global.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +35,7 @@ public class AuthController implements AuthControllerDocs {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final AuthCodeService authCodeService;
 
     @Value("${security.cookie.secure:true}")
     private boolean cookieSecure;
@@ -157,6 +161,60 @@ public class AuthController implements AuthControllerDocs {
 //                .ok(ApiResponse.success(AuthDto.TokenVerifyResponse.success(AuthDto.UserInfoResponse.from(user))));
 //    }
 
+    // -------------------------------------------------------------------------
+    // Auth Code 교환 API
+    // -------------------------------------------------------------------------
+
+    @Override
+    @PostMapping("/exchange-code")
+    public ResponseEntity<ApiResponse<AuthDto.TokenResponse>> exchangeCode(
+            @Valid @RequestBody AuthDto.ExchangeCodeRequest request) {
+
+        // 1. Redis에서 일회용 코드 조회
+        AuthCode authCode = authCodeService.findByCode(request.code())
+                .orElse(null);
+
+        if (authCode == null) {
+            log.warn("유효하지 않거나 만료된 Auth Code: {}", request.code());
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error("유효하지 않거나 만료된 인증 코드입니다. 다시 로그인해주세요."));
+        }
+
+        String email = authCode.getEmail();
+        String provider = authCode.getProvider();
+
+        // 2. 코드 즉시 삭제 (일회용)
+        authCodeService.deleteCode(request.code());
+
+        // 3. 사용자 정보 조회
+        SocialProvider socialProvider;
+        try {
+            socialProvider = SocialProvider.valueOf(provider);
+        } catch (IllegalArgumentException e) {
+            log.error("알 수 없는 SocialProvider: {}", provider);
+            return ResponseEntity.status(500)
+                    .body(ApiResponse.error("소셜 제공자 정보가 올바르지 않습니다."));
+        }
+
+        // 4. JWT 토큰 생성
+        String accessToken = jwtTokenProvider.createAccessToken(email, provider);
+        String refreshToken = jwtTokenProvider.createRefreshToken(email, provider);
+
+        // 5. RefreshToken DB 저장
+        refreshTokenService.createRefreshToken(email, refreshToken, socialProvider);
+
+        log.info("Auth Code 교환 완료 - JWT 토큰 발급: email={} ({})", maskEmail(email), provider);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                AuthDto.TokenResponse.builder()
+                        .accessToken(accessToken)
+                        .refreshToken(refreshToken)
+                        .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpiration())
+                        .refreshTokenExpiresIn(jwtTokenProvider.getRefreshTokenExpiration())
+                        .email(email)
+                        .build()));
+    }
+
     @Override
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthDto.TokenResponse>> refreshToken(
@@ -277,6 +335,13 @@ public class AuthController implements AuthControllerDocs {
             }
         }
         return null;
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return "***";
+        String[] parts = email.split("@");
+        String local = parts[0];
+        return (local.length() > 2 ? local.substring(0, 2) : local) + "***@" + parts[1];
     }
 
 }

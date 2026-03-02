@@ -1,6 +1,5 @@
 package com.moa2.global.config;
 
-import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.handler.OAuth2FailureHandler;
 import com.moa2.global.handler.OAuth2SuccessHandler;
@@ -48,7 +47,6 @@ public class SecurityConfig {
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
         private final JwtTokenProvider jwtTokenProvider;
         private final UserRepository userRepository;
-        private final RefreshTokenRepository refreshTokenRepository;
         private final ClientRegistrationRepository clientRegistrationRepository;
 
         // V2 프로필에서만 주입됨 (V1에서는 null)
@@ -130,7 +128,7 @@ public class SecurityConfig {
                 DefaultOAuth2AuthorizationRequestResolver defaultResolver = new DefaultOAuth2AuthorizationRequestResolver(
                                 clientRegistrationRepository, "/oauth2/authorization");
                 CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver = new CustomOAuth2AuthorizationRequestResolver(
-                                defaultResolver, jwtTokenProvider, userRepository, refreshTokenRepository);
+                                defaultResolver, jwtTokenProvider, userRepository);
                 http
                                 // CORS 적용
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -185,6 +183,7 @@ public class SecurityConfig {
                                                                 "/api/auth/logout",
                                                                 "/api/auth/logout/complete",
                                                                 "/api/auth/error",
+                                                                "/api/auth/exchange-code", // 일회용 코드 → JWT 토큰 교환 (로그인 직후 호출, 인증 불필요)
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
                                                                 "/v3/api-docs/**",

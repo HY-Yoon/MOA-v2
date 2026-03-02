@@ -10,13 +10,17 @@ import com.moa2.global.util.LogMaskingUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 /**
- * Refresh Token 관리 서비스
- * DB에 저장된 Refresh Token을 관리하고 Access Token 갱신 처리
+ * Refresh Token 관리 서비스 (Redis 기반)
+ *
+ * [변경 이유]
+ * 기존 JPA(DB) → Redis 마이그레이션
+ * - TTL 자동 관리 (만료 시 Redis 자동 삭제, DB 스케줄러 불필요)
+ * - 고성능 토큰 검증 (DB 조회 부하 없음)
+ * - 토큰 무효화(로그아웃) 기능 유지
  */
 @Slf4j
 @Service
@@ -27,169 +31,111 @@ public class RefreshTokenService {
     private final JwtTokenProvider jwtTokenProvider;
 
     /**
-     * Refresh Token을 DB에 저장
-     * 기존 Refresh Token이 있으면 삭제하고 새로 저장 (One Token Per User Per Provider)
-     * @param email 사용자 이메일
-     * @param refreshToken Refresh Token 문자열
-     * @param socialProvider 소셜 제공자
-     * @return 저장된 RefreshToken 엔티티
+     * Refresh Token을 Redis에 저장
+     * 동일한 email+provider 조합의 기존 토큰이 있으면 삭제 후 새로 저장 (One Token Per User Per Provider)
      */
-    @Transactional
     public RefreshToken createRefreshToken(String email, String refreshToken, SocialProvider socialProvider) {
-        // 기존 Refresh Token이 있으면 삭제 (같은 이메일 + 같은 제공자)
-        if (refreshTokenRepository.existsByUserEmailAndSocialProvider(email, socialProvider)) {
-            refreshTokenRepository.deleteByUserEmailAndSocialProvider(email, socialProvider);
-            log.debug("기존 Refresh Token 삭제: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
+        String providerName = socialProvider.name();
+
+        // 기존 토큰 삭제 (동일 email + provider)
+        List<RefreshToken> existing = refreshTokenRepository.findByUserEmailAndSocialProvider(email, providerName);
+        if (!existing.isEmpty()) {
+            existing.forEach(t -> refreshTokenRepository.deleteById(t.getToken()));
+            log.debug("기존 Refresh Token 삭제: {} ({})", LogMaskingUtil.maskEmail(email), providerName);
         }
 
-        // 만료 시간 계산 (7일)
-        LocalDateTime expiryDate = LocalDateTime.now()
-                .plusSeconds(jwtTokenProvider.getRefreshTokenExpiration() / 1000);
+        // TTL = JWT Refresh Token 만료 시간(ms) → 초 단위 변환
+        long ttlSeconds = jwtTokenProvider.getRefreshTokenExpiration() / 1000;
 
-        // 새 Refresh Token 저장
-        RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
-                .userEmail(email)
-                .socialProvider(socialProvider)
-                .expiryDate(expiryDate)
-                .build();
-
-        RefreshToken savedToken = refreshTokenRepository.save(token);
-        log.info("Refresh Token 저장 완료: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
-        return savedToken;
-    }
-
-    /**
-     * Refresh Token 만료 확인 및 예외 처리
-     * @param token RefreshToken 엔티티
-     * @throws RefreshTokenException.RefreshTokenExpiredException 만료된 경우
-     */
-    public void verifyExpiration(RefreshToken token) {
-        if (token.isExpired()) {
-            refreshTokenRepository.delete(token);
-            throw new RefreshTokenException.RefreshTokenExpiredException(
-                    "Refresh Token이 만료되었습니다. 다시 로그인해주세요."
-            );
-        }
+        RefreshToken token = new RefreshToken(refreshToken, email, providerName, ttlSeconds);
+        RefreshToken saved = refreshTokenRepository.save(token);
+        log.info("Refresh Token Redis 저장 완료: {} ({})", LogMaskingUtil.maskEmail(email), providerName);
+        return saved;
     }
 
     /**
      * 토큰 문자열로 Refresh Token 조회
-     * @param token Refresh Token 문자열
-     * @return RefreshToken 엔티티
-     * @throws RefreshTokenException.RefreshTokenNotFoundException 찾을 수 없는 경우
      */
-    @Transactional(readOnly = true)
     public RefreshToken findByToken(String token) {
-        return refreshTokenRepository.findByToken(token)
+        return refreshTokenRepository.findById(token)
                 .orElseThrow(() -> new RefreshTokenException.RefreshTokenNotFoundException(
-                        "Refresh Token을 찾을 수 없습니다."
+                        "Refresh Token을 찾을 수 없습니다. 다시 로그인해주세요."
                 ));
     }
 
     /**
      * 사용자 이메일로 Refresh Token 삭제 (로그아웃 시)
-     * @param email 사용자 이메일
      */
-    @Transactional
     public void deleteByUserEmail(String email) {
-        refreshTokenRepository.deleteByUserEmail(email);
+        List<RefreshToken> tokens = refreshTokenRepository.findByUserEmail(email);
+        tokens.forEach(t -> refreshTokenRepository.deleteById(t.getToken()));
         log.info("Refresh Token 삭제 완료: {}", LogMaskingUtil.maskEmail(email));
     }
 
     /**
-     * 사용자 이메일과 소셜 제공자로 Refresh Token 삭제 (로그아웃 시)
-     * @param email 사용자 이메일
-     * @param socialProvider 소셜 제공자
+     * 사용자 이메일 + 소셜 제공자로 Refresh Token 삭제 (로그아웃 시)
      */
-    @Transactional
     public void deleteByUserEmailAndSocialProvider(String email, SocialProvider socialProvider) {
-        refreshTokenRepository.deleteByUserEmailAndSocialProvider(email, socialProvider);
-        log.info("Refresh Token 삭제 완료: {} ({})", LogMaskingUtil.maskEmail(email), socialProvider);
+        String providerName = socialProvider.name();
+        List<RefreshToken> tokens = refreshTokenRepository.findByUserEmailAndSocialProvider(email, providerName);
+        tokens.forEach(t -> refreshTokenRepository.deleteById(t.getToken()));
+        log.info("Refresh Token 삭제 완료: {} ({})", LogMaskingUtil.maskEmail(email), providerName);
     }
 
     /**
-     * 토큰으로 Refresh Token 삭제
-     * @param token Refresh Token 문자열
+     * 토큰 문자열로 삭제
      */
-    @Transactional
     public void deleteByToken(String token) {
-        refreshTokenRepository.deleteByToken(token);
-        log.info("Refresh Token 삭제 완료");
+        refreshTokenRepository.deleteById(token);
+        log.info("Refresh Token 삭제 완료 (by token)");
     }
 
     /**
      * Refresh Token으로 새로운 Access Token 발급
-     * @param refreshToken Refresh Token 문자열
-     * @return TokenResponse (새 Access Token + 기존 Refresh Token 정보)
+     * Redis에 저장된 토큰인지 검증 후 새 Access Token 발급
      */
-    @Transactional
     public AuthDto.TokenResponse refreshAccessToken(String refreshToken) {
-        // 1. Refresh Token 검증 (JWT 서명 검증)
-        // JWT 형식이 맞지 않거나 서명이 유효하지 않은 경우
+        // 1. JWT 서명 검증
         if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
-            log.warn("유효하지 않은 Refresh Token 서명 또는 형식: {}", LogMaskingUtil.maskToken(refreshToken));
+            log.warn("유효하지 않은 Refresh Token 서명 또는 형식");
             throw new RefreshTokenException.InvalidGrantException(
-                    "유효하지 않은 Refresh Token 형식입니다. 다시 로그인해주세요."
+                    "유효하지 않은 Refresh Token입니다. 다시 로그인해주세요."
             );
         }
 
-        // 2. DB에서 Refresh Token 조회 (존재하지 않는 경우)
-        RefreshToken token;
-        try {
-            token = findByToken(refreshToken);
-        } catch (RefreshTokenException.RefreshTokenNotFoundException e) {
-            // DB에 존재하지 않는 토큰
-            log.warn("DB에서 Refresh Token을 찾을 수 없음");
-            throw e; // 원본 예외 그대로 전파
-        }
+        // 2. Redis에서 토큰 존재 여부 검증 (없으면 로그아웃된 것으로 간주)
+        findByToken(refreshToken); // 없으면 내부에서 예외 throw
 
-        // 3. 만료 확인
-        try {
-            verifyExpiration(token);
-        } catch (RefreshTokenException.RefreshTokenExpiredException e) {
-            // 만료된 토큰
-            log.warn("Refresh Token이 만료됨: {}", LogMaskingUtil.maskEmail(token.getUserEmail()));
-            throw e; // 원본 예외 그대로 전파
-        }
-
-        // 4. 이메일 및 제공자 추출
+        // 3. 이메일 및 제공자 추출
         String email;
         String provider;
         try {
             email = jwtTokenProvider.getEmailFromRefreshToken(refreshToken);
             provider = jwtTokenProvider.getProviderFromRefreshToken(refreshToken);
-            
-            // provider가 없으면 예외 발생 (구형 토큰일 수 있음)
             if (provider == null || provider.isEmpty()) {
-                log.warn("Refresh Token에 provider 정보가 없습니다. 구형 토큰일 수 있습니다: {}", LogMaskingUtil.maskEmail(email));
                 throw new RefreshTokenException.InvalidGrantException(
                         "토큰에 제공자 정보가 없습니다. 다시 로그인해주세요."
                 );
             }
         } catch (RefreshTokenException e) {
-            throw e; // 이미 처리된 예외는 그대로 전파
+            throw e;
         } catch (Exception e) {
-            // JWT 파싱 오류
-            log.error("Refresh Token에서 정보 추출 실패: {}", e.getMessage());
+            log.error("Refresh Token 파싱 오류: {}", e.getMessage());
             throw new RefreshTokenException.InvalidGrantException(
                     "토큰 파싱 중 오류가 발생했습니다. 다시 로그인해주세요."
             );
         }
 
-        // 5. 새 Access Token 생성 (provider 정보 포함)
+        // 4. 새 Access Token 발급
         String newAccessToken = jwtTokenProvider.createAccessToken(email, provider);
-
         log.info("Access Token 갱신 완료: {}", LogMaskingUtil.maskEmail(email));
 
-        // 6. TokenResponse 반환
         return AuthDto.TokenResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(refreshToken) // 기존 Refresh Token 유지
+                .refreshToken(refreshToken)
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpiration())
                 .refreshTokenExpiresIn(jwtTokenProvider.getRefreshTokenExpiration())
                 .email(email)
                 .build();
     }
 }
-

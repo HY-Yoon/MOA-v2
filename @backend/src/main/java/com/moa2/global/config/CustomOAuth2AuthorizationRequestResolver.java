@@ -1,6 +1,5 @@
 package com.moa2.global.config;
 
-import com.moa2.api.auth.domain.repository.RefreshTokenRepository;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +21,6 @@ public class CustomOAuth2AuthorizationRequestResolver implements OAuth2Authoriza
     private final OAuth2AuthorizationRequestResolver defaultResolver;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
