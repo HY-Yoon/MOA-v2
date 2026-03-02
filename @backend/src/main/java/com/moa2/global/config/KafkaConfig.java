@@ -3,6 +3,7 @@ package com.moa2.global.config;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -23,6 +24,7 @@ import java.util.Map;
  * Kafka Consumer 설정
  * - 수동 커밋 (MANUAL_IMMEDIATE)
  * - DLQ: 3초 간격 3번 재시도 후 reservation-request.DLT 토픽으로 이동
+ * - 운영 환경(prod): Aiven SSL(Client Certificate) 자동 적용
  */
 @Profile("v2")
 @Configuration
@@ -30,6 +32,12 @@ public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
+
+    private final KafkaProperties kafkaProperties;
+
+    public KafkaConfig(KafkaProperties kafkaProperties) {
+        this.kafkaProperties = kafkaProperties;
+    }
 
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
@@ -41,6 +49,13 @@ public class KafkaConfig {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.moa2.api.reservation.dto");
+
+        // application-prod.properties의 SSL 속성 자동 주입 (security.protocol, ssl.* 등)
+        Map<String, String> sslProps = kafkaProperties.getProperties();
+        if (sslProps != null && !sslProps.isEmpty()) {
+            props.putAll(sslProps);
+        }
+
         return new DefaultKafkaConsumerFactory<>(props);
     }
 

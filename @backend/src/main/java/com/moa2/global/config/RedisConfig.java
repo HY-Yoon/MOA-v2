@@ -34,7 +34,15 @@ public class RedisConfig {
         if (password != null && !password.isBlank()) {
             config.setPassword(password);
         }
-        return new LettuceConnectionFactory(config);
+
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(config);
+
+        // Upstash 등 클라우드 Redis는 TLS(SSL) 필수
+        if (password != null && !password.isBlank()) {
+            factory.setUseSsl(true);
+        }
+
+        return factory;
     }
 
     @Bean
