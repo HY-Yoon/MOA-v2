@@ -1,16 +1,23 @@
 'use client';
 
+import Image from 'next/image';
+import ShowList from "./(home)/_components/ShowList";
+
 // 메인 홈
 export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Banner Section */}
-      <section className="bg-muted">
+      <section>
         <div className="container mx-auto px-4">
-          <div className="border-border flex h-64 items-center justify-center rounded-sm border sm:h-80 lg:h-96">
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-muted-foreground text-sm">배너 이미지 영역</p>
-            </div>
+          <div className="border-border relative h-64 overflow-hidden rounded-sm border sm:h-80 lg:h-96">
+            <Image
+              src="https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2602/260224093155_26001991.gif"
+              alt="메인 배너"
+              fill
+              priority
+              className="object-cover"
+            />
           </div>
         </div>
       </section>
@@ -21,6 +28,8 @@ export default function Home() {
           {/* Featured Shows */}
           <div className="mb-16">
             <h2 className="mb-8 text-2xl font-bold">타이틀</h2>
+
+            <ShowList />
           </div>
         </div>
       </section>
