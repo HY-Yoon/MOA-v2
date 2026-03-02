@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
         hostname: 'localhost',
         port: '8080',
       },
+      // 메인 배너 외부 이미지
+      {
+        protocol: 'https',
+        hostname: 'ticketimage.interpark.com',
+      },
       // 백엔드 서버 도메인 (환경 변수가 설정된 경우만)
       ...(process.env.NEXT_PUBLIC_BACKEND_URL
         ? [
