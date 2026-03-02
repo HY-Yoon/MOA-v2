@@ -23,6 +23,9 @@ public class RedissonConfig {
     @Value("${spring.data.redis.port:6379}")
     private int port;
 
+    @Value("${spring.data.redis.username:}")
+    private String username;
+
     @Value("${spring.data.redis.password:}")
     private String password;
 
@@ -42,6 +45,11 @@ public class RedissonConfig {
                 .setTimeout(3000)
                 .setRetryAttempts(3)
                 .setRetryInterval(1500);
+
+        // 사용자명이 설정된 경우 (Upstash: "default")
+        if (username != null && !username.isBlank()) {
+            config.useSingleServer().setUsername(username);
+        }
 
         // 비밀번호가 설정된 경우
         if (password != null && !password.isBlank()) {
