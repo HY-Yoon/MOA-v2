@@ -28,6 +28,13 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    
+    // V2: Redisson (분산 락)
+    implementation("org.redisson:redisson-spring-boot-starter:3.24.3")
+//
+    // V2: ShedLock (다중 서버 스케줄러 중복 방지)
+    implementation("net.javacrumbs.shedlock:shedlock-spring:5.9.1")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-redis-spring:5.9.1")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -46,13 +53,14 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.17.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
 
-    // Kafka 주석 처리
-    // implementation("org.springframework.boot:spring-boot-starter-kafka")
+    // Kafka (비동기 예매 처리)
+    implementation("org.springframework.kafka:spring-kafka")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
 
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
+    developmentOnly("org.springframework.boot:spring-boot-docker-compose")
     runtimeOnly("org.postgresql:postgresql")
     annotationProcessor("org.projectlombok:lombok")
 

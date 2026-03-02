@@ -20,16 +20,12 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-    name = "schedule_seats",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_schedule_seat", columnNames = {"schedule_id", "seat_id"})
-    },
-    indexes = {
+@Table(name = "schedule_seats", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_schedule_seat", columnNames = { "schedule_id", "seat_id" })
+}, indexes = {
         @Index(name = "idx_schedule_status", columnList = "schedule_id, status"),
         @Index(name = "idx_locked_user", columnList = "locked_by_user_id, locked_until")
-    }
-)
+})
 public class ScheduleSeat extends BaseTimeEntity {
 
     @Id
@@ -67,7 +63,8 @@ public class ScheduleSeat extends BaseTimeEntity {
 
     /**
      * 좌석 선점 (LOCKED)
-     * @param userId 선점한 사용자 ID
+     * 
+     * @param userId      선점한 사용자 ID
      * @param lockedUntil 선점 만료 시간
      */
     public void lock(Long userId, LocalDateTime lockedUntil) {
@@ -126,10 +123,12 @@ public class ScheduleSeat extends BaseTimeEntity {
 
     /**
      * 특정 사용자가 선점한 좌석인지 확인
+     * - LOCKED: V1 흐름 (선점 후 결제 대기)
+     * - RESERVED: V2 흐름 (lock → reserve 순서로 상태 전이됨)
      */
     public boolean isLockedBy(Long userId) {
-        return this.status == SeatStatus.LOCKED 
-            && this.lockedByUserId != null 
-            && this.lockedByUserId.equals(userId);
+        return (this.status == SeatStatus.LOCKED || this.status == SeatStatus.RESERVED)
+                && this.lockedByUserId != null
+                && this.lockedByUserId.equals(userId);
     }
 }

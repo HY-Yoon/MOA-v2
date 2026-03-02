@@ -14,6 +14,7 @@ import com.moa2.global.security.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @RestController
+@Profile("v1")
 @RequestMapping("/api/v1/schedules")
 @RequiredArgsConstructor
 public class ScheduleSeatLockController implements ScheduleSeatLockControllerDocs {

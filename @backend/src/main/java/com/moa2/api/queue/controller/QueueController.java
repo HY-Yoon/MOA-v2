@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Tag(name = "대기열 API", description = "공연 예매 대기열 관리 API")
 @RestController
+@Profile("v1")
 @RequestMapping("/api/v1/queue")
 @RequiredArgsConstructor
 public class QueueController implements QueueControllerDocs {

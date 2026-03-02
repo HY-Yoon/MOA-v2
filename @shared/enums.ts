@@ -2,6 +2,8 @@
 
 export type AdminAction = "CREATE" | "UPDATE" | "DELETE" | "FORCE_CANCEL" | "FORCE_WITHDRAWAL";
 
+export type ErrorCode = "BAD_REQUEST" | "QUEUE_EXPIRED" | "SEAT_CONFLICT";
+
 export type Gender = "MALE" | "FEMALE" | "OTHER";
 
 export type Genre = "MUSICAL" | "CONCERT" | "THEATER" | "CLASSIC" | "DANCE";
@@ -10,7 +12,7 @@ export type PaymentMethod = "CARD" | "VIRTUAL_ACCOUNT" | "EASY_PAY" | "TRANSFER"
 
 export type PaymentStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | "CANCELLED";
 
-export type QueueStatus = "WAITING" | "READY" | "EXPIRED" | "COMPLETED";
+export type QueueStatus = "WAITING" | "READY" | "EXPIRED" | "COMPLETED" | "NOT_FOUND";
 
 export type Region = "SEOUL" | "GYEONGGI" | "INCHEON" | "BUSAN" | "DAEGU" | "DAEJEON" | "GWANGJU" | "ULSAN" | "SEJONG" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU";
 

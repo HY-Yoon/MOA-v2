@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,6 +31,7 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
+@Profile("v1")
 @RequiredArgsConstructor
 public class QueueReadyInterceptor implements HandlerInterceptor {
 

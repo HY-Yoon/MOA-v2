@@ -3,6 +3,7 @@ package com.moa2.api.schedule.scheduler;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,10 +12,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
- * 좌석 선점 만료 스케줄러
- * - 10초마다 LOCKED && lockedUntil < now 인 좌석을 AVAILABLE로 되돌림
+ * 좌석 선점 만료 스케줄러 (V2 전용)
+ * - 10초마다 (LOCKED OR RESERVED) && lockedUntil < now 인 좌석을 AVAILABLE로 되돌림
  */
 @Slf4j
+@Profile("v2")
 @Component
 @RequiredArgsConstructor
 public class ScheduleSeatLockScheduler {
@@ -34,4 +36,3 @@ public class ScheduleSeatLockScheduler {
         }
     }
 }
-

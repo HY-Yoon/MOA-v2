@@ -3,7 +3,9 @@ package com.moa2.global.handler;
 import com.moa2.global.util.LogMaskingUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -21,6 +23,13 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 @Component
 public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler {
+
+    // Frontend URL for redirect
+    @Value("${app.frontend.local-url:http://localhost:3000}")
+    private String frontendLocalUrl;
+
+    @Value("${app.frontend.prod-url:https://moa-v2.vercel.app}")
+    private String frontendProdUrl;
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request,
@@ -52,11 +61,25 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
             }
         }
 
-        // 에러 페이지로 리다이렉트
-        String redirectUrl = "/api/auth/error?message=" + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8)
+        // 프론트엔드 도메인 결정
+        HttpSession session = request.getSession(false);
+        String env = "prod"; // 기본값
+        if (session != null) {
+            String sessionEnv = (String) session.getAttribute("oauth2_env");
+            if (sessionEnv != null) {
+                env = sessionEnv;
+                session.removeAttribute("oauth2_env");
+            }
+        }
+
+        String baseUrl = "local".equalsIgnoreCase(env) ? frontendLocalUrl : frontendProdUrl;
+
+        // 에러 페이지로 리다이렉트 (프론트엔드)
+        String redirectUrl = baseUrl + "/login?error=true&message="
+                + URLEncoder.encode(errorMessage, StandardCharsets.UTF_8)
                 + "&code=" + URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
 
-        log.info("OAuth2 로그인 실패 - 사용자를 에러 페이지로 리다이렉트: {}", redirectUrl);
+        log.info("OAuth2 로그인 실패 - 사용자를 프론트 에러 페이지로 리다이렉트: {}", redirectUrl);
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 
