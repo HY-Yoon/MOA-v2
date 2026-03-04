@@ -96,12 +96,26 @@ export function Header() {
           <div className="flex items-center gap-4">
             {/* 로그인 여부에 따른 헤더 유틸 메뉴 */}
             <div className="flex items-center gap-2 text-sm">
+              {/* 관리자 메뉴 */}
+              {isLoggedIn && user?.role.toUpperCase() === 'ADMIN' && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mr-2 h-auto px-2 py-1 text-xs"
+                >
+                  <Link href={ADMIN_ROUTES.DASHBOARD}>관리자 메뉴</Link>
+                </Button>
+              )}
+
+              {/* 사용자 이름 */}
               {isLoggedIn && (
-                <span className="bg-muted/60 rounded-md px-2.5 py-1 text-xs font-semibold text-foreground">
+                <span className="bg-muted/60 text-foreground rounded-md px-2.5 py-1 text-xs font-semibold">
                   {user?.name}님
                 </span>
               )}
 
+              {/* 마이페이지 | 로그아웃 */}
               {(isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
                 (item, index) => (
                   <div key={item.href} className="flex items-center gap-1">

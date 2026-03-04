@@ -20,7 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // 중복 모달 방지
   const alertShown = useRef(false);
 
-  const isAdmin = (role?: UserRole) => role === 'ADMIN';
+  const isAdmin = (role?: UserRole) => role?.toUpperCase() === 'ADMIN';
 
   useEffect(() => {
     setGlobalAlertHandler(alert);
