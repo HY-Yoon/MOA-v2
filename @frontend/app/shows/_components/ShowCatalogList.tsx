@@ -9,7 +9,7 @@ import { Loader2, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const PAGE_SIZE = 20;
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 const DEFAULT_SORT: SortLabel = '인기순';
 
 const SORT_OPTIONS = [

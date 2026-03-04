@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const MOCK_SHOWS: ShowCatalog.List[] = [
   {
