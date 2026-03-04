@@ -16,10 +16,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Gender, UserStatus } from '@shared/enums';
 import StatusBadge from '@/components/molecules/StatusBadge';
-import { VERIFY_LABELS } from '@/constants/admin/user';
 import { USER_STATUS_LABELS } from '@/constants/common/userStatus';
 import { GENDER_LABELS } from '@/constants/common/gender';
 import { deriveFilterOptions } from '@/lib/admin/table-filter';
+import { ROLE_LABELS } from '@/constants/common/role';
 
 export default function UserList() {
   const { confirmWithInput } = useAlert();
@@ -159,9 +159,9 @@ export default function UserList() {
       filterOptions: initialFilterOptions.socialProvider,
     },
     {
-      key: 'isVerified',
-      label: '인증 여부',
-      render: (user) => (user.isVerified ? VERIFY_LABELS.VERIFY : VERIFY_LABELS.NO_VERIFY),
+      key: 'role',
+      label: '권한',
+      render: (user) => ROLE_LABELS[user.role],
     },
     {
       key: 'createdAt',
