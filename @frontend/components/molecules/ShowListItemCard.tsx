@@ -1,7 +1,14 @@
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/atoms';
-import { GENRE_LABELS, REGION_LABELS } from '@/constants/common';
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/atoms';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getGenreLabel, getRegionLabel } from '@/lib/common/labels';
 
 interface ShowListItemCardProps {
   show: ShowCatalog.List;
@@ -16,20 +23,6 @@ export default function ShowListItemCard({
   showRank = false,
   rank,
 }: ShowListItemCardProps) {
-  const getRegionLabel = (region: ShowCatalog.List['location']['region']) => {
-    if (typeof region === 'string' && region in REGION_LABELS) {
-      return REGION_LABELS[region as keyof typeof REGION_LABELS];
-    }
-    return String(region);
-  };
-
-  const getGenreLabel = (genre: ShowCatalog.List['genre']) => {
-    if (genre in GENRE_LABELS) {
-      return GENRE_LABELS[genre as keyof typeof GENRE_LABELS];
-    }
-    return String(genre);
-  };
-
   return (
     <Link href={href} className="block h-full">
       <Card className="h-full gap-3 py-0 transition hover:shadow-md">
@@ -53,7 +46,7 @@ export default function ShowListItemCard({
             </div>
           )}
           {showRank && typeof rank === 'number' && (
-            <div className="pointer-events-none absolute bottom-2 left-3 z-10 text-6xl font-black leading-none text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]">
+            <div className="pointer-events-none absolute bottom-2 left-3 z-10 text-6xl leading-none font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]">
               {rank}
             </div>
           )}
@@ -67,7 +60,7 @@ export default function ShowListItemCard({
             {getRegionLabel(show.location.region)} · {show.location.venue} {show.location.hallName}
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0 text-sm text-slate-600">
+        <CardContent className="px-4 pt-0 pb-4 text-sm text-slate-600">
           공연기간: {show.startDate} ~ {show.endDate}
         </CardContent>
       </Card>
