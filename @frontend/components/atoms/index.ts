@@ -13,6 +13,7 @@ export * from './avatar';
 export * from './badge';
 export * from './breadcrumb';
 export * from './dropdown-menu';
+export * from './popover';
 export * from './separator';
 export * from './sheet';
 export * from './sidebar';

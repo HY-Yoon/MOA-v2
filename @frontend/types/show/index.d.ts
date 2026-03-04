@@ -16,6 +16,18 @@ namespace ShowCatalog {
     orderDirection?: 'asc' | 'desc';
   }
 
+  interface Schedule {
+    keyId: number;
+    date: string;
+    time: {
+      hour: number;
+      minute: number;
+      second: number;
+      nano: number;
+    };
+    session: number;
+  }
+
   interface List {
     id: number;
     title: string;
@@ -36,16 +48,12 @@ namespace ShowCatalog {
     viewCount: number;
     startDate: string;
     endDate: string;
-    schedules: Array<{
-      keyId: number;
-      date: string;
-      time: {
-        hour: number;
-        minute: number;
-        second: number;
-        nano: number;
-      };
-      session: number;
-    }>;
+    schedules: Array<Schedule>;
+  }
+
+  interface Detail extends List {
+    detailImageUrls: string[];
+    runningTime: string;
+    cast: string;
   }
 }
