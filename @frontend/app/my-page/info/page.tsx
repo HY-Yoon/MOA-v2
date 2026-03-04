@@ -1,18 +1,13 @@
 'use client';
 
-import { useAuth } from '@/lib/auth/AuthContext';
 import type { User } from '@/lib/auth/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { Button } from '@/components/atoms/button';
 import { Card, CardContent } from '@/components/atoms/card';
-import { UserRole } from '@shared/enums';
 import { useMutation } from '@tanstack/react-query';
 import { deleteUser } from '@/lib/api/auth/auth';
 import { useAlert } from '@/components/molecules/AlertContext';
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  USER: '일반',
-  ADMIN: '관리자',
-} as const;
+import { ROLE_LABELS } from '@/constants/common/role';
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: '구글',

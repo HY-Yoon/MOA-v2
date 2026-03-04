@@ -1,6 +1,7 @@
 namespace User {
   type UserStatus = import('@shared/enums').UserStatus;
   type Gender = import('@shared/enums').Gender;
+  type UserRole = import('@shared/enums').UserRole;
 
   // 회원 목록 조회 파라미터
   interface ListParams {
@@ -25,5 +26,6 @@ namespace User {
     status: UserStatus;
     isVerified: boolean;
     createdAt: string; // ISO YYYY-MM-DDTHH:mm:dd"
+    role: UserRole;
   }
 }
