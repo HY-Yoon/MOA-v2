@@ -3,6 +3,7 @@ package com.moa2.api.user.dto;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.global.model.SocialProvider;
+import com.moa2.global.model.UserRole;
 import com.moa2.global.model.UserStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -44,7 +45,9 @@ public class UserDto {
 
                         @Schema(description = "본인인증 여부", example = "true") Boolean isVerified,
 
-                        @Schema(description = "가입일시") @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime createdAt) {
+                        @Schema(description = "가입일시") @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime createdAt,
+
+                        @Schema(description = "사용자 권한", example = "USER") UserRole role) {
                 public static UserListResponse from(User user) {
                         return UserListResponse.builder()
                                         .id(user.getId())
@@ -58,6 +61,7 @@ public class UserDto {
                                         .status(user.getStatus())
                                         .isVerified(user.getIsVerified())
                                         .createdAt(user.getCreatedAt())
+                                        .role(user.getRole())
                                         .build();
                 }
         }

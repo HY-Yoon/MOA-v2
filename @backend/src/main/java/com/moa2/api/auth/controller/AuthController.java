@@ -196,14 +196,24 @@ public class AuthController implements AuthControllerDocs {
                     .body(ApiResponse.error("소셜 제공자 정보가 올바르지 않습니다."));
         }
 
-        // 4. JWT 토큰 생성
-        String accessToken = jwtTokenProvider.createAccessToken(email, provider);
-        String refreshToken = jwtTokenProvider.createRefreshToken(email, provider);
+        // 사용자 조회 → role 확인
+        User user = userRepository.findByEmailAndSocialProvider(email, socialProvider)
+                .orElse(null);
+        if (user == null) {
+            log.error("사용자를 찾을 수 없습니다: {} ({})", maskEmail(email), provider);
+            return ResponseEntity.status(404)
+                    .body(ApiResponse.error("사용자를 찾을 수 없습니다."));
+        }
+        String role = user.getRole().name();
+
+        // 4. JWT 토큰 생성 (role 포함)
+        String accessToken = jwtTokenProvider.createAccessToken(email, provider, role);
+        String refreshToken = jwtTokenProvider.createRefreshToken(email, provider, role);
 
         // 5. RefreshToken DB 저장
         refreshTokenService.createRefreshToken(email, refreshToken, socialProvider);
 
-        log.info("Auth Code 교환 완료 - JWT 토큰 발급: email={} ({})", maskEmail(email), provider);
+        log.info("Auth Code 교환 완료 - JWT 토큰 발급: email={} ({}, role={})", maskEmail(email), provider, role);
 
         return ResponseEntity.ok(ApiResponse.success(
                 AuthDto.TokenResponse.builder()
@@ -212,6 +222,7 @@ public class AuthController implements AuthControllerDocs {
                         .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpiration())
                         .refreshTokenExpiresIn(jwtTokenProvider.getRefreshTokenExpiration())
                         .email(email)
+                        .role(role)
                         .build()));
     }
 

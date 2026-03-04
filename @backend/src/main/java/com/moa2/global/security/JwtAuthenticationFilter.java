@@ -37,16 +37,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validateAccessToken(token)) {
             String email = jwtTokenProvider.getEmailFromAccessToken(token);
             String provider = jwtTokenProvider.getProviderFromAccessToken(token);
+            String role = jwtTokenProvider.getRoleFromAccessToken(token);
 
-            // 인증 객체 생성 (권한은 기본적으로 USER로 설정)
+            // 인증 객체 생성 (토큰의 role claim 기반으로 권한 설정)
             UserPrincipal userPrincipal = new UserPrincipal(email, provider);
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     userPrincipal,
                     null,
-                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("JWT 인증 성공: {}", LogMaskingUtil.maskEmail(email));
+            log.debug("JWT 인증 성공: {} (role={})", LogMaskingUtil.maskEmail(email), role);
         }
 
         filterChain.doFilter(request, response);
