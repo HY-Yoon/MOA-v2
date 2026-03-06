@@ -103,6 +103,7 @@ public class ShowDto {
                                 .cast(show.getCast())
                                 .salePeriod(mapToDetailSalePeriod(show))
                                 .schedules(scheduleInfos)
+                                .serverCurrentTime(LocalDateTime.now())
                                 .build();
         }
 
@@ -453,7 +454,8 @@ public class ShowDto {
                         @Schema(description = "상영 시간") String runningTime,
                         @Schema(description = "출연진") String cast,
                         @Schema(description = "판매 기간") SalePeriod salePeriod,
-                        @Schema(description = "일정 목록") List<ScheduleInfo> schedules) {
+                        @Schema(description = "일정 목록") List<ScheduleInfo> schedules,
+                        @Schema(description = "현재 서버 시간") LocalDateTime serverCurrentTime) {
                 @Builder
                 public record LocationInfo(String region, String venue, String hallName) {
                 }
