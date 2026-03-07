@@ -73,7 +73,7 @@ export interface AdminTableProps<T> {
   emptyMessage?: string;
 }
 
-export function AdminTable<T extends Record<string, never>>({
+export function AdminTable<T extends Record<string, any>>({
   data,
   columns,
   searchPlaceholder = '검색어를 입력하세요',
