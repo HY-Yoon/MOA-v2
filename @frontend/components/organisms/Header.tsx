@@ -62,9 +62,7 @@ export function Header() {
     return null;
   }
 
-  if (isLoading) {
-    return null;
-  }
+  const showAsLoggedIn = !isLoading && isLoggedIn;
 
   return (
     <header className="bg-background sticky top-0 z-40 shadow-sm">
@@ -97,7 +95,7 @@ export function Header() {
             {/* 로그인 여부에 따른 헤더 유틸 메뉴 */}
             <div className="flex items-center gap-2 text-sm">
               {/* 관리자 메뉴 */}
-              {isLoggedIn && user?.role.toUpperCase() === 'ADMIN' && (
+              {showAsLoggedIn && user?.role.toUpperCase() === 'ADMIN' && (
                 <Button
                   asChild
                   variant="outline"
@@ -109,14 +107,14 @@ export function Header() {
               )}
 
               {/* 사용자 이름 */}
-              {isLoggedIn && (
+              {showAsLoggedIn && (
                 <span className="bg-muted/60 text-foreground rounded-md px-2.5 py-1 text-xs font-semibold">
                   {user?.name}님
                 </span>
               )}
 
               {/* 마이페이지 | 로그아웃 */}
-              {(isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
+              {(showAsLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
                 (item, index) => (
                   <div key={item.href} className="flex items-center gap-1">
                     {item.isLogout ? (
@@ -139,7 +137,8 @@ export function Header() {
                       </Button>
                     )}
                     {index <
-                      (isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).length -
+                      (showAsLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS)
+                        .length -
                         1 && <span className="text-slate-300">|</span>}
                   </div>
                 ),
