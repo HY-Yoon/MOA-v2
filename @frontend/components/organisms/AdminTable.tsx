@@ -22,6 +22,9 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, ListFilter, FunnelX } from 'lucide-
 
 export type { AdminTableFilterOption };
 
+/** 필터 드롭다운에서 '전체' 선택 시 사용하는 예약 값 (필터 해제) */
+const ALL_FILTER_VALUE = '__all__';
+
 export interface AdminTableColumn<T> {
   key: string;
   label: string;
@@ -70,7 +73,7 @@ export interface AdminTableProps<T> {
   emptyMessage?: string;
 }
 
-export function AdminTable<T extends Record<string, any>>({
+export function AdminTable<T extends Record<string, never>>({
   data,
   columns,
   searchPlaceholder = '검색어를 입력하세요',
@@ -136,6 +139,11 @@ export function AdminTable<T extends Record<string, any>>({
   }
 
   function handleFilterChange(columnKey: string, selectedVal: string, checked: boolean) {
+    if (selectedVal === ALL_FILTER_VALUE) {
+      // '전체' 선택 시 해당 컬럼 필터 해제
+      onFilter?.(columnKey, []);
+      return;
+    }
     const current = filterValues?.[columnKey] ?? [];
     // TODO: 필터 다중 선택
     // const next = checked ? [...current, selectedVal] : current.filter((v) => v !== selectedVal);
@@ -161,9 +169,14 @@ export function AdminTable<T extends Record<string, any>>({
   function renderFilter(column: AdminTableColumn<T>) {
     if (!column.filter) return null;
 
-    const options = column.filterOptions ?? [];
     const selectedValues = filterValues?.[column.key] ?? [];
     const isActive = selectedValues.length > 0;
+
+    const options = column.filterOptions ?? [];
+    const displayOptions: AdminTableFilterOption[] = [
+      { value: ALL_FILTER_VALUE, label: '전체' },
+      ...options,
+    ];
 
     return (
       <DropdownMenu>
@@ -177,11 +190,7 @@ export function AdminTable<T extends Record<string, any>>({
             aria-label={`${column.label} 필터`}
             aria-pressed={isActive}
           >
-            {isActive ? (
-              <FunnelX className="h-4 w-4" />
-            ) : (
-              <ListFilter className="h-4 w-4" />
-            )}
+            {isActive ? <FunnelX className="h-4 w-4" /> : <ListFilter className="h-4 w-4" />}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-40">
@@ -189,15 +198,19 @@ export function AdminTable<T extends Record<string, any>>({
             <DropdownMenuCheckboxItem
               disabled
               checked={false}
-              className="cursor-default px-3 py-2 text-sm text-muted-foreground"
+              className="text-muted-foreground cursor-default px-3 py-2 text-sm"
             >
               데이터가 없습니다.
             </DropdownMenuCheckboxItem>
           ) : (
-            options.map((opt) => (
+            displayOptions.map((opt) => (
               <DropdownMenuCheckboxItem
                 key={opt.value}
-                checked={(filterValues?.[column.key] ?? []).includes(opt.value)}
+                checked={
+                  opt.value === ALL_FILTER_VALUE
+                    ? selectedValues.length === 0
+                    : selectedValues.includes(opt.value)
+                }
                 onCheckedChange={(checked) => handleFilterChange(column.key, opt.value, checked)}
               >
                 {opt.label}
