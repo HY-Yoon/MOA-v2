@@ -23,3 +23,16 @@ export const getShowDetail = (id: number) => ({
   },
   enabled: !!id && id > 0,
 });
+
+/** 날짜별 회차 조회(잔여석) */
+export const getShowSchedulesByDate = (showId: number, date: string) => ({
+  queryKey: ['show', 'schedules', showId, date],
+  queryFn: async (): Promise<ShowCatalog.ScheduleByDate[]> => {
+    const response = await axiosInstance.get<Api.Response<ShowCatalog.ScheduleByDate[]>>(
+      `${BASE_URL}/${showId}/schedules`,
+      { params: { date } },
+    );
+    return response?.data.data ?? [];
+  },
+  enabled: !!showId && !!date,
+});

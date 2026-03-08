@@ -9,17 +9,14 @@ import { SIDEBAR_PHASE, type SidebarPhase } from '@/constants/shows/details';
 import ShowDetailSidebar from './_components/ShowDetailSidebar';
 import ShowDetailMain from './_components/ShowDetailMain';
 import ShowDetailTabs from './_components/ShowDetailTabs';
-import { createMockShowDetail } from '@/app/shows/[id]/_components/mockShowDetail';
-
-const MOCKUP = true;
 
 export default function ShowDetailPage() {
   const params = useParams();
   const id = Number(params?.id);
 
-  const { data, isFetching } = useQuery({ ...getShowDetail(id), enabled: !MOCKUP });
+  const { data, isFetching } = useQuery(getShowDetail(id));
 
-  const showDetail = useMemo(() => createMockShowDetail(id), [id]); //data as ShowCatalog.Detail, [data]);
+  const showDetail = useMemo(() => data as ShowCatalog.Detail, [data]);
 
   const initialPhase = useMemo(() => getInitialSidebarPhase(showDetail), [showDetail]);
   const [sidebarPhase, setSidebarPhase] = useState<SidebarPhase>(initialPhase);
