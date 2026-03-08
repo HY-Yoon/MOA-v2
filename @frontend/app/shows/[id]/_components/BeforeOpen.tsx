@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/atoms';
-import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { DATE_FORMAT, DATE_UNIT } from '@/constants/common/dateFormat';
 import dayjs from '@/plugins/dayjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -10,11 +10,11 @@ interface Props {
   onOpenTimeReached?: () => void;
 }
 
-export default function TicketOpenBefore({ saleOpenAt, onOpenTimeReached }: Props) {
+export default function BeforeOpen({ saleOpenAt, onOpenTimeReached }: Props) {
   const leftDays = saleOpenAt ? getDaysLeft(saleOpenAt) : 0;
 
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const openFiredRef = useRef(false);
+  const openTimeReachedRef = useRef(false); // 렌더링 한 번만 호출하기 위한 트리거
 
   const tick = useCallback(() => {
     if (!saleOpenAt) return;
@@ -22,22 +22,25 @@ export default function TicketOpenBefore({ saleOpenAt, onOpenTimeReached }: Prop
     if (!openAt.isValid()) return;
 
     const now = dayjs();
-    const countdownStart = openAt.subtract(15, 'minute');
+    const countdownStart = openAt.subtract(15, DATE_UNIT.MINUTE);
 
     if (now.isBefore(countdownStart)) {
       setRemainingSeconds(null);
       return;
     }
-    if (!now.isBefore(openAt)) {
-      setRemainingSeconds(0);
-      if (!openFiredRef.current) {
-        openFiredRef.current = true;
-        onOpenTimeReached?.();
-      }
+    if (!now.isBefore(openAt) && !openTimeReachedRef.current) {
+      openTimeReachedRef.current = true;
+      onOpenTimeReached?.();
       return;
     }
 
-    const remaining = Math.max(0, openAt.diff(now, 'second'));
+    // 0초가 되면 state 갱신 없이 바로 전환해야 '예매하기' 버튼 안보임
+    const remaining = Math.max(0, openAt.diff(now, DATE_UNIT.SECOND));
+    if (remaining === 0 && !openTimeReachedRef.current) {
+      openTimeReachedRef.current = true;
+      onOpenTimeReached?.();
+      return;
+    }
     setRemainingSeconds(remaining);
   }, [saleOpenAt, onOpenTimeReached]);
 
@@ -51,7 +54,7 @@ export default function TicketOpenBefore({ saleOpenAt, onOpenTimeReached }: Prop
   function getDaysLeft(isoDate: string): number | null {
     const target = dayjs(isoDate);
     if (!target.isValid()) return null;
-    const diffDays = target.diff(dayjs(), 'day', true);
+    const diffDays = target.diff(dayjs(), DATE_UNIT.DAY, true);
     return Math.max(0, Math.ceil(diffDays));
   }
 

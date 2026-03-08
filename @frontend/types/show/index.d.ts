@@ -19,12 +19,14 @@ namespace ShowCatalog {
   interface Schedule {
     keyId: number;
     date: string;
-    time: {
-      hour: number;
-      minute: number;
-      second: number;
-      nano: number;
-    };
+    time:
+      | string
+      | {
+          hour: number;
+          minute: number;
+          second: number;
+          nano: number;
+        };
     session: number;
   }
 
@@ -55,5 +57,22 @@ namespace ShowCatalog {
     detailImageUrls: string[];
     runningTime: string;
     cast: string;
+  }
+
+  interface SeatGrades {
+    sectionName: string;
+    price: number;
+    remainingSeats: number;
+    totalSeats: number;
+  }
+
+  interface ScheduleByDate {
+    keyId: number;
+    date: string;
+    time: string;
+    isSoldOut: boolean;
+    totalSeats: number;
+    remainingSeats: number;
+    seatGrades: SeatGrades[];
   }
 }
