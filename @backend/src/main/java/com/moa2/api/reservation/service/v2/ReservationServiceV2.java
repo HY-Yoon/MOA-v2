@@ -1,7 +1,6 @@
 package com.moa2.api.reservation.service.v2;
 
 import com.moa2.api.reservation.dto.ReservationDtoV2;
-import com.moa2.api.reservation.dto.ReservationRequestEvent;
 import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.show.domain.entity.ScheduleSeat;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
@@ -17,17 +16,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * V2: Redisson 분산 락 기반 예매 서비스 (Kafka 비동기 처리)
+ * V2: Redisson 분산 락 기반 예매 서비스
  *
- * [Kafka 도입 후 흐름]
+ * [변경 후 흐름]
  * 1. Redis 분산 락 획득 + 좌석 유효성 검증
- * 2. Kafka에 예매 이벤트 발행 (DB 커넥션 점유 없음)
- * 3. 즉시 202 Accepted 응답
- * 4. Consumer가 비동기로 DB 저장 (ReservationPersistService)
+ * 2. Redis에 좌석 선점 상태 저장 (SETNX + TTL)
+ * 3. 즉시 200 OK 응답 (DB Write 없음!)
+ * 4. /order API에서 예약자 정보와 함께 DB 저장
  */
 @Slf4j
 @Profile("v2")
@@ -38,7 +36,6 @@ public class ReservationServiceV2 {
     private final RedissonClient redissonClient;
     private final RedisTemplate<String, String> redisTemplate;
     private final ScheduleSeatRepository scheduleSeatRepository;
-    private final ReservationKafkaProducer kafkaProducer;
 
     @Value("${queue.token.ttl-minutes:5}")
     private int lockTtlMinutes;
@@ -47,15 +44,16 @@ public class ReservationServiceV2 {
     private static final String SEAT_STATUS_PREFIX = "seat:status:";
 
     /**
-     * 예약 처리 (분산 락 + Kafka 비동기 발행)
+     * [1단계] 좌석 선점 (Redis Only — DB Write 없음)
      * - Redis 분산 락으로 좌석 동시성 제어
-     * - Kafka에 이벤트 발행 후 즉시 응답 (DB 커넥션 사용 없음)
+     * - Redis에 선점 상태만 저장 (TTL 5분)
+     * - 즉시 200 응답
      */
-    public ReservationDtoV2.ReserveAcceptedResponse reserve(
+    public ReservationDtoV2.ReserveSeatResponse reserveSeats(
             Long userId,
             Long scheduleId,
             List<Long> seatIds) {
-        log.info("V2 예매 시작 - userId: {}, scheduleId: {}, seatIds: {}", userId, scheduleId, seatIds);
+        log.info("V2 좌석 선점 시작 - userId: {}, scheduleId: {}, seatIds: {}", userId, scheduleId, seatIds);
 
         // 1. 좌석 ID 정렬 (데드락 방지)
         List<Long> sortedSeatIds = new ArrayList<>(seatIds);
@@ -65,8 +63,6 @@ public class ReservationServiceV2 {
         List<RLock> acquiredLocks = new ArrayList<>();
         List<String> conflictSeatNumbers = new ArrayList<>();
         int totalAmount = 0;
-
-        String eventId = UUID.randomUUID().toString();
 
         try {
             // 2. 각 좌석에 대해 Redis 분산 락 획득 및 검증
@@ -89,8 +85,8 @@ public class ReservationServiceV2 {
                     String statusKey = SEAT_STATUS_PREFIX + seatId;
                     String cachedStatus = redisTemplate.opsForValue().get(statusKey);
 
-                    if ("RESERVED".equals(cachedStatus) || "SOLD".equals(cachedStatus)
-                            || "PENDING_KAFKA".equals(cachedStatus) || "CONFIRMED".equals(cachedStatus)) {
+                    if (cachedStatus != null) {
+                        // 이미 누군가 선점했거나 판매된 좌석
                         conflictSeatNumbers.add(String.valueOf(seatId));
                         continue;
                     }
@@ -108,12 +104,15 @@ public class ReservationServiceV2 {
                         throw new IllegalArgumentException("해당 스케줄의 좌석이 아닙니다: " + seatId);
                     }
 
-                    // Redis 캐시: PENDING_KAFKA 상태로 설정 (Consumer 처리 전까지 유지)
-                    redisTemplate.opsForValue().set(statusKey, "PENDING_KAFKA", 10, TimeUnit.MINUTES);
+                    // Redis에 선점 저장: seat:status:{seatId} = userId (TTL)
+                    redisTemplate.opsForValue().set(
+                            statusKey,
+                            String.valueOf(userId),
+                            lockTtlMinutes, TimeUnit.MINUTES);
 
                     validatedSeatIds.add(seatId);
                     totalAmount += scheduleSeat.getGrade().getPrice();
-                    log.debug("좌석 검증 성공: seatId={}", seatId);
+                    log.debug("좌석 선점 성공: seatId={}", seatId);
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -123,41 +122,23 @@ public class ReservationServiceV2 {
 
             // 충돌된 좌석이 있으면 SeatConflictException 발생
             if (!conflictSeatNumbers.isEmpty()) {
-                throw new SeatConflictException(conflictSeatNumbers);
-            }
-
-            // 3. Kafka 이벤트 발행 (DB 커넥션 사용 없이 비동기 처리!)
-            ReservationRequestEvent event = ReservationRequestEvent.builder()
-                    .eventId(eventId)
-                    .userId(userId)
-                    .scheduleId(scheduleId)
-                    .scheduleSeatIds(validatedSeatIds)
-                    .totalAmount(totalAmount)
-                    .lockTtlMinutes(lockTtlMinutes)
-                    .build();
-
-            try {
-                kafkaProducer.send(event);
-            } catch (Exception e) {
-                // ★ Producer 실패 시 보상 트랜잭션: Redis 상태 롤백
-                log.error("Kafka 이벤트 발행 실패 - 보상 트랜잭션 실행", e);
+                // 이미 선점한 좌석들의 Redis 키 롤백
                 for (Long seatId : validatedSeatIds) {
                     redisTemplate.delete(SEAT_STATUS_PREFIX + seatId);
                 }
-                throw new RuntimeException("예매 처리 중 오류가 발생했습니다. 다시 시도해주세요.", e);
+                throw new SeatConflictException(conflictSeatNumbers);
             }
 
-            // 4. 예매 상태: PENDING (폴링용)
-            redisTemplate.opsForValue().set(
-                    "reservation:status:" + eventId, "PENDING", 30, TimeUnit.MINUTES);
+            // 선점 결과 반환 (DB Write 없음!)
+            long remainingSeconds = (long) lockTtlMinutes * 60;
 
-            log.info("V2 Kafka 예매 이벤트 발행 완료 - eventId: {}", eventId);
+            log.info("V2 좌석 선점 완료 - userId: {}, seats: {}, totalAmount: {}", userId, validatedSeatIds, totalAmount);
 
-            // 5. 202 Accepted 응답 (DB 저장은 Consumer가 비동기 처리)
-            return ReservationDtoV2.ReserveAcceptedResponse.of(eventId);
+            return ReservationDtoV2.ReserveSeatResponse.of(
+                    validatedSeatIds.size(), remainingSeconds, totalAmount);
 
         } finally {
-            // 6. 락 해제 (항상 실행)
+            // 락 해제 (항상 실행)
             for (RLock lock : acquiredLocks) {
                 try {
                     if (lock.isHeldByCurrentThread()) {
@@ -168,5 +149,120 @@ public class ReservationServiceV2 {
                 }
             }
         }
+    }
+
+    /**
+     * [2단계] 주문 생성 전 Redis 선점 유효성 확인
+     * - 해당 좌석들이 아직 이 사용자의 선점 상태인지 확인
+     */
+    public void validateSeatHold(Long userId, List<Long> seatIds) {
+        for (Long seatId : seatIds) {
+            String statusKey = SEAT_STATUS_PREFIX + seatId;
+            String holdUserId = redisTemplate.opsForValue().get(statusKey);
+
+            if (holdUserId == null) {
+                throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
+            }
+            if (!holdUserId.equals(String.valueOf(userId))) {
+                throw new IllegalStateException("다른 사용자가 선점한 좌석입니다. 좌석 ID: " + seatId);
+            }
+        }
+    }
+
+    /**
+     * 좌석 선점 해제 (결제 실패/취소 시 호출)
+     */
+    public void releaseSeatHold(List<Long> seatIds) {
+        for (Long seatId : seatIds) {
+            redisTemplate.delete(SEAT_STATUS_PREFIX + seatId);
+        }
+        log.info("좌석 선점 해제 완료: seatIds={}", seatIds);
+    }
+
+    /**
+     * [미리보기] 결제 페이지 진입 시 주문 상세 조회
+     */
+    public ReservationDtoV2.PreviewResponse getPreviewInfo(
+            Long userId,
+            Long scheduleId,
+            List<Long> seatIds,
+            com.moa2.api.user.domain.entity.User user) {
+        
+        // 1. 좌석 선점 유효성 확인 및 잔여 시간 조회
+        long minTtlSeconds = Long.MAX_VALUE;
+        for (Long seatId : seatIds) {
+            String statusKey = SEAT_STATUS_PREFIX + seatId;
+            String holdUserId = redisTemplate.opsForValue().get(statusKey);
+
+            if (holdUserId == null) {
+                throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
+            }
+            if (!holdUserId.equals(String.valueOf(userId))) {
+                throw new IllegalStateException("다른 사용자가 선점한 좌석입니다. 좌석 ID: " + seatId);
+            }
+
+            Long ttl = redisTemplate.getExpire(statusKey, TimeUnit.SECONDS);
+            if (ttl != null && ttl > 0) {
+                minTtlSeconds = Math.min(minTtlSeconds, ttl);
+            }
+        }
+
+        if (minTtlSeconds == Long.MAX_VALUE) {
+            minTtlSeconds = 0;
+        }
+
+        // 2. DB에서 좌석 및 스케줄, 공연 정보 조회
+        List<ScheduleSeat> seats = seatIds.stream()
+                .map(id -> scheduleSeatRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + id)))
+                .toList();
+
+        if (seats.isEmpty()) {
+            throw new IllegalArgumentException("선택된 좌석이 없습니다.");
+        }
+
+        com.moa2.api.show.domain.entity.ShowSchedule schedule = seats.get(0).getSchedule();
+        if (!schedule.getId().equals(scheduleId)) {
+            throw new IllegalArgumentException("해당 스케줄의 좌석이 아닙니다.");
+        }
+
+        com.moa2.api.show.domain.entity.Show show = schedule.getShow();
+
+        // 3. 금액 계산 (수수료는 기본 4000원으로 가정, 기획에 맞게 수정 가능)
+        int ticketAmount = seats.stream().mapToInt(seat -> seat.getGrade().getPrice()).sum();
+        int bookingFee = 4000; 
+        int totalAmount = ticketAmount + bookingFee;
+
+        // 4. 좌석 상세 정보 맵핑
+        List<ReservationDtoV2.PreviewResponse.SeatPreviewInfo> seatPreviewInfos = seats.stream()
+                .map(scheduleSeat -> ReservationDtoV2.PreviewResponse.SeatPreviewInfo.builder()
+                        .scheduleSeatId(scheduleSeat.getId())
+                        .gradeName(scheduleSeat.getGrade().getSection().getName()) // 구역명 (R석, VIP 등)
+                        .seatNumber(scheduleSeat.getSeat().getSeatRow() + "열 " + scheduleSeat.getSeat().getSeatNumber() + "번")
+                        .price(scheduleSeat.getGrade().getPrice())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+
+        // 5. 기본 예약자 정보
+        ReservationDtoV2.PreviewResponse.BookerInfo defaultBooker = 
+                ReservationDtoV2.PreviewResponse.BookerInfo.builder()
+                        .name(user.getName())
+                        .email(user.getEmail())
+                        .phone(user.getPhone())
+                        .build();
+
+        // 6. 응답 DTO 생성
+        return ReservationDtoV2.PreviewResponse.builder()
+                .title(show.getTitle())
+                .venueName(show.getVenue() != null ? show.getVenue().getName() : "미정")
+                .showDate(schedule.getShowDate() != null ? schedule.getShowDate().toString() : "")
+                .showTime(schedule.getShowTime() != null ? schedule.getShowTime().toString() : "")
+                .bookingFee(bookingFee)
+                .ticketAmount(ticketAmount)
+                .totalAmount(totalAmount)
+                .paymentDeadline(java.time.LocalDateTime.now().plusSeconds(minTtlSeconds))
+                .seats(seatPreviewInfos)
+                .defaultBooker(defaultBooker)
+                .build();
     }
 }

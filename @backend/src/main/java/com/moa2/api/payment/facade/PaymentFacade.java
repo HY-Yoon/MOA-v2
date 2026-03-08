@@ -6,27 +6,44 @@ import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
 import com.moa2.api.payment.exception.TossPaymentException;
 import com.moa2.api.payment.service.PaymentService;
+import com.moa2.api.reservation.dto.ReservationRequestEvent;
+import com.moa2.api.reservation.service.v2.ReservationKafkaProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PaymentFacade {
 
     private final PaymentService paymentService;
     private final TossPaymentClient tossPaymentClient;
+
+    // V2 프로필에서만 주입되는 빈 (Optional)
+    private ReservationKafkaProducer kafkaProducer;
+
+    public PaymentFacade(PaymentService paymentService, TossPaymentClient tossPaymentClient) {
+        this.paymentService = paymentService;
+        this.tossPaymentClient = tossPaymentClient;
+    }
+
+    @Autowired(required = false)
+    public void setKafkaProducer(ReservationKafkaProducer kafkaProducer) {
+        this.kafkaProducer = kafkaProducer;
+    }
 
     /**
      * Facade 패턴: 결제 승인
      * 1. [DB Transaction] 결제 정보 검증 및 선점 (Locking & State Update to IN_PROGRESS)
      * 2. [External API] 토스 결제 승인 (No DB Transaction) -> DB 락 없이 수행
      * 3. [DB Transaction] 결제 완료 처리 (State Update to COMPLETED)
+     * 4. [Kafka] 결제 완료 알림 이벤트 발행 (V2 프로필에서만)
      */
     public PaymentDto.SuccessResponse confirmPayment(PaymentDto.ConfirmRequest request, Long userId) {
         // Step 1. 결제 검증 및 진행 상태로 변경 (트랜잭션 A)
-        // 이 단계가 끝나면 DB 락이 해제됨. 하지만 상태는 IN_PROGRESS이므로 다른 요청이 들어와도 막힘.
         paymentService.preparePayment(request.orderId(), request.amount().longValue(), userId);
 
         TossPaymentResponse tossResponse;
@@ -36,7 +53,6 @@ public class PaymentFacade {
             tossResponse = tossPaymentClient.confirmPayment(
                     request.paymentKey(), request.orderId(), request.amount());
         } catch (TossPaymentException e) {
-            // 실패 시 결제 실패 처리 (DB 상태 원복 등)
             log.error("토스 결제 승인 실패: {}", e.getMessage());
             paymentService.failPaymentProcessing(request.orderId(), e.getMessage());
             throw PaymentException.invalidState("결제 승인에 실패했습니다: " + e.getMessage());
@@ -44,9 +60,15 @@ public class PaymentFacade {
 
         // Step 3. 결제 완료 처리 (트랜잭션 B)
         try {
-            return paymentService.completePayment(request.orderId(), request.paymentKey(), tossResponse);
+            PaymentDto.SuccessResponse response = paymentService.completePayment(
+                    request.orderId(), request.paymentKey(), tossResponse);
+
+            // Step 4. Kafka 결제 완료 알림 발행 (실패해도 결제 결과에 영향 없음)
+            sendPaymentNotification(userId, response.orderId());
+
+            return response;
         } catch (Exception e) {
-            // [CRITICAL] 3-1. 결제 승인은 성공했으나, DB 반영 실패 시 -> 결제 취소(환불) 처리 (보상 트랜잭션)
+            // [CRITICAL] 결제 승인은 성공했으나, DB 반영 실패 시 -> 결제 취소(환불) 처리
             log.error("결제 완료 처리 중 오류 발생 (DB Commit Fail). 자동 취소(환불)를 진행합니다. orderId={}, reason={}",
                     request.orderId(), e.getMessage());
 
@@ -55,10 +77,8 @@ public class PaymentFacade {
             } catch (Exception cancelEx) {
                 log.error("자동 취소 실패! 수동 확인이 필요합니다. paymentKey={}, error={}", tossResponse.paymentKey(),
                         cancelEx.getMessage());
-                // 여기서 Admin 알림 등을 발송해야 함.
             }
 
-            // 실패 처리 (DB 상태 FAILED로 변경 시도)
             try {
                 paymentService.failPaymentProcessing(request.orderId(), "DB Commit Failed during completion");
             } catch (Exception failEx) {
@@ -71,26 +91,49 @@ public class PaymentFacade {
 
     /**
      * Facade 패턴: Mock 결제 승인
-     * 1. [DB Transaction] 결제 정보 검증 및 선점 (Locking & State Update to IN_PROGRESS)
-     * 2. [Simulation] 외부 API 호출 시간 시뮬레이션 (No DB Transaction) -> DB 락 없이 수행
-     * 3. [DB Transaction] 결제 완료 처리 (State Update to COMPLETED)
      */
     public PaymentDto.PaymentSuccessResponse confirmPaymentMock(String paymentKey, String orderId, Long amount) {
         // Step 1. 결제 검증 및 진행 상태로 변경 (트랜잭션 A)
         paymentService.preparePaymentMock(orderId, amount);
 
-        // Step 2. 외부 API 호출 시뮬레이션 (약 500ms 지연 가정)
-        // 실제 외부 연동이 없으므로 단순 로깅 처리하거나 Thread.sleep()을 줄 수 있음.
+        // Step 2. 외부 API 호출 시뮬레이션
         log.info("Mock 외부 결제 시스템 승인 처리 중... (Simulation)");
 
         // Step 3. 결제 완료 처리 (트랜잭션 B)
         try {
-            return paymentService.completePaymentMock(paymentKey, orderId, amount);
+            PaymentDto.PaymentSuccessResponse response = paymentService.completePaymentMock(paymentKey, orderId, amount);
+
+            // Step 4. Kafka 결제 완료 알림 발행
+            sendPaymentNotification(null, orderId);
+
+            return response;
         } catch (Exception e) {
             log.error("Mock 결제 완료 처리 중 오류 발생: {}", e.getMessage());
-            // 실패 시 상태 롤백 (FAILED)
             paymentService.failPaymentProcessing(orderId, "Mock System Error: " + e.getMessage());
             throw e;
+        }
+    }
+
+    /**
+     * 결제 완료 후 Kafka 알림 이벤트 발행
+     * - V2 프로필에서만 동작 (kafkaProducer가 null이면 스킵)
+     * - 이메일/SMS 알림 전용 (실패해도 결제 결과에 영향 없음)
+     */
+    private void sendPaymentNotification(Long userId, String orderId) {
+        if (kafkaProducer == null) {
+            log.debug("Kafka Producer 미설정 (V1 모드) - 알림 이벤트 발행 스킵");
+            return;
+        }
+
+        try {
+            ReservationRequestEvent event = ReservationRequestEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .userId(userId != null ? userId : 0L)
+                    .build();
+            kafkaProducer.send(event);
+            log.info("결제 완료 알림 이벤트 발행 성공 - orderId: {}", orderId);
+        } catch (Exception e) {
+            log.warn("결제 완료 알림 이벤트 발행 실패 (무시): {}", e.getMessage());
         }
     }
 }

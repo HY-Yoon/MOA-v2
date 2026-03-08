@@ -8,6 +8,7 @@ import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ErrorResponse;
 import com.moa2.global.model.ErrorCode;
+import java.util.List;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,26 +17,16 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 /**
  * V2: Redis 기반 예매 컨트롤러
- * - 토큰 기반 입장 제어
- * - Redisson 분산 락으로 동시성 제어
- *
- * 에러 응답 data 구조:
- * - QUEUE_EXPIRED : { "code": "QUEUE_EXPIRED" }
- * - BAD_REQUEST : { "code": "BAD_REQUEST" }
- * - SEAT_CONFLICT : { "code": "SEAT_CONFLICT", "conflictSeatIds": ["A-4",
- * "B-7"] }
+ * - [1단계] 좌석 선점: POST /reserve → Redis 선점만 (DB 없음) → 200
+ * - [2단계] 주문 생성: POST /order  → DB 저장 (Reservation + Payment) → 200
+ * - [3단계] 결제 완료: PaymentController에서 처리 (기존 유지)
  */
 @Slf4j
 @Profile("v2")
@@ -47,45 +38,41 @@ public class ReservationControllerV2 implements ReservationControllerV2Docs {
 
     private final ReservationFacade reservationFacade;
     private final UserRepository userRepository;
-    private final RedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper objectMapper;
 
     /**
-     * 좌석 예매
+     * [1단계] 좌석 선점
      * - X-Queue-Token 헤더로 토큰 전달
+     * - Redis에 좌석 선점만 저장 (DB Write 없음)
+     * - 즉시 200 OK 응답
      */
-    @Operation(summary = "V2 좌석 예매", description = "Redis 기반 예매 API입니다. 비동기 처리를 위해 202 Accepted를 반환하고, 상태 확인용 eventId를 제공합니다.")
+    @Operation(summary = "V2 좌석 선점", description = "Redis 기반 좌석 선점 API. DB Write 없이 즉시 200 응답합니다.")
     @PostMapping("/reserve")
+    @Override
     public ResponseEntity<?> reserve(
             @RequestHeader("X-Queue-Token") String token,
             @Valid @RequestBody ReservationDtoV2.ReserveRequest request) {
 
         try {
             Long userId = getAuthenticatedUserId();
-            ReservationDtoV2.ReserveAcceptedResponse response = reservationFacade.reserve(token, userId, request);
-            // Kafka 비동기 처리: 202 Accepted 응답
-            return ResponseEntity.status(HttpStatus.ACCEPTED)
-                    .body(com.moa2.global.dto.ApiResponse.success(response));
+            ReservationDtoV2.ReserveSeatResponse response = reservationFacade.reserve(token, userId, request);
+            return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
 
         } catch (SeatConflictException e) {
-            // 좌석 충돌: 충돌 좌석 목록을 data에 포함
-            log.warn("V2 예매 실패 (좌석 충돌): {}", e.getConflictSeatIds());
+            log.warn("V2 좌석 선점 실패 (좌석 충돌): {}", e.getConflictSeatIds());
             return ResponseEntity.badRequest()
                     .body(com.moa2.global.dto.ApiResponse.error(
                             e.getMessage(),
                             ErrorResponse.ofConflict(e.getConflictSeatIds())));
 
         } catch (IllegalArgumentException e) {
-            // 토큰 만료/사용됨 → QUEUE_EXPIRED, 존재하지 않는 좌석 → BAD_REQUEST 구분
             String msg = e.getMessage();
             ErrorCode code = isQueueTokenError(msg) ? ErrorCode.QUEUE_EXPIRED : ErrorCode.BAD_REQUEST;
-            log.warn("V2 예매 실패 ({}): {}", code, msg);
+            log.warn("V2 좌석 선점 실패 ({}): {}", code, msg);
             return ResponseEntity.badRequest()
                     .body(com.moa2.global.dto.ApiResponse.error(msg, ErrorResponse.of(code)));
 
         } catch (IllegalStateException e) {
-            // 인증 오류 또는 기타 상태 오류
-            log.warn("V2 예매 실패 (상태 오류): {}", e.getMessage());
+            log.warn("V2 좌석 선점 실패 (상태 오류): {}", e.getMessage());
             return ResponseEntity.badRequest()
                     .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
                             ErrorResponse.of(ErrorCode.BAD_REQUEST)));
@@ -93,42 +80,62 @@ public class ReservationControllerV2 implements ReservationControllerV2Docs {
     }
 
     /**
-     * 예매 처리 상태 폴링 API
-     * - 클라이언트가 1~2초 간격으로 호출하여 비동기 처리 상태 확인
-     * - PENDING: 아직 처리 중
-     * - COMPLETED: DB 저장 완료 → 결제 페이지로 이동 가능
-     * - FAILED: 처리 실패 → 재시도 안내
+     * [미리보기] 결제 페이지 진입 시 주문 상세 조회
+     * - 선점한 좌석 상세 정보, 결제 금액, 예약자 정보를 반환
      */
-    @Operation(summary = "예매 처리 상태 조회 (폴링)", description = "Kafka 비동기 처리 상태를 확인합니다.")
-    @GetMapping("/status/{eventId}")
-    public ResponseEntity<?> getReservationStatus(@PathVariable String eventId) {
-        String statusKey = "reservation:status:" + eventId;
-        String status = redisTemplate.opsForValue().get(statusKey);
+    @Operation(summary = "V2 주문 미리보기", description = "결제 화면에서 필요한 주문 상세 정보(공연명, 가격, 남은 시간 등)를 조회합니다.")
+    @GetMapping("/preview")
+    public ResponseEntity<?> getPreview(
+            @RequestParam("scheduleId") Long scheduleId,
+            @RequestParam("scheduleSeatIds") List<Long> scheduleSeatIds) {
 
-        if (status == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(com.moa2.global.dto.ApiResponse.error(
-                            "해당 예매 이벤트를 찾을 수 없습니다.",
-                            Map.of("eventId", eventId, "status", "NOT_FOUND")));
+        try {
+            Long userId = getAuthenticatedUserId();
+            ReservationDtoV2.PreviewResponse response = reservationFacade.getPreviewInfo(userId, scheduleId, scheduleSeatIds);
+            return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
+
+        } catch (IllegalStateException e) {
+            log.warn("V2 주문 미리보기 실패 (상태 오류): {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
+                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
+        } catch (IllegalArgumentException e) {
+            log.warn("V2 주문 미리보기 실패: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
+                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
         }
+    }
 
-        if ("COMPLETED".equals(status)) {
-            String resultKey = "reservation:result:" + eventId;
-            String resultJson = redisTemplate.opsForValue().get(resultKey);
+    /**
+     * [2단계] 주문 생성
+     * - 예약자 정보를 받아 DB에 Reservation + Payment(PENDING) 생성
+     * - orderId를 반환하여 Toss 위젯 초기화
+     */
+    @Operation(summary = "V2 주문 생성", description = "예약자 정보를 입력받아 주문을 생성합니다. Toss 결제 위젯 초기화에 필요한 orderId를 반환합니다.")
+    @PostMapping("/order")
+    @Override
+    public ResponseEntity<?> createOrder(
+            @Valid @RequestBody ReservationDtoV2.CreateOrderRequest request) {
 
-            if (resultJson != null) {
-                try {
-                    Object resultObj = objectMapper.readValue(resultJson, Object.class);
-                    return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(
-                            Map.of("eventId", eventId, "status", status, "result", resultObj)));
-                } catch (Exception e) {
-                    log.error("예매 결과 JSON 파싱 실패: {}", e.getMessage());
-                }
-            }
+        try {
+            Long userId = getAuthenticatedUserId();
+            ReservationDtoV2.CreateOrderResponse response = reservationFacade.createOrder(userId, request);
+            return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
+
+        } catch (IllegalStateException e) {
+            // 선점 만료 또는 인증 오류
+            log.warn("V2 주문 생성 실패 (상태 오류): {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
+                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
+
+        } catch (IllegalArgumentException e) {
+            log.warn("V2 주문 생성 실패: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
+                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
         }
-
-        return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(
-                Map.of("eventId", eventId, "status", status)));
     }
 
     /**
