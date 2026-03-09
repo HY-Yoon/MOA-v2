@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.data.redis.core.RedisCallback;
+
 /**
  * V2: Redisson 분산 락 기반 예매 서비스
  *
@@ -152,30 +154,48 @@ public class ReservationServiceV2 {
     }
 
     /**
-     * [2단계] 주문 생성 전 Redis 선점 유효성 확인
-     * - 해당 좌석들이 아직 이 사용자의 선점 상태인지 확인
+     * [2단계] 주문 생성 전 Redis 선점 유효성 확인 (Pipeline)
+     * - N개 좌석을 Redis 왕복 1회로 확인
      */
     public void validateSeatHold(Long userId, List<Long> seatIds) {
-        for (Long seatId : seatIds) {
-            String statusKey = SEAT_STATUS_PREFIX + seatId;
-            String holdUserId = redisTemplate.opsForValue().get(statusKey);
+        // Pipeline MGET - 왕복 1회
+        List<String> keys = seatIds.stream()
+                .map(seatId -> SEAT_STATUS_PREFIX + seatId)
+                .toList();
 
-            if (holdUserId == null) {
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String key : keys) {
+                connection.stringCommands().get(key.getBytes());
+            }
+            return null;
+        });
+
+        for (int i = 0; i < seatIds.size(); i++) {
+            Object result = results.get(i);
+            Long seatId = seatIds.get(i);
+
+            if (result == null) {
                 throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
             }
-            if (!holdUserId.equals(String.valueOf(userId))) {
+            if (!result.toString().equals(String.valueOf(userId))) {
                 throw new IllegalStateException("다른 사용자가 선점한 좌석입니다. 좌석 ID: " + seatId);
             }
         }
     }
 
     /**
-     * 좌석 선점 해제 (결제 실패/취소 시 호출)
+     * 좌석 선점 해제 (결제 실패/취소 시 호출, Pipeline)
      */
     public void releaseSeatHold(List<Long> seatIds) {
-        for (Long seatId : seatIds) {
-            redisTemplate.delete(SEAT_STATUS_PREFIX + seatId);
-        }
+        if (seatIds.isEmpty()) return;
+
+        // Pipeline DEL - 왕복 1회
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (Long seatId : seatIds) {
+                connection.keyCommands().del((SEAT_STATUS_PREFIX + seatId).getBytes());
+            }
+            return null;
+        });
         log.info("좌석 선점 해제 완료: seatIds={}", seatIds);
     }
 
@@ -188,22 +208,46 @@ public class ReservationServiceV2 {
             List<Long> seatIds,
             com.moa2.api.user.domain.entity.User user) {
         
-        // 1. 좌석 선점 유효성 확인 및 잔여 시간 조회
-        long minTtlSeconds = Long.MAX_VALUE;
-        for (Long seatId : seatIds) {
-            String statusKey = SEAT_STATUS_PREFIX + seatId;
-            String holdUserId = redisTemplate.opsForValue().get(statusKey);
+        // 1. 좌석 선점 유효성 확인 및 잔여 시간 조회 (Pipeline - 왕복 2회)
+        List<String> statusKeys = seatIds.stream()
+                .map(seatId -> SEAT_STATUS_PREFIX + seatId)
+                .toList();
 
-            if (holdUserId == null) {
+        // Pipeline GET - 왕복 1회
+        List<Object> holdResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String key : statusKeys) {
+                connection.stringCommands().get(key.getBytes());
+            }
+            return null;
+        });
+
+        for (int i = 0; i < seatIds.size(); i++) {
+            Object result = holdResults.get(i);
+            Long seatId = seatIds.get(i);
+
+            if (result == null) {
                 throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
             }
-            if (!holdUserId.equals(String.valueOf(userId))) {
+            if (!result.toString().equals(String.valueOf(userId))) {
                 throw new IllegalStateException("다른 사용자가 선점한 좌석입니다. 좌석 ID: " + seatId);
             }
+        }
 
-            Long ttl = redisTemplate.getExpire(statusKey, TimeUnit.SECONDS);
-            if (ttl != null && ttl > 0) {
-                minTtlSeconds = Math.min(minTtlSeconds, ttl);
+        // Pipeline TTL - 왕복 1회
+        List<Object> ttlResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String key : statusKeys) {
+                connection.keyCommands().ttl(key.getBytes());
+            }
+            return null;
+        });
+
+        long minTtlSeconds = Long.MAX_VALUE;
+        for (Object ttlResult : ttlResults) {
+            if (ttlResult != null) {
+                long ttl = ((Number) ttlResult).longValue();
+                if (ttl > 0) {
+                    minTtlSeconds = Math.min(minTtlSeconds, ttl);
+                }
             }
         }
 

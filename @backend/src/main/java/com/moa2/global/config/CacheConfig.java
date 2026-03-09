@@ -45,7 +45,7 @@ public class CacheConfig {
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
 
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofSeconds(3))           // ⭐️ 3초 TTL (1~3초 주기 캐싱)
+                .entryTtl(Duration.ofSeconds(10))          // ⭐️ 10초 TTL (네트워크 부하 절감)
                 .serializeKeysWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(
