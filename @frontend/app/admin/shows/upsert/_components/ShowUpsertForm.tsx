@@ -194,7 +194,7 @@ export default function ShowUpsertForm(props: Props) {
     () => ({ region: watchedRegion ?? '', page: 0, size: 100 }),
     [watchedRegion],
   );
-  const { data: seatMapListResponse, isFetched: isSeatMapFetched } = useQuery({
+  const { data: seatMapListResponse, isFetching: isSeatMapFetching } = useQuery({
     ...getSeatMapList(seatMapParams),
     enabled: !!watchedRegion,
   });
@@ -236,12 +236,21 @@ export default function ShowUpsertForm(props: Props) {
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
   }, [venueOptions, watchedVenueName, setValue]);
+
   useEffect(() => {
     const hallValues = hallOptions.map((o) => o.value);
     if (watchedHallName && hallValues.length > 0 && !hallValues.includes(watchedHallName)) {
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
   }, [hallOptions, watchedHallName, setValue]);
+
+  // 수정 모드: fetch 이후 장소/공연장 데이터 다시 설정
+  useEffect(() => {
+    if (!isUpdate || !data || isSeatMapFetching) return;
+
+    setValue(SHOW_FORM_FIELDS.VENUE_NAME, data.venueName, { shouldValidate: true });
+    setValue(SHOW_FORM_FIELDS.HALL_NAME, data.hallName, { shouldValidate: true });
+  }, [isUpdate, data, isSeatMapFetching, venueOptions, setValue]);
 
   // 리액트 하이드레이션 무한 루프 방지용 마운트 플래그
   useEffect(() => {
@@ -250,7 +259,7 @@ export default function ShowUpsertForm(props: Props) {
 
   // 수정인 경우 데이터 로드 후 폼 초기화
   useEffect(() => {
-    if (!isUpdate || !data) return;
+    if (!isUpdate || !data || isSeatMapFetching) return;
 
     const formSchedules =
       data.schedules.length > 0
