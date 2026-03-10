@@ -30,6 +30,11 @@ namespace ShowCatalog {
     session: number;
   }
 
+  interface SalePeriod {
+    startDate: string;
+    endDate: string;
+  }
+
   interface List {
     id: number;
     title: string;
@@ -42,10 +47,7 @@ namespace ShowCatalog {
       venue: string;
       hallName: string;
     };
-    salePeriod: {
-      startDate: string;
-      endDate: string;
-    };
+    salePeriod: SalePeriod;
     createdAt: string;
     viewCount: number;
     startDate: string;

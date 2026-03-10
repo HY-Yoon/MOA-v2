@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Calendar } from '@/components/atoms';
-import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { DATE_FORMAT, DATE_UNIT } from '@/constants/common/dateFormat';
 import { getShowSchedulesByDate } from '@/lib/api/show';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
@@ -98,7 +98,10 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
           selected={selectedDate}
           onSelect={handleSelectDate}
           defaultMonth={selectedDate ?? defaultDate}
-          disabled={(date) => !scheduleDatesSet.has(formatDateOnly(date))}
+          disabled={(date) =>
+            dayjs(date).isBefore(dayjs(), DATE_UNIT.DAY) ||
+            !scheduleDatesSet.has(formatDateOnly(date))
+          }
           className="[&_.rdp-weekday]:first-child:text-red-500 [&_.rdp-weekday]:last-child:text-muted-foreground rounded-lg border-0 p-0"
         />
 
