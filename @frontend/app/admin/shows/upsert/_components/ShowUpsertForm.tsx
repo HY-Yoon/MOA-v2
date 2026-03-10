@@ -231,7 +231,7 @@ export default function ShowUpsertForm(props: Props) {
   // 지역 또는 장소 선택 변경시 초기화
   useEffect(() => {
     const venueValues = venueOptions.map((o) => o.value);
-    if (watchedVenueName && venueValues.length > 0 && !venueValues.includes(watchedVenueName)) {
+    if (watchedVenueName && !venueValues.includes(watchedVenueName)) {
       setValue(SHOW_FORM_FIELDS.VENUE_NAME, '');
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
@@ -239,7 +239,7 @@ export default function ShowUpsertForm(props: Props) {
 
   useEffect(() => {
     const hallValues = hallOptions.map((o) => o.value);
-    if (watchedHallName && hallValues.length > 0 && !hallValues.includes(watchedHallName)) {
+    if (watchedHallName && !hallValues.includes(watchedHallName)) {
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
   }, [hallOptions, watchedHallName, setValue]);
@@ -247,10 +247,11 @@ export default function ShowUpsertForm(props: Props) {
   // 수정 모드: fetch 이후 장소/공연장 데이터 다시 설정
   useEffect(() => {
     if (!isUpdate || !data || isSeatMapFetching) return;
+    if (watchedRegion !== data.region) return;
 
     setValue(SHOW_FORM_FIELDS.VENUE_NAME, data.venueName, { shouldValidate: true });
     setValue(SHOW_FORM_FIELDS.HALL_NAME, data.hallName, { shouldValidate: true });
-  }, [isUpdate, data, isSeatMapFetching, venueOptions, setValue]);
+  }, [isUpdate, data, isSeatMapFetching, hallOptions, watchedRegion, setValue]);
 
   // 리액트 하이드레이션 무한 루프 방지용 마운트 플래그
   useEffect(() => {
@@ -259,7 +260,7 @@ export default function ShowUpsertForm(props: Props) {
 
   // 수정인 경우 데이터 로드 후 폼 초기화
   useEffect(() => {
-    if (!isUpdate || !data || isSeatMapFetching) return;
+    if (!isUpdate || !data) return;
 
     const formSchedules =
       data.schedules.length > 0
