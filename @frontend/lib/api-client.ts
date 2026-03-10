@@ -5,6 +5,10 @@
 import type { AlertOptions } from '@/components/molecules/AlertContext';
 import axios, { type AxiosInstance } from 'axios';
 
+type RouterLike = {
+  back: () => void;
+};
+
 // axios 인스턴스 설정
 export const axiosInstance: AxiosInstance = axios.create({
   timeout: 10000,
@@ -14,26 +18,44 @@ export const axiosInstance: AxiosInstance = axios.create({
 });
 
 // axios interceptor
-let globalRouter: any = null;
+let globalRouter: RouterLike | null = null;
 let globalAlert: ((options: AlertOptions) => void) | null = null;
 let globalOnUnauthorized: (() => void) | null = null;
 
-export const setGlobalRouter = (router: any) => (globalRouter = router);
+export const setGlobalRouter = (router: RouterLike | null) => (globalRouter = router);
 export const setGlobalAlertHandler = (handler: (options: AlertOptions) => void) =>
   (globalAlert = handler);
 export const setGlobalOnUnauthorized = (handler: (() => void) | null) =>
   (globalOnUnauthorized = handler);
 
+const getSafeErrorPayload = (error: unknown) => {
+  const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+  if (typeof responseData === 'string') {
+    const normalized = responseData.trim();
+    const isHtmlResponse = normalized.startsWith('<!DOCTYPE html') || normalized.startsWith('<html');
+    if (isHtmlResponse) {
+      return 'HTML error response received (body omitted)';
+    }
+    return normalized.slice(0, 300);
+  }
+  return responseData ?? (error as { message?: string })?.message ?? 'Unknown error';
+};
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.error('API Error:', error.response?.data || error.message);
+    const method = (error as { config?: { method?: string } })?.config?.method?.toUpperCase() ?? 'UNKNOWN';
+    const url = (error as { config?: { url?: string } })?.config?.url ?? 'UNKNOWN_URL';
+    const status = (error as { response?: { status?: number } })?.response?.status ?? 'NO_STATUS';
+    console.error(`API Error [${method} ${url}] (${status})`, getSafeErrorPayload(error));
 
     if (error.response?.status === 401) {
-      // 로그인 여부 확인은 401 리다이렉트 제외 (users/me)
+      // 로그인 여부 확인 요청은 401 글로벌 리다이렉트 제외
       const isAuthCheckRequest =
-        error.config?.method?.toLowerCase() === 'get' &&
-        (error.config?.url?.includes('users/me') ?? false);
+        (error.config?.method?.toLowerCase() === 'get' &&
+          (error.config?.url?.includes('users/me') ?? false)) ||
+        (error.config?.method?.toLowerCase() === 'post' &&
+          (error.config?.url?.includes('/auth/verification-status') ?? false));
       if (!isAuthCheckRequest) {
         globalOnUnauthorized?.();
       }
