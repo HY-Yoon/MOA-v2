@@ -60,7 +60,7 @@ export default function ShowDetailPage() {
 
         <ShowDetailSidebar
           phase={sidebarPhase}
-          saleOpenAt={showDetail.salePeriod.startDate}
+          salePeriod={showDetail.salePeriod}
           schedules={showDetail.schedules}
           onOpenTimeReached={handleOpenTimeReached}
         />
