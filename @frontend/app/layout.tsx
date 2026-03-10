@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from '@/lib/client-providers';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 import { AlertProvider } from '@/components/molecules/AlertContext';
-import { Header } from '@/components/organisms/Header';
+import { AppHeader } from '@/components/organisms/AppHeader';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <AuthProvider>
             <AlertProvider>
-              <Header />
+              <AppHeader />
               <main>{children}</main>
             </AlertProvider>
           </AuthProvider>

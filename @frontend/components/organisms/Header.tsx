@@ -9,7 +9,6 @@ import {
   USER_ROUTES,
   USER_ROUTES_LABELS,
 } from '@/constants/route/userRoutes';
-import { usePathname } from 'next/navigation';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 
 // 네비게이션 메뉴 설정
@@ -52,13 +51,15 @@ const AUTHENTICATED_DROPDOWN_ITEMS = [
   },
 ];
 
-export function Header() {
+interface HeaderProps {
+  hidden?: boolean;
+}
+
+export function Header({ hidden = false }: HeaderProps) {
   const { isLoggedIn, isLoading, user } = useAuth();
   const handleLogout = useConfirmLogout();
-  const pathname = usePathname();
 
-  // admin 경로는 GNB 표시 안 함
-  if (pathname.startsWith(ADMIN_ROUTES.DASHBOARD)) {
+  if (hidden) {
     return null;
   }
 
