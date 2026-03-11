@@ -21,7 +21,7 @@ export default function ShowDetailSidebar({
   onOpenTimeReached,
 }: ShowDetailSidebarProps) {
   const isEnded = salePeriod.endDate
-    ? dayjs(salePeriod.endDate).isBefore(dayjs(), DATE_UNIT.DAY)
+    ? dayjs(salePeriod.endDate).isBefore(dayjs(), DATE_UNIT.HOUR)
     : false;
 
   return (
