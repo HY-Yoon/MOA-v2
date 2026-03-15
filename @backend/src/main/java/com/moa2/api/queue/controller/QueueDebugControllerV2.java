@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
  * - 로그인한 사용자 기준으로 WAITING/READY 시나리오를 강제 구성
  */
 @Slf4j
-@Profile("local & v2")
 @RestController
 @RequestMapping("/api/v2/queue/debug")
 @RequiredArgsConstructor
