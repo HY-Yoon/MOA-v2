@@ -1,11 +1,11 @@
 package com.moa2.api.reservation.controller.docs;
 
 import com.moa2.api.reservation.dto.ReservationDto;
+import com.moa2.api.reservation.dto.ReservationSearchCondition;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.dto.PageResponse;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
-import com.moa2.api.reservation.dto.ReservationSearchCondition;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -15,8 +15,8 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@Tag(name = "마이페이지 - 예매 내역", description = "내 예매 내역 조회 및 취소 API")
-public interface ReservationControllerDocs {
+@Tag(name = "사용자 예매 API", description = "내 예매 내역 조회 및 상세 조회 API")
+public interface UserReservationControllerDocs {
 
   @Operation(summary = "내 예매 내역 목록 조회", description = "로그인한 사용자의 예매 내역을 조회합니다.\n\n" +
       "**인증 방식:** Cookie (accessToken)\n\n" +

@@ -16,7 +16,6 @@ import com.moa2.global.model.PaymentStatus;
 import com.moa2.global.model.ReservationStatus;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.format.annotation.DateTimeFormat;
-import java.time.LocalDateTime;
 
 /**
  * 관리자용 예매 관련 DTO
@@ -36,6 +35,10 @@ public class AdminReservationDto {
                         @Parameter(description = "예매 상태") ReservationStatus status,
 
                         @Parameter(description = "결제 상태") PaymentStatus paymentStatus,
+
+                        @Parameter(hidden = true) Long showId,
+
+                        @Parameter(hidden = true) Long scheduleId,
 
                         @Parameter(description = "조회 시작일시") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
 
@@ -67,7 +70,7 @@ public class AdminReservationDto {
          * 관리자용 예매 목록 응답
          */
         @Builder
-        @Schema(description = "관리자용 예매 목록 응답")
+        @Schema(name = "AdminReservationListResponse", description = "관리자용 예매 목록 응답")
         public record ListResponse(
                         @Schema(description = "예매 ID", example = "1") Long reservationId,
 
@@ -113,7 +116,7 @@ public class AdminReservationDto {
          * 관리자용 예매 상세 응답
          */
         @Builder
-        @Schema(description = "관리자용 예매 상세 응답")
+        @Schema(name = "AdminReservationDetailResponse", description = "관리자용 예매 상세 응답")
         public record DetailResponse(
                         @Schema(description = "예매 ID", example = "1") Long reservationId,
 

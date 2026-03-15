@@ -1,6 +1,6 @@
 package com.moa2.api.reservation.controller;
 
-import com.moa2.api.reservation.controller.docs.ReservationControllerV2Docs;
+import com.moa2.api.reservation.controller.docs.TicketingControllerDocs;
 import com.moa2.api.reservation.dto.ReservationDtoV2;
 import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.reservation.service.v2.ReservationFacade;
@@ -23,18 +23,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * V2: Redis 기반 예매 컨트롤러
+ * 티켓팅 전용 컨트롤러 (V2)
  * - [1단계] 좌석 선점: POST /reserve → Redis 선점만 (DB 없음) → 200
  * - [2단계] 주문 생성: POST /order  → DB 저장 (Reservation + Payment) → 200
  * - [3단계] 결제 완료: PaymentController에서 처리 (기존 유지)
  */
 @Slf4j
-@Profile("v2")
-@Tag(name = "예매 API V2", description = "Redis 기반 공연 예매 API (V2)")
 @RestController
 @RequestMapping("/api/v2/reservations")
 @RequiredArgsConstructor
-public class ReservationControllerV2 implements ReservationControllerV2Docs {
+public class TicketingController implements TicketingControllerDocs {
 
     private final ReservationFacade reservationFacade;
     private final UserRepository userRepository;

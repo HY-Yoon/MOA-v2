@@ -6,15 +6,16 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 /**
- * V2: Redis 기반 예매 API 문서
+ * 티켓팅 API 문서
  */
-@Tag(name = "예매 API V2", description = "Redis 기반 공연 예매 API (V2)")
-public interface ReservationControllerV2Docs {
+@Tag(name = "티켓팅 API V2", description = "예매 진행 플로우 및 주문 처리 API (V2)")
+public interface TicketingControllerDocs {
 
   @Operation(summary = "좌석 선점 (V2)", description = """
       Redis 분산 락 기반으로 좌석을 선점합니다. DB Write 없이 즉시 200 응답합니다.

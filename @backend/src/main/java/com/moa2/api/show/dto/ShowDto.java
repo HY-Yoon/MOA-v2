@@ -385,7 +385,7 @@ public class ShowDto {
         // ===== Response DTOs =====
 
         @Builder
-        @Schema(description = "공연 목록 조회 응답")
+        @Schema(name = "ShowListResponse", description = "공연 목록 조회 응답")
         public record ListResponse(
                         @Schema(description = "공연 ID", example = "1") Long id,
                         @Schema(description = "제목", example = "레미제라블") String title,
@@ -442,7 +442,7 @@ public class ShowDto {
         }
 
         @Builder
-        @Schema(description = "공연 상세 조회 응답 (사용자용)")
+        @Schema(name = "ShowDetailResponse", description = "공연 상세 조회 응답 (사용자용)")
         public record DetailResponse(
                         @Schema(description = "공연 ID", example = "1") Long id,
                         @Schema(description = "제목") String title,
