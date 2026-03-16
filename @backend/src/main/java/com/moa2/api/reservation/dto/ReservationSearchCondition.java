@@ -22,11 +22,15 @@ public record ReservationSearchCondition(
 
         @Parameter(description = "조회 종료일") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
 
-        @Parameter(description = "페이지 번호 (0부터 시작)") int page,
+        @Parameter(description = "페이지 번호 (0부터 시작, 기본값: 0)", required = false, example = "0")
+        @Schema(defaultValue = "0")
+        int page,
 
-        @Parameter(description = "페이지 크기") int size) {
+        @Parameter(description = "페이지 크기 (기본값: 20)", required = false, example = "20")
+        @Schema(defaultValue = "20")
+        int size) {
     public ReservationSearchCondition {
         if (size == 0)
-            size = 10;
+            size = 20;
     }
 }

@@ -37,7 +37,6 @@ out/
 .vscode/
 
 docs/*
-src/main/java/com/moa2/api/test/
 src/test/
 test/
 

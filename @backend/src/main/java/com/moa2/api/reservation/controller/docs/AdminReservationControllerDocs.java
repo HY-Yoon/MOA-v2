@@ -38,6 +38,9 @@ public interface AdminReservationControllerDocs {
                         schema = @Schema(allowableValues = {"RESERVATION_NUMBER", "BOOKER_NAME", "BOOKER_ID", "SHOW_TITLE"})),
                 @Parameter(name = "searchKeyword",   in = ParameterIn.QUERY, required = false,
                         description = "검색어 (예매번호, 예매자명, 예매자ID, 공연제목)"),
+                @Parameter(name = "showId",          in = ParameterIn.QUERY, required = false,
+                        description = "공연 ID (해당 공연 기준 목록 조회)", example = "1",
+                        schema = @Schema(type = "integer", format = "int64")),
                 @Parameter(name = "status",          in = ParameterIn.QUERY, required = false,
                         description = "예매 상태",
                         schema = @Schema(allowableValues = {"PENDING", "CONFIRMED", "CANCELLED", "SOLD"})),
@@ -66,12 +69,9 @@ public interface AdminReservationControllerDocs {
         @Operation(
                 summary = "예매 상세 조회",
                 description = """
-                        예매(reservationId), 공연(showId), 회차(scheduleId) 기준으로 예매 상세를 조회합니다.
+                        예매 ID(reservationId) 기준으로 예매 상세를 조회합니다.
 
-                        `reservationId`, `showId`, `scheduleId`는 모두 선택값입니다.
-                        - 둘 다 비우면: 전체 예매 상세 목록
-                        - 하나만 입력하면: 해당 조건 조회
-                        - 둘 다 입력하면: OR 조건 조회
+                        `reservationId`는 필수값입니다.
 
                         **응답 정보 (예매별):**
                         - 예매 기본 정보 (예매번호, 예매일시, 상태)
@@ -81,26 +81,10 @@ public interface AdminReservationControllerDocs {
                         - 결제 정보
                         """)
         @Parameters({
-                @Parameter(name = "reservationId", in = ParameterIn.QUERY, required = false,
+                @Parameter(name = "reservationId", in = ParameterIn.QUERY, required = true,
                         description = "예매 ID (해당 예매 단건 상세 조회)", example = "1",
-                        schema = @Schema(type = "integer", format = "int64")),
-                @Parameter(name = "showId",     in = ParameterIn.QUERY, required = false,
-                        description = "공연 ID (해당 공연의 전체 예매 상세 조회)", example = "1",
-                        schema = @Schema(type = "integer", format = "int64")),
-                @Parameter(name = "scheduleId", in = ParameterIn.QUERY, required = false,
-                        description = "스케줄(회차) ID (해당 회차의 전체 예매 상세 조회)", example = "10",
-                        schema = @Schema(type = "integer", format = "int64")),
-                @Parameter(name = "page",       in = ParameterIn.QUERY, required = false,
-                        description = "페이지 번호 (0부터 시작, 기본값: 0)", example = "0",
-                        schema = @Schema(type = "integer", defaultValue = "0")),
-                @Parameter(name = "size",       in = ParameterIn.QUERY, required = false,
-                        description = "페이지 크기 (기본값: 10)", example = "10",
-                        schema = @Schema(type = "integer", defaultValue = "10")),
+                        schema = @Schema(type = "integer", format = "int64"))
         })
         ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.DetailResponse>>> getReservationDetails(
-                        @RequestParam(required = false) Long reservationId,
-                        @RequestParam(required = false) Long showId,
-                        @RequestParam(required = false) Long scheduleId,
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "10") int size);
+                        @RequestParam Long reservationId);
 }

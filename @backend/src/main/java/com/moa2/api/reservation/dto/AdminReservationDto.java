@@ -36,7 +36,7 @@ public class AdminReservationDto {
 
                         @Parameter(description = "결제 상태") PaymentStatus paymentStatus,
 
-                        @Parameter(hidden = true) Long showId,
+                        @Parameter(description = "공연 ID (해당 공연 기준 목록 조회)", example = "1") Long showId,
 
                         @Parameter(hidden = true) Long scheduleId,
 

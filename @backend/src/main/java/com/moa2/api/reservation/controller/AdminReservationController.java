@@ -51,15 +51,9 @@ public class AdminReservationController implements AdminReservationControllerDoc
     @Override
     @GetMapping("/detail")
     public ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.DetailResponse>>> getReservationDetails(
-            @RequestParam(required = false) Long reservationId,
-            @RequestParam(required = false) Long showId,
-            @RequestParam(required = false) Long scheduleId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, SORT_CREATED_AT));
+            @RequestParam Long reservationId) {
         PageResponse<AdminReservationDto.DetailResponse> response =
-                adminReservationService.getReservationDetails(reservationId, showId, scheduleId, pageable);
+                adminReservationService.getReservationDetails(reservationId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

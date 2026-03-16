@@ -29,7 +29,7 @@ public interface UserReservationControllerDocs {
       "- `startDate`, `endDate` 파라미터로 기간별 조회 가능\n" +
       "- `dateType` 파라미터로 날짜 기준 선택 (RESERVATION: 예매일, SHOW: 공연일)\n\n" +
       "**정렬:** 최신 예매순 (createdAt DESC)\n\n" +
-      "**페이지네이션:** page, size 파라미터 사용")
+      "**페이지네이션:** page, size 파라미터 사용 (기본값: page=0, size=20)")
   @ApiResponses(value = {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "성공 응답", value = """
           {
@@ -66,7 +66,7 @@ public interface UserReservationControllerDocs {
               "currentPage": 0,
               "totalPages": 1,
               "totalCount": 1,
-              "pageSize": 10
+              "pageSize": 20
             },
             "message": null
           }
