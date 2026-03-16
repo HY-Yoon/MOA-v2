@@ -5,9 +5,9 @@ import { useAlert } from '@/components/molecules/AlertContext';
 import { ToggleDropdown } from '@/components/molecules/ToggleDropdown';
 import { PageCard } from '@/components/molecules/PageCard';
 import {
-  AdminTable,
-  type AdminTableColumn,
-  type AdminTableFilterOption,
+  BaseTable,
+  type BaseTableColumn,
+  type BaseTableFilterOption,
 } from '@/components/organisms';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import dayjs from '@/plugins/dayjs';
@@ -40,7 +40,7 @@ export default function UserList() {
 
   // 필터
   const [initialFilterOptions, setInitialFilterOptions] = useState<
-    Record<string, AdminTableFilterOption[]>
+    Record<string, BaseTableFilterOption[]>
   >({});
   const [filterValues, setFilterValues] = useState<Record<string, string[]>>({});
 
@@ -110,7 +110,7 @@ export default function UserList() {
     }
   }, [userList, filterValues, initialFilterOptions]);
 
-  const columns: AdminTableColumn<User.List>[] = [
+  const columns: BaseTableColumn<User.List>[] = [
     {
       key: 'id',
       label: '번호',
@@ -248,7 +248,7 @@ export default function UserList() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : (
-          <AdminTable
+          <BaseTable
             data={userList}
             columns={columns}
             onSearch={handleSearch}

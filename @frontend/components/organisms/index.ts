@@ -7,4 +7,4 @@ export * from './Header';
 export * from './MyPageSideBar';
 export * from './AdminSidebar';
 export * from './AdminBreadcrumb';
-export * from './AdminTable';
+export * from './BaseTable';

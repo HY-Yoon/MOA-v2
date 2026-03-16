@@ -2,7 +2,7 @@
 
 import { Button, Skeleton } from '@/components/atoms';
 import { PageCard } from '@/components/molecules/PageCard';
-import { AdminTable, type AdminTableColumn, type AdminTableFilterOption } from '@/components/organisms';
+import { BaseTable, type BaseTableColumn, type BaseTableFilterOption } from '@/components/organisms';
 import { REGION_LABELS } from '@/constants/common';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { deriveFilterOptions } from '@/lib/admin/table-filter';
@@ -21,7 +21,7 @@ export default function SeatList() {
   const [keyword, setKeyword] = useState('');
   const [searchColumn, setSearchColumn] = useState('all');
   const [initialFilterOptions, setInitialFilterOptions] = useState<
-    Record<string, AdminTableFilterOption[]>
+    Record<string, BaseTableFilterOption[]>
   >({});
   const [filterValues, setFilterValues] = useState<Record<string, string[]>>({});
 
@@ -62,7 +62,7 @@ export default function SeatList() {
     }
   }, [seatList, filterValues, initialFilterOptions]);
 
-  const columns: AdminTableColumn<Seat.List>[] = [
+  const columns: BaseTableColumn<Seat.List>[] = [
     { key: 'seatMapId', label: '번호' },
     {
       key: 'region',
@@ -110,7 +110,7 @@ export default function SeatList() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : (
-          <AdminTable
+          <BaseTable
             data={seatList}
             columns={columns}
             onSearch={handleSearch}

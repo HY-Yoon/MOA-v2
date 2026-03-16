@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { PageCard } from '@/components/molecules/PageCard';
 import {
-  AdminTable,
-  type AdminTableColumn,
-  type AdminTableFilterOption,
+  BaseTable,
+  type BaseTableColumn,
+  type BaseTableFilterOption,
 } from '@/components/organisms';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import StatusBadge from '@/components/molecules/StatusBadge';
@@ -41,7 +41,7 @@ export default function ShowList() {
 
   // 필터
   const [initialFilterOptions, setInitialFilterOptions] = useState<
-    Record<string, AdminTableFilterOption[]>
+    Record<string, BaseTableFilterOption[]>
   >({});
   const [filterValues, setFilterValues] = useState<Record<string, string[]>>({});
 
@@ -105,7 +105,7 @@ export default function ShowList() {
   }, [showList, filterValues, initialFilterOptions]);
 
   // 컬럼 정의
-  const columns: AdminTableColumn<Show.List>[] = [
+  const columns: BaseTableColumn<Show.List>[] = [
     { key: 'id', label: '번호', sorter: true },
     {
       key: 'title',
@@ -275,7 +275,7 @@ export default function ShowList() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : (
-          <AdminTable
+          <BaseTable
             data={showList}
             columns={columns}
             onSearch={handleSearch}
