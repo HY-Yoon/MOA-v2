@@ -16,16 +16,16 @@ import {
 } from '@/components/atoms';
 import { SearchBar, SearchColumn } from '@/components/molecules/SearchBar';
 import { Pagination } from '@/components/molecules/Pagination';
-import type { AdminTableFilterOption } from '@/lib/admin/table-filter';
+import type { BaseTableFilterOption } from '@/lib/admin/table-filter';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, ChevronsUpDown, ListFilter, FunnelX } from 'lucide-react';
 
-export type { AdminTableFilterOption };
+export type { BaseTableFilterOption };
 
 /** 필터 드롭다운에서 '전체' 선택 시 사용하는 예약 값 (필터 해제) */
 const ALL_FILTER_VALUE = '__all__';
 
-export interface AdminTableColumn<T> {
+export interface BaseTableColumn<T> {
   key: string;
   label: string;
   render?: (item: T) => React.ReactNode;
@@ -33,15 +33,16 @@ export interface AdminTableColumn<T> {
   search?: boolean; // 검색 컬럼 여부
   sorter?: boolean; // 정렬 컬럼 여부
   filter?: boolean; // 필터 컬럼 여부
-  filterOptions?: AdminTableFilterOption[]; // 필터  옵션 목록
+  filterOptions?: BaseTableFilterOption[]; // 필터  옵션 목록
 }
 
-export interface AdminTableProps<T> {
+export interface BaseTableProps<T> {
   // 데이터
   data: T[];
-  columns: AdminTableColumn<T>[];
+  columns: BaseTableColumn<T>[];
 
   // 검색 기능
+  showSearch?: boolean;
   searchPlaceholder?: string;
   onSearch?: (keyword: string, searchColumn: string) => void;
 
@@ -73,9 +74,10 @@ export interface AdminTableProps<T> {
   emptyMessage?: string;
 }
 
-export function AdminTable<T extends Record<string, any>>({
+export function BaseTable<T extends Record<string, any>>({
   data,
   columns,
+  showSearch = true,
   searchPlaceholder = '검색어를 입력하세요',
   onSearch,
   defaultSortColumn,
@@ -93,7 +95,7 @@ export function AdminTable<T extends Record<string, any>>({
   isLoading = false,
   className,
   emptyMessage = '데이터가 없습니다.',
-}: AdminTableProps<T>) {
+}: BaseTableProps<T>) {
   const [sortColumn, setSortColumn] = React.useState<string | undefined>(defaultSortColumn);
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc' | undefined>(defaultSortOrder);
 
@@ -166,14 +168,14 @@ export function AdminTable<T extends Record<string, any>>({
   }
 
   // 필터 아이콘 + 체크박스 드롭다운 렌더링
-  function renderFilter(column: AdminTableColumn<T>) {
+  function renderFilter(column: BaseTableColumn<T>) {
     if (!column.filter) return null;
 
     const selectedValues = filterValues?.[column.key] ?? [];
     const isActive = selectedValues.length > 0;
 
     const options = column.filterOptions ?? [];
-    const displayOptions: AdminTableFilterOption[] = [
+    const displayOptions: BaseTableFilterOption[] = [
       { value: ALL_FILTER_VALUE, label: '전체' },
       ...options,
     ];
@@ -207,11 +209,9 @@ export function AdminTable<T extends Record<string, any>>({
               <DropdownMenuCheckboxItem
                 key={opt.value}
                 checked={
-                  opt.value === ALL_FILTER_VALUE
-                    ? selectedValues.length === 0
-                    : selectedValues.includes(opt.value)
+                  opt.value === ALL_FILTER_VALUE ? selectedValues.length === 0 : selectedValues.includes(opt.value)
                 }
-                onCheckedChange={(checked) => handleFilterChange(column.key, opt.value, checked)}
+                onCheckedChange={(nextChecked) => handleFilterChange(column.key, opt.value, nextChecked)}
               >
                 {opt.label}
               </DropdownMenuCheckboxItem>
@@ -227,15 +227,19 @@ export function AdminTable<T extends Record<string, any>>({
       {/* 상단 컨트롤 영역 */}
       <div className="flex items-center justify-between gap-4">
         {/* 좌측: 검색 영역 */}
-        <SearchBar
-          searchColumns={searchColumns}
-          placeholder={searchPlaceholder}
-          value={searchKeyword}
-          selectedColumn={selectedSearchColumn}
-          onValueChange={setSearchKeyword}
-          onColumnChange={setSelectedSearchColumn}
-          onSearch={handleSearch}
-        />
+        {showSearch ? (
+          <SearchBar
+            searchColumns={searchColumns}
+            placeholder={searchPlaceholder}
+            value={searchKeyword}
+            selectedColumn={selectedSearchColumn}
+            onValueChange={setSearchKeyword}
+            onColumnChange={setSelectedSearchColumn}
+            onSearch={handleSearch}
+          />
+        ) : (
+          <div />
+        )}
 
         {/* 우측: 헤더 액션 영역 */}
         {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
@@ -244,11 +248,14 @@ export function AdminTable<T extends Record<string, any>>({
       {/* 테이블 */}
       <div className="rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/40">
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key} className={column.className}>
-                  <div className="flex items-center">
+                <TableHead
+                  key={column.key}
+                  className={cn('text-center', column.className)}
+                >
+                  <div className="flex items-center justify-center">
                     {/* 컬럼명 */}
                     {column.label}
                     {/* 정렬 아이콘 */}
@@ -284,7 +291,7 @@ export function AdminTable<T extends Record<string, any>>({
               data.map((item, index) => (
                 <TableRow key={index}>
                   {columns.map((column) => (
-                    <TableCell key={column.key} className={column.className}>
+                    <TableCell key={column.key} className={cn('text-center', column.className)}>
                       {column.render ? column.render(item) : item[column.key] || '-'}
                     </TableCell>
                   ))}
@@ -308,3 +315,4 @@ export function AdminTable<T extends Record<string, any>>({
     </div>
   );
 }
+

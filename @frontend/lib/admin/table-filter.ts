@@ -1,4 +1,4 @@
-export interface AdminTableFilterOption {
+export interface BaseTableFilterOption {
   value: string;
   label: string;
 }
@@ -15,8 +15,8 @@ export interface DeriveFilterOptionsConfig<T> {
 export function deriveFilterOptions<T>(
   data: T[],
   config: DeriveFilterOptionsConfig<T>[],
-): Record<string, AdminTableFilterOption[]> {
-  const options: Record<string, AdminTableFilterOption[]> = {};
+): Record<string, BaseTableFilterOption[]> {
+  const options: Record<string, BaseTableFilterOption[]> = {};
 
   for (const { key, getValue, getLabel } of config) {
     const valueToItem = new Map<string, T>();
