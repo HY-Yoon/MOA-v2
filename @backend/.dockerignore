@@ -54,7 +54,7 @@ uploads
 
 # Test
 src/test
-**/test
+test
 
 # Docker
 Dockerfile

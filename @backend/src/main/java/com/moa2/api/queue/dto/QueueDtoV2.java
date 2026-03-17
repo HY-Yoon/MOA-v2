@@ -138,4 +138,70 @@ public class QueueDtoV2 {
                     .build();
         }
     }
+
+    @Schema(description = "V2 디버그 WAITING 시나리오 요청")
+    public record DebugWaitingScenarioRequest(
+            @NotNull(message = "스케줄 ID는 필수입니다")
+            @Schema(description = "공연 회차 ID", example = "7", requiredMode = Schema.RequiredMode.REQUIRED)
+            Long scheduleId,
+
+            @Schema(description = "내 앞에 둘 가짜 대기 인원 수", example = "3", defaultValue = "3")
+            Long usersAhead
+    ) {
+        public long normalizedUsersAhead() {
+            if (usersAhead == null || usersAhead < 1) {
+                return 3L;
+            }
+            return usersAhead;
+        }
+    }
+
+    @Schema(description = "V2 디버그 READY 시나리오 요청")
+    public record DebugReadyScenarioRequest(
+            @NotNull(message = "스케줄 ID는 필수입니다")
+            @Schema(description = "공연 회차 ID", example = "7", requiredMode = Schema.RequiredMode.REQUIRED)
+            Long scheduleId
+    ) {}
+
+    @Schema(description = "V2 디버그 시나리오 초기화 요청")
+    public record DebugResetScenarioRequest(
+            @NotNull(message = "스케줄 ID는 필수입니다")
+            @Schema(description = "공연 회차 ID", example = "7", requiredMode = Schema.RequiredMode.REQUIRED)
+            Long scheduleId
+    ) {}
+
+    @Builder
+    @Schema(description = "V2 디버그 시나리오 응답")
+    public record DebugScenarioResponse(
+            @Schema(description = "처리 메시지", example = "WAITING 시나리오 구성 완료")
+            String message,
+
+            @Schema(description = "스케줄 ID", example = "7")
+            Long scheduleId,
+
+            @Schema(description = "로그인 사용자 ID", example = "1")
+            Long userId,
+
+            @Schema(description = "예상 내 순번 (WAITING 시나리오일 때)", example = "4")
+            Long position,
+
+            @Schema(description = "예상 대기열 총원 (WAITING 시나리오일 때)", example = "4")
+            Long totalWaiting
+    ) {
+        public static DebugScenarioResponse of(
+                String message,
+                Long scheduleId,
+                Long userId,
+                Long position,
+                Long totalWaiting
+        ) {
+            return DebugScenarioResponse.builder()
+                    .message(message)
+                    .scheduleId(scheduleId)
+                    .userId(userId)
+                    .position(position)
+                    .totalWaiting(totalWaiting)
+                    .build();
+        }
+    }
 }

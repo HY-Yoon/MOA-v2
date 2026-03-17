@@ -18,7 +18,7 @@ public class ReservationDto {
          * 예매 목록 응답 DTO
          */
         @Builder
-        @Schema(description = "예매 목록 응답")
+        @Schema(name = "UserReservationListResponse", description = "예매 목록 응답")
         public record ListResponse(
                         @Schema(description = "예매 ID", example = "1") Long reservationId,
 
@@ -64,7 +64,7 @@ public class ReservationDto {
          * 예매 상세 응답 DTO
          */
         @Builder
-        @Schema(description = "예매 상세 응답")
+        @Schema(name = "UserReservationDetailResponse", description = "예매 상세 응답")
         public record DetailResponse(
                         // ===== 예매 기본 정보 =====
                         @Schema(description = "예매 ID", example = "1") Long reservationId,

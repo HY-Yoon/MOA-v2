@@ -83,7 +83,9 @@ public class AuthDto {
 
             @Schema(description = "Refresh Token 만료 시간 (밀리초)", example = "1209600000") Long refreshTokenExpiresIn,
 
-            @Schema(description = "사용자 이메일", example = "test@example.com") String email) {
+            @Schema(description = "사용자 이메일", example = "test@example.com") String email,
+
+            @Schema(description = "사용자 역할", example = "USER") String role) {
     }
 
     /**

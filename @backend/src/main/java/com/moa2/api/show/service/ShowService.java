@@ -7,6 +7,8 @@ import com.moa2.api.show.dto.ShowDto;
 import com.moa2.global.model.SeatStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
  * 사용자용 공연 조회 서비스
  */
 @Slf4j
+@Profile("v2")
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -93,6 +96,7 @@ public class ShowService {
         /**
          * 날짜별 회차 조회
          */
+        @Cacheable(value = "scheduleSeats", key = "#showId + '_' + #date", cacheManager = "shortTtlCacheManager", sync = true)
         public List<ShowDto.ScheduleListResponse> getShowSchedules(Long showId, LocalDate date) {
                 // 공연 존재 여부 확인
                 if (!showRepository.existsById(showId)) {

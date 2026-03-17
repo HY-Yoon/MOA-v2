@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.context.annotation.Profile;
@@ -181,5 +183,106 @@ public class TokenService {
         String tokenKey = TOKEN_PREFIX + token;
         redisTemplate.delete(tokenKey);
         log.debug("토큰 삭제 완료: token={}", token);
+    }
+
+    // ====================================================================
+    // Pipeline 기반 배치 메서드 (QueueProcessorScheduler에서 사용)
+    // ====================================================================
+
+    /**
+     * [Pipeline] 여러 유저의 기존 토큰을 일괄 조회
+     * - N명에 대해 Redis 왕복 1회로 처리 (개별 호출 시 N×2회 왕복)
+     *
+     * @param userSchedulePairs (userId, scheduleId) 쌍 리스트
+     * @return userId → 토큰문자열 Map (토큰 없는 유저는 포함되지 않음)
+     */
+    public Map<Long, String> findTokensByUserBatch(List<long[]> userSchedulePairs) {
+        if (userSchedulePairs.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 1) user:token:{userId}:{scheduleId} 키 목록 생성
+        List<String> userTokenKeys = new ArrayList<>(userSchedulePairs.size());
+        for (long[] pair : userSchedulePairs) {
+            userTokenKeys.add(USER_TOKEN_PREFIX + pair[0] + ":" + pair[1]);
+        }
+
+        // 2) Pipeline MGET - 왕복 1회
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String key : userTokenKeys) {
+                connection.stringCommands().get(key.getBytes());
+            }
+            return null;
+        });
+
+        // 3) 결과 파싱: 토큰이 존재하는 유저만 Map에 넣기
+        Map<Long, String> tokenMap = new HashMap<>();
+        for (int i = 0; i < userSchedulePairs.size(); i++) {
+            Object result = results.get(i);
+            if (result != null) {
+                String token = result.toString();
+                // 토큰 키가 실제로 유효한지는 확인하지 않음 (TTL이 관리)
+                tokenMap.put(userSchedulePairs.get(i)[0], token);
+            }
+        }
+
+        return tokenMap;
+    }
+
+    /**
+     * [Pipeline] 여러 유저에게 토큰을 일괄 발급
+     * - N명에 대해 Redis 왕복 1회로 처리 (개별 호출 시 N×2회 왕복)
+     *
+     * @param userSchedulePairs (userId, scheduleId) 쌍 리스트
+     * @return userId → 발급된 토큰 Map
+     */
+    public Map<Long, String> issueTokenBatch(List<long[]> userSchedulePairs) {
+        if (userSchedulePairs.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        long ttlSeconds = (long) tokenTtlMinutes * 60;
+        Map<Long, String> issuedTokens = new HashMap<>();
+
+        // 토큰 생성 및 JSON 준비
+        List<String[]> keyValuePairs = new ArrayList<>(); // [tokenKey, infoJson, userTokenKey, token]
+        for (long[] pair : userSchedulePairs) {
+            long userId = pair[0];
+            long scheduleId = pair[1];
+            String token = UUID.randomUUID().toString();
+
+            TokenInfo info = TokenInfo.builder()
+                    .userId(userId)
+                    .scheduleId(scheduleId)
+                    .used(false)
+                    .build();
+
+            try {
+                String infoJson = objectMapper.writeValueAsString(info);
+                String tokenKey = TOKEN_PREFIX + token;
+                String userTokenKey = USER_TOKEN_PREFIX + userId + ":" + scheduleId;
+
+                keyValuePairs.add(new String[]{tokenKey, infoJson, userTokenKey, token});
+                issuedTokens.put(userId, token);
+            } catch (JsonProcessingException e) {
+                log.error("토큰 발급 중 JSON 변환 오류: userId={}", userId, e);
+            }
+        }
+
+        // Pipeline SET - 왕복 1회로 모든 SET + EXPIRE 실행
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String[] kv : keyValuePairs) {
+                // tokenKey → infoJson (TTL)
+                connection.stringCommands().setEx(
+                        kv[0].getBytes(), ttlSeconds, kv[1].getBytes());
+                // userTokenKey → token (TTL)
+                connection.stringCommands().setEx(
+                        kv[2].getBytes(), ttlSeconds, kv[3].getBytes());
+            }
+            return null;
+        });
+
+        log.info("토큰 일괄 발급 완료: count={}", issuedTokens.size());
+        return issuedTokens;
     }
 }

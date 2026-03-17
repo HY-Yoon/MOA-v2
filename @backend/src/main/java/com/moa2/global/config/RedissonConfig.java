@@ -28,10 +28,10 @@ public class RedissonConfig {
 
         config.useSingleServer()
                 .setAddress(redisUrl)
-                .setConnectionPoolSize(50)
-                .setConnectionMinimumIdleSize(10)
+                .setConnectionPoolSize(10)
+                .setConnectionMinimumIdleSize(2)
                 .setConnectTimeout(10000)
-                .setTimeout(3000)
+                .setTimeout(5000)
                 .setRetryAttempts(3)
                 .setRetryInterval(1500);
 

@@ -187,7 +187,6 @@ public class SecurityConfig {
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
                                                                 "/v3/api-docs/**",
-                                                                "/api/v1/admin/**",
                                                                 "/actuator/**",
                                                                 "/actuator/health",
                                                                 "/api/v1/shows/**",
@@ -195,6 +194,10 @@ public class SecurityConfig {
                                                                 "/api/test/**",
                                                                 "/api/v1/payment/**")
                                                 .permitAll()
+
+                                                // 관리자 전용 경로 (ADMIN 역할 필요)
+                                                .requestMatchers("/api/v1/admin/**")
+                                                .hasRole("ADMIN")
 
                                                 // 마이페이지 - 인증 필요
                                                 .requestMatchers("/api/v1/users/**", "/api/v1/reservations/**")

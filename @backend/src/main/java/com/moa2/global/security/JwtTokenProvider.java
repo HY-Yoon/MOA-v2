@@ -37,18 +37,20 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 이메일과 제공자를 기반으로 Access Token 생성
+     * 이메일, 제공자, 역할을 기반으로 Access Token 생성
      * @param email 사용자 이메일
      * @param provider 소셜 제공자 (KAKAO, NAVER, GOOGLE)
+     * @param role 사용자 역할 (USER, ADMIN)
      * @return Access Token 문자열
      */
-    public String createAccessToken(String email, String provider) {
+    public String createAccessToken(String email, String provider, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpiration);
 
         return Jwts.builder()
                 .subject(email)
                 .claim("provider", provider)
+                .claim("role", role)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(accessTokenSecretKey, Jwts.SIG.HS256)
@@ -56,18 +58,20 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 이메일과 제공자를 기반으로 Refresh Token 생성
+     * 이메일, 제공자, 역할을 기반으로 Refresh Token 생성
      * @param email 사용자 이메일
      * @param provider 소셜 제공자 (KAKAO, NAVER, GOOGLE)
+     * @param role 사용자 역할 (USER, ADMIN)
      * @return Refresh Token 문자열
      */
-    public String createRefreshToken(String email, String provider) {
+    public String createRefreshToken(String email, String provider, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
                 .subject(email)
                 .claim("provider", provider)
+                .claim("role", role)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(refreshTokenSecretKey, Jwts.SIG.HS256)
@@ -211,6 +215,41 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.get("provider", String.class);
+    }
+
+    /**
+     * Access Token에서 역할(role) 추출
+     * @param token Access Token 문자열
+     * @return 사용자 역할 문자열 (USER, ADMIN)
+     */
+    public String getRoleFromAccessToken(String token) {
+        return getRoleFromToken(token, accessTokenSecretKey);
+    }
+
+    /**
+     * Refresh Token에서 역할(role) 추출
+     * @param token Refresh Token 문자열
+     * @return 사용자 역할 문자열 (USER, ADMIN)
+     */
+    public String getRoleFromRefreshToken(String token) {
+        return getRoleFromToken(token, refreshTokenSecretKey);
+    }
+
+    /**
+     * JWT 토큰에서 역할(role) 추출 (내부 메서드)
+     * @param token JWT 토큰 문자열
+     * @param secretKey 파싱에 사용할 SecretKey
+     * @return 사용자 역할 문자열 (USER, ADMIN), 없으면 "USER" (기본값)
+     */
+    private String getRoleFromToken(String token, SecretKey secretKey) {
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        String role = claims.get("role", String.class);
+        return (role != null && !role.isEmpty()) ? role : "USER"; // 기존 토큰 호환: role 없으면 USER 기본값
     }
 
     /**

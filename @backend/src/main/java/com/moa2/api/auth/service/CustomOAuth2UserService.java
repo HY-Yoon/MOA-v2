@@ -121,13 +121,16 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             user = userRepository.save(user);
             log.info("신규 사용자 등록: {} (name: {}, picture: {})",
                     user.getEmail(), user.getName(), user.getPicture());
-        } else if (user.getStatus() == UserStatus.DELETED) {
-            // 탈퇴한 사용자 재가입 처리
-            user.activate(); //
-            user = userRepository.save(user); //
-            log.info("탈퇴한 사용자 재가입: {} ({}) - 상태를 ACTIVE로 복구",
-                    LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
         } else {
+            boolean statusRestored = false;
+            // 로그인 시 무조건 ACTIVE 상태로 강제 변경 (요청사항: 강제탈퇴/정지된 사용자도 로그인하면 ACTIVE로 복구)
+            if (user.getStatus() != UserStatus.ACTIVE) {
+                user.activate();
+                statusRestored = true;
+                log.info("사용자 인증 - 상태를 ACTIVE로 강제 복구: {} ({})",
+                        LogMaskingUtil.maskEmail(user.getEmail()), user.getSocialProvider());
+            }
+
             // 기존 사용자 정보 업데이트
             // DB에 이미 정보가 있으면 유지, 없으면 OAuth 정보 사용
             String oldName = user.getName();
@@ -201,16 +204,17 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             boolean ageRangeChanged = (newAgeRange != null && !newAgeRange.equals(oldAgeRange))
                     || (newAgeRange == null && oldAgeRange != null);
 
-            if (nameChanged || pictureChanged || phoneChanged || genderChanged || birthDateChanged || ageRangeChanged) {
+            if (statusRestored || nameChanged || pictureChanged || phoneChanged || genderChanged || birthDateChanged || ageRangeChanged) {
                 user.updateOAuth2Info(newName, newPicture, newPhone, newGender, newBirthDate, newAgeRange);
                 user = userRepository.save(user);
                 log.info(
-                        "기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {}, gender: {}, birthDate: {}, ageRange: {})",
+                        "기존 사용자 정보 업데이트: {} (name: {}, picture: {}, phone: {}, gender: {}, birthDate: {}, ageRange: {}, statusRestored: {})",
                         user.getEmail(), newName, newPicture,
                         newPhone != null ? LogMaskingUtil.mask(newPhone) : "null",
                         newGender != null ? newGender : "null",
                         newBirthDate != null ? newBirthDate : "null",
-                        newAgeRange != null ? newAgeRange : "null");
+                        newAgeRange != null ? newAgeRange : "null",
+                        statusRestored);
             }
         }
 

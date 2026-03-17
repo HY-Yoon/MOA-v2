@@ -62,7 +62,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleIllegalArgumentException(
             IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        if (e.getMessage() != null && e.getMessage().contains("찾을 수 없습니다")) {
+            status = HttpStatus.NOT_FOUND;
+        }
+        return ResponseEntity.status(status)
             .body(ApiResponse.error(e.getMessage()));
     }
 

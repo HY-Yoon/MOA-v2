@@ -43,23 +43,17 @@ public class AdminReservationController implements AdminReservationControllerDoc
                 Sort.by(Sort.Direction.DESC, SORT_CREATED_AT));
 
         PageResponse<AdminReservationDto.ListResponse> response = adminReservationService.getReservations(
-                condition.searchKeyword(),
-                condition.searchType(),
-                condition.status(),
-                condition.paymentStatus(),
-                condition.startDate(),
-                condition.endDate(),
-                condition.dateSearchType(),
+                condition,
                 pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Override
-    @GetMapping("/{reservationId}")
-    public ResponseEntity<ApiResponse<AdminReservationDto.DetailResponse>> getReservationDetail(
-            @PathVariable Long reservationId) {
-
-        AdminReservationDto.DetailResponse response = adminReservationService.getReservationDetail(reservationId);
+    @GetMapping("/detail")
+    public ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.DetailResponse>>> getReservationDetails(
+            @RequestParam Long reservationId) {
+        PageResponse<AdminReservationDto.DetailResponse> response =
+                adminReservationService.getReservationDetails(reservationId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
