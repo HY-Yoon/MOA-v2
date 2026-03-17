@@ -8,7 +8,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -21,8 +20,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/atoms/dropdown-menu';
-import { Armchair, LayoutDashboard, Theater, Users } from 'lucide-react';
+import { Armchair, House, LayoutDashboard, Theater, Users } from 'lucide-react';
 import { ADMIN_ROUTE_LABELS, ADMIN_ROUTES } from '@/constants/route/adminRoutes';
+import { USER_ROUTES } from '@/constants/route/userRoutes';
 import { useEffect, useState } from 'react';
 import { useAuth, useConfirmLogout } from '@/lib/auth/AuthContext';
 
@@ -72,6 +72,15 @@ export function AdminSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === USER_ROUTES.HOME}>
+                  <Link href={USER_ROUTES.HOME} className="flex items-center gap-3">
+                    <House className="h-4 w-4" />
+                    <span>사용자 메인</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {ADMIN_ROUTE_ITEMS.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={pathname === item.href}>

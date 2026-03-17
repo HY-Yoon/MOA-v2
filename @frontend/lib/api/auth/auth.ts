@@ -1,6 +1,7 @@
 import { axiosInstance } from '@/lib/api-client';
 
 const USER_URL = '/api/v1/users/me' as const;
+const AUTH_VERIFICATION_STATUS_URL = '/api/v1/auth/verification-status' as const;
 
 /**
  * 유저 정보 조회로 로그인 여부 판단
@@ -35,3 +36,24 @@ export const deleteUser = () => ({
   mutationKey: ['auth', 'user', 'delete'],
   mutationFn: async () => await axiosInstance.delete(USER_URL, { withCredentials: true }),
 });
+
+/**
+ * 로그인 상태 확인
+ * - 200: 로그인 상태
+ * - 401: 로그인 필요
+ */
+export const checkAuthLogin = async () => {
+  try {
+    await axiosInstance.get(USER_URL, {
+      withCredentials: true,
+    });
+    return true;
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    if (status === 401) {
+      return false;
+    }
+    throw error;
+  }
+};
+

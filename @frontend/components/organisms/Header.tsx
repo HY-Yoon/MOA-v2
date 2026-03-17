@@ -9,7 +9,6 @@ import {
   USER_ROUTES,
   USER_ROUTES_LABELS,
 } from '@/constants/route/userRoutes';
-import { usePathname } from 'next/navigation';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 
 // 네비게이션 메뉴 설정
@@ -52,19 +51,19 @@ const AUTHENTICATED_DROPDOWN_ITEMS = [
   },
 ];
 
-export function Header() {
+interface HeaderProps {
+  hidden?: boolean;
+}
+
+export function Header({ hidden = false }: HeaderProps) {
   const { isLoggedIn, isLoading, user } = useAuth();
   const handleLogout = useConfirmLogout();
-  const pathname = usePathname();
 
-  // admin 경로는 GNB 표시 안 함
-  if (pathname.startsWith(ADMIN_ROUTES.DASHBOARD)) {
+  if (hidden) {
     return null;
   }
 
-  if (isLoading) {
-    return null;
-  }
+  const showAsLoggedIn = !isLoading && isLoggedIn;
 
   return (
     <header className="bg-background sticky top-0 z-40 shadow-sm">
@@ -96,13 +95,27 @@ export function Header() {
           <div className="flex items-center gap-4">
             {/* 로그인 여부에 따른 헤더 유틸 메뉴 */}
             <div className="flex items-center gap-2 text-sm">
-              {isLoggedIn && (
-                <span className="bg-muted/60 rounded-md px-2.5 py-1 text-xs font-semibold text-foreground">
+              {/* 관리자 메뉴 */}
+              {showAsLoggedIn && user?.role.toUpperCase() === 'ADMIN' && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mr-2 h-auto px-2 py-1 text-xs"
+                >
+                  <Link href={ADMIN_ROUTES.DASHBOARD}>관리자 메뉴</Link>
+                </Button>
+              )}
+
+              {/* 사용자 이름 */}
+              {showAsLoggedIn && (
+                <span className="bg-muted/60 text-foreground rounded-md px-2.5 py-1 text-xs font-semibold">
                   {user?.name}님
                 </span>
               )}
 
-              {(isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
+              {/* 마이페이지 | 로그아웃 */}
+              {(showAsLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).map(
                 (item, index) => (
                   <div key={item.href} className="flex items-center gap-1">
                     {item.isLogout ? (
@@ -125,7 +138,8 @@ export function Header() {
                       </Button>
                     )}
                     {index <
-                      (isLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS).length -
+                      (showAsLoggedIn ? AUTHENTICATED_DROPDOWN_ITEMS : UNAUTHENTICATED_ITEMS)
+                        .length -
                         1 && <span className="text-slate-300">|</span>}
                   </div>
                 ),

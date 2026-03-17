@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const MOCK_SHOWS: ShowCatalog.List[] = [
   {
@@ -175,7 +175,7 @@ export default function ShowList({ showRank = false }: ShowListProps) {
               <CarouselItem key={show.id} className="basis-full md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                 <ShowListItemCard
                   show={show}
-                  href={`/show/detail/${show.id}`}
+                  href={`/shows/${show.id}`}
                   showRank={showRank}
                   rank={index + 1}
                 />

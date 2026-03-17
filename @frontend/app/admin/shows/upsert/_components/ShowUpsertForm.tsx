@@ -11,9 +11,8 @@ import {
 import { useAlert } from '@/components/molecules/AlertContext';
 import { ERROR_MESSAGES, SHOW_FORM_FIELDS } from '@/constants/admin/show';
 import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
-import { DATE_FORMAT } from '@/constants/common/dateFormat';
+import { DATE_FORMAT, DATE_UNIT } from '@/constants/common/dateFormat';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
-import { getFirstShowDate } from '@/lib/admin/show';
 import { createShow, getShow, updateShow } from '@/lib/api/admin/show';
 import { stringToDate } from '@/lib/common/date';
 import dayjs from '@/plugins/dayjs';
@@ -32,6 +31,19 @@ interface Props {
   id?: string;
 }
 type ActionType = '입력' | '선택';
+
+// 공연 일정 중에서 첫 번째 공연 시각(날짜+시간)을 찾는 함수
+function getFirstShowDateTime(schedules?: Show.Schedules[]) {
+  if (!schedules?.length) return null;
+
+  const dateTimes = schedules
+    .filter((s) => s.showDate && dayjs(s.showDate).isValid())
+    .map((s) => (s.showTime ? dayjs(`${s.showDate}T${s.showTime}`) : dayjs(s.showDate)));
+
+  if (!dateTimes?.length) return null;
+
+  return dateTimes.reduce((earliest, current) => (current.isBefore(earliest) ? current : earliest));
+}
 
 const requiredStringSchema = (field: string, action: ActionType) =>
   z.string().min(1, `${field}을(를) ${action}하세요.`);
@@ -102,15 +114,15 @@ const showFormSchema = z
         return true; // 다른 필드 입력시 처리
       }
 
-      const firstShowDate = getFirstShowDate(form.schedules);
-      if (!firstShowDate) {
-        return true; // 공연일이 입력되지 않았으면 우선 리턴
+      const firstShowDateTime = getFirstShowDateTime(form.schedules as Show.Schedules[]);
+      if (!firstShowDateTime) {
+        return true; // 공연일·시간이 입력되지 않았으면 우선 리턴
       }
 
       const startDateTime = dayjs(form.startDate);
 
-      // 예매 시작일이 첫 번째 공연일보다 이전이어야 함
-      return startDateTime.isBefore(firstShowDate);
+      // 예매 시작일이 첫 공연 시간보다 이전이어야 함
+      return startDateTime.isBefore(firstShowDateTime);
     },
     {
       message: ERROR_MESSAGES.START_DATE_EARLY,
@@ -194,11 +206,14 @@ export default function ShowUpsertForm(props: Props) {
     () => ({ region: watchedRegion ?? '', page: 0, size: 100 }),
     [watchedRegion],
   );
-  const { data: seatMapListResponse, isFetched: isSeatMapFetched } = useQuery({
+  const { data: seatMapListResponse, isFetching: isSeatMapFetching } = useQuery({
     ...getSeatMapList(seatMapParams),
     enabled: !!watchedRegion,
   });
-  const seatMapList = seatMapListResponse?.content ?? [];
+  const seatMapList = useMemo(
+    () => seatMapListResponse?.content ?? [],
+    [seatMapListResponse?.content],
+  );
 
   // 장소 목록
   const venueOptions = useMemo(() => {
@@ -231,17 +246,27 @@ export default function ShowUpsertForm(props: Props) {
   // 지역 또는 장소 선택 변경시 초기화
   useEffect(() => {
     const venueValues = venueOptions.map((o) => o.value);
-    if (watchedVenueName && venueValues.length > 0 && !venueValues.includes(watchedVenueName)) {
+    if (watchedVenueName && !venueValues.includes(watchedVenueName)) {
       setValue(SHOW_FORM_FIELDS.VENUE_NAME, '');
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
   }, [venueOptions, watchedVenueName, setValue]);
+
   useEffect(() => {
     const hallValues = hallOptions.map((o) => o.value);
-    if (watchedHallName && hallValues.length > 0 && !hallValues.includes(watchedHallName)) {
+    if (watchedHallName && !hallValues.includes(watchedHallName)) {
       setValue(SHOW_FORM_FIELDS.HALL_NAME, '');
     }
   }, [hallOptions, watchedHallName, setValue]);
+
+  // 수정 모드: fetch 이후 장소/공연장 데이터 다시 설정
+  useEffect(() => {
+    if (!isUpdate || !data || isSeatMapFetching) return;
+    if (watchedRegion !== data.region) return;
+
+    setValue(SHOW_FORM_FIELDS.VENUE_NAME, data.venueName, { shouldValidate: true });
+    setValue(SHOW_FORM_FIELDS.HALL_NAME, data.hallName, { shouldValidate: true });
+  }, [isUpdate, data, isSeatMapFetching, hallOptions, watchedRegion, setValue]);
 
   // 리액트 하이드레이션 무한 루프 방지용 마운트 플래그
   useEffect(() => {
@@ -271,7 +296,7 @@ export default function ShowUpsertForm(props: Props) {
       [SHOW_FORM_FIELDS.HALL_NAME]: data.hallName,
       [SHOW_FORM_FIELDS.RUNNING_TIME]: data.runningTime,
       [SHOW_FORM_FIELDS.CAST]: data.cast,
-      [SHOW_FORM_FIELDS.START_DATE]: data.saleStartDate.split('T')[0],
+      [SHOW_FORM_FIELDS.START_DATE]: data.saleStartDate.slice(0, 16),
       [SHOW_FORM_FIELDS.SCHEDULES]: formSchedules,
     };
 
@@ -332,21 +357,20 @@ export default function ShowUpsertForm(props: Props) {
   }, [hasDuplicateSchedule, setError, clearErrors]);
 
   // 2. 예매 시작일 또는 첫 번째 공연일이 변경될 때 재검증
-  const firstShowDateStr = useMemo(() => {
-    if (!schedules || schedules.length === 0) return null;
-    const firstShowDate = getFirstShowDate(schedules);
-    return firstShowDate ? firstShowDate.format(DATE_FORMAT.DATE_ONLY) : null;
+  const firstShowDateTimeStr = useMemo(() => {
+    const first = getFirstShowDateTime(schedules as Show.Schedules[]);
+    return first ? first.format(DATE_FORMAT.FULL_TIMEZONE) : null;
   }, [schedules]);
 
   useEffect(() => {
-    if (!startDate || !firstShowDateStr) {
+    if (!startDate || !firstShowDateTimeStr) {
       clearErrors(SHOW_FORM_FIELDS.START_DATE);
       return;
     }
 
     // 예매 시작일 재검증
     const startDateTime = dayjs(startDate);
-    const firstShowDateTime = dayjs(firstShowDateStr);
+    const firstShowDateTime = dayjs(firstShowDateTimeStr);
     const isValid = startDateTime.isBefore(firstShowDateTime);
 
     if (!isValid) {
@@ -357,28 +381,25 @@ export default function ShowUpsertForm(props: Props) {
     } else {
       clearErrors(SHOW_FORM_FIELDS.START_DATE);
     }
-  }, [startDate, firstShowDateStr, setError, clearErrors]);
+  }, [startDate, firstShowDateTimeStr, setError, clearErrors]);
 
-  // 3. 일정 공연일이 변경될 때 마지막 공연일을 endDate 설정
+  // 3. 일정 공연일이 변경될 때 endDate 설정 (마지막 공연의 2시간 전)
   useEffect(() => {
-    // 유효한 공연일 체크
-    const validDates =
-      schedules
-        ?.map((schedule) => schedule.showDate)
-        .filter((date) => date && dayjs(date).isValid())
-        .map((date) => dayjs(date)) ?? [];
+    const dateTimes = (schedules ?? [])
+      .filter((s) => s.showDate && dayjs(s.showDate).isValid())
+      .map((s) => (s.showTime ? dayjs(`${s.showDate}T${s.showTime}`) : dayjs(s.showDate)));
 
-    if (validDates.length === 0) {
+    if (dateTimes.length === 0) {
       setValue(SHOW_FORM_FIELDS.END_DATE, '');
       return;
     }
 
-    // 마지막 날짜 찾기
-    const lastDate = validDates.reduce((latest, current) => {
-      return current.isAfter(latest) ? current : latest;
-    }, validDates[0]);
+    const lastShowDateTime = dateTimes.reduce((latest, current) =>
+      current.isAfter(latest) ? current : latest,
+    );
+    const endMoment = lastShowDateTime.subtract(2, DATE_UNIT.HOUR);
 
-    setValue(SHOW_FORM_FIELDS.END_DATE, lastDate.format(DATE_FORMAT.DATE_ONLY));
+    setValue(SHOW_FORM_FIELDS.END_DATE, endMoment.format(DATE_FORMAT.FULL_TIMEZONE));
   }, [schedules, setValue]);
 
   // 메인 포스터 파일 변경 핸들러
@@ -671,7 +692,7 @@ export default function ShowUpsertForm(props: Props) {
                 name={SHOW_FORM_FIELDS.START_DATE}
                 label="예매 시작일"
                 htmlFor={SHOW_FORM_FIELDS.START_DATE}
-                type="date"
+                type="datetime-local"
                 register={register}
                 errors={errors}
                 placeholder="예매 시작일을 입력하세요."

@@ -3,6 +3,7 @@
 // 외부 라이브러리(Shadcn/ui, Radix UI 등)에만 의존
 
 export * from './button';
+export * from './calendar';
 export * from './input';
 export * from './label';
 export * from './card';
@@ -13,6 +14,7 @@ export * from './avatar';
 export * from './badge';
 export * from './breadcrumb';
 export * from './dropdown-menu';
+export * from './popover';
 export * from './separator';
 export * from './sheet';
 export * from './sidebar';

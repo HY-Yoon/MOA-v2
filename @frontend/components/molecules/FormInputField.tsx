@@ -53,7 +53,10 @@ export function FormInputField<T extends FieldValues>({
         id={htmlFor}
         type={type}
         {...register(name as Path<T>)}
-        className={classNames({ 'border-red-500': hasError, 'w-64': type === 'date' })}
+        className={classNames({
+          'border-red-500': hasError,
+          'w-64': ['date', 'datetime-local'].includes(type),
+        })}
         placeholder={placeholder}
         min={min}
         disabled={disabled}

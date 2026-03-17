@@ -9,7 +9,7 @@ import { Loader2, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const PAGE_SIZE = 20;
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 const DEFAULT_SORT: SortLabel = '인기순';
 
 const SORT_OPTIONS = [
@@ -330,7 +330,7 @@ export default function ShowCatalogList() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
             {shows.map((show) => (
-              <ShowListItemCard key={show.id} show={show} href={`/show/detail/${show.id}`} />
+              <ShowListItemCard key={show.id} show={show} href={`/shows/${show.id}`} />
             ))}
           </div>
 

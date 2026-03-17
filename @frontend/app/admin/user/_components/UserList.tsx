@@ -5,9 +5,9 @@ import { useAlert } from '@/components/molecules/AlertContext';
 import { ToggleDropdown } from '@/components/molecules/ToggleDropdown';
 import { PageCard } from '@/components/molecules/PageCard';
 import {
-  AdminTable,
-  type AdminTableColumn,
-  type AdminTableFilterOption,
+  BaseTable,
+  type BaseTableColumn,
+  type BaseTableFilterOption,
 } from '@/components/organisms';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
 import dayjs from '@/plugins/dayjs';
@@ -16,10 +16,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Gender, UserStatus } from '@shared/enums';
 import StatusBadge from '@/components/molecules/StatusBadge';
-import { VERIFY_LABELS } from '@/constants/admin/user';
 import { USER_STATUS_LABELS } from '@/constants/common/userStatus';
 import { GENDER_LABELS } from '@/constants/common/gender';
 import { deriveFilterOptions } from '@/lib/admin/table-filter';
+import { ROLE_LABELS } from '@/constants/common/role';
 
 export default function UserList() {
   const { confirmWithInput } = useAlert();
@@ -40,7 +40,7 @@ export default function UserList() {
 
   // 필터
   const [initialFilterOptions, setInitialFilterOptions] = useState<
-    Record<string, AdminTableFilterOption[]>
+    Record<string, BaseTableFilterOption[]>
   >({});
   const [filterValues, setFilterValues] = useState<Record<string, string[]>>({});
 
@@ -110,7 +110,7 @@ export default function UserList() {
     }
   }, [userList, filterValues, initialFilterOptions]);
 
-  const columns: AdminTableColumn<User.List>[] = [
+  const columns: BaseTableColumn<User.List>[] = [
     {
       key: 'id',
       label: '번호',
@@ -159,9 +159,9 @@ export default function UserList() {
       filterOptions: initialFilterOptions.socialProvider,
     },
     {
-      key: 'isVerified',
-      label: '인증 여부',
-      render: (user) => (user.isVerified ? VERIFY_LABELS.VERIFY : VERIFY_LABELS.NO_VERIFY),
+      key: 'role',
+      label: '권한',
+      render: (user) => ROLE_LABELS[user.role],
     },
     {
       key: 'createdAt',
@@ -248,7 +248,7 @@ export default function UserList() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : (
-          <AdminTable
+          <BaseTable
             data={userList}
             columns={columns}
             onSearch={handleSearch}

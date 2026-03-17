@@ -11,3 +11,14 @@ export const DATE_FORMAT = {
   YEAR_MONTH: 'YYYY-MM',
   COMPACT_TIMESTAMP: 'YYMMDD-HHmmss',
 } as const;
+
+export const DATE_UNIT = {
+  MILLISECOND: 'millisecond',
+  SECOND: 'second',
+  MINUTE: 'minute',
+  HOUR: 'hour',
+  DAY: 'day',
+  MONTH: 'month',
+  YEAR: 'year',
+  DATE: 'date',
+} as const;

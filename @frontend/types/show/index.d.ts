@@ -16,6 +16,25 @@ namespace ShowCatalog {
     orderDirection?: 'asc' | 'desc';
   }
 
+  interface Schedule {
+    keyId: number;
+    date: string;
+    time:
+      | string
+      | {
+          hour: number;
+          minute: number;
+          second: number;
+          nano: number;
+        };
+    session: number;
+  }
+
+  interface SalePeriod {
+    startDate: string;
+    endDate: string;
+  }
+
   interface List {
     id: number;
     title: string;
@@ -28,24 +47,34 @@ namespace ShowCatalog {
       venue: string;
       hallName: string;
     };
-    salePeriod: {
-      startDate: string;
-      endDate: string;
-    };
+    salePeriod: SalePeriod;
     createdAt: string;
     viewCount: number;
     startDate: string;
     endDate: string;
-    schedules: Array<{
-      keyId: number;
-      date: string;
-      time: {
-        hour: number;
-        minute: number;
-        second: number;
-        nano: number;
-      };
-      session: number;
-    }>;
+    schedules: Array<Schedule>;
+  }
+
+  interface Detail extends List {
+    detailImageUrls: string[];
+    runningTime: string;
+    cast: string;
+  }
+
+  interface SeatGrades {
+    sectionName: string;
+    price: number;
+    remainingSeats: number;
+    totalSeats: number;
+  }
+
+  interface ScheduleByDate {
+    keyId: number;
+    date: string;
+    time: string;
+    isSoldOut: boolean;
+    totalSeats: number;
+    remainingSeats: number;
+    seatGrades: SeatGrades[];
   }
 }
