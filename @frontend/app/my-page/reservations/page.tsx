@@ -85,7 +85,10 @@ function ReservationListHeaderFilters({
         ))}
       </div>
 
-      <Select value={draftDateType} onValueChange={(v) => onChangeDateType(v as any)}>
+      <Select
+        value={draftDateType}
+        onValueChange={(v) => onChangeDateType(v as Reservation.DateType)}
+      >
         <SelectTrigger className="w-32">
           <SelectValue placeholder="날짜 기준" />
         </SelectTrigger>
@@ -118,7 +121,7 @@ function ReservationListHeaderFilters({
   );
 }
 
-export default function reservationList() {
+export default function ReservationList() {
   // 페이지네이션
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
