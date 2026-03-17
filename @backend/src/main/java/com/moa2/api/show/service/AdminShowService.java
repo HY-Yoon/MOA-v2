@@ -125,6 +125,12 @@ public class AdminShowService {
                 .venue(venue)
                 .title(request.title())
                 .genre(Genre.valueOf(request.genre()))
+                .runningTime(request.runningTime())
+                .cast(request.cast())
+                .posterUrl(posterUrl)
+                .startDate(firstShowDate)
+                .endDate(lastShowDate)
+                .startTime(firstShowTime)
                 .saleStartDate(request.salePeriod().startDate())
                 .saleEndDate(request.salePeriod().endDate())
                 .status(ShowStatus.WAITING)
@@ -409,11 +415,13 @@ public class AdminShowService {
 
     private void uploadAndSaveDetailImages(List<MultipartFile> detailImages, Show show) {
         if (detailImages != null && !detailImages.isEmpty()) {
-            for (MultipartFile detailImage : detailImages) {
+            for (int i = 0; i < detailImages.size(); i++) {
+                MultipartFile detailImage = detailImages.get(i);
                 String detailImageUrl = fileService.uploadFile(detailImage, "details");
                 DetailImage image = DetailImage.builder()
                         .show(show)
                         .url(detailImageUrl)
+                        .displayOrder(i) // 순서 지정
                         .build();
                 detailImageRepository.save(image);
             }

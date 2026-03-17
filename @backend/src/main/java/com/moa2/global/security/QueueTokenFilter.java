@@ -54,8 +54,12 @@ public class QueueTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        // status 조회 API는 대기열 토큰 없이 접근 가능하도록 예외 처리
-        if (pathMatcher.match("/api/v2/reservations/status/**", uri)) {
+        // [V2 흐름] 아래 경로는 /reserve 이후 단계로 토큰이 이미 소진됨 → 토큰 검증 불필요
+        // /order : 예약자 정보 입력 후 주문 생성
+        // /preview : 결제 페이지 진입 시 주문 미리보기 조회
+        if (pathMatcher.match("/api/v2/reservations/order", uri) ||
+            pathMatcher.match("/api/v2/reservations/preview/**", uri) ||
+            pathMatcher.match("/api/v2/reservations/status/**", uri)) {
             filterChain.doFilter(request, response);
             return;
         }

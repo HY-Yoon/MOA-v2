@@ -126,9 +126,10 @@ public class RefreshTokenService {
             );
         }
 
-        // 4. 새 Access Token 발급
-        String newAccessToken = jwtTokenProvider.createAccessToken(email, provider);
-        log.info("Access Token 갱신 완료: {}", LogMaskingUtil.maskEmail(email));
+        // 4. 새 Access Token 발급 (role 포함)
+        String role = jwtTokenProvider.getRoleFromRefreshToken(refreshToken);
+        String newAccessToken = jwtTokenProvider.createAccessToken(email, provider, role);
+        log.info("Access Token 갱신 완료: {} (role={})", LogMaskingUtil.maskEmail(email), role);
 
         return AuthDto.TokenResponse.builder()
                 .accessToken(newAccessToken)
@@ -136,6 +137,7 @@ public class RefreshTokenService {
                 .accessTokenExpiresIn(jwtTokenProvider.getAccessTokenExpiration())
                 .refreshTokenExpiresIn(jwtTokenProvider.getRefreshTokenExpiration())
                 .email(email)
+                .role(role)
                 .build();
     }
 }

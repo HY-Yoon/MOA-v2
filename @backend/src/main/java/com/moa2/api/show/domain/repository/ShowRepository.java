@@ -43,7 +43,7 @@ public interface ShowRepository extends JpaRepository<Show, Long> {
          */
         @Query("SELECT s FROM Show s " +
                         "WHERE s.saleStatus = 'ALLOWED' " +
-                        "AND s.status IN ('ON_SALE', 'SOLD_OUT') " + // 임시: WAITING 포함
+                        "AND s.status IN ('WAITING', 'ON_SALE', 'SOLD_OUT') " + // 임시: WAITING 포함
                         "AND (:genre IS NULL OR s.genre = :genre) " +
                         "AND (:region IS NULL OR s.venue.region = :region) " +
                         "AND (:keyword IS NULL OR LOWER(s.title) LIKE :keyword) " +

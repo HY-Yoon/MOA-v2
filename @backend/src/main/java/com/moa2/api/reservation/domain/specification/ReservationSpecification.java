@@ -15,6 +15,28 @@ import java.time.LocalDateTime;
 
 public class ReservationSpecification {
 
+    public static Specification<Reservation> equalReservationId(Long reservationId) {
+        return (root, query, criteriaBuilder) -> {
+            if (reservationId == null) return null;
+            return criteriaBuilder.equal(root.get("id"), reservationId);
+        };
+    }
+
+    public static Specification<Reservation> equalShowId(Long showId) {
+        return (root, query, criteriaBuilder) -> {
+            if (showId == null) return null;
+            Join<Reservation, ShowSchedule> scheduleJoin = root.join("showSchedule", JoinType.INNER);
+            return criteriaBuilder.equal(scheduleJoin.get("show").get("id"), showId);
+        };
+    }
+
+    public static Specification<Reservation> equalScheduleId(Long scheduleId) {
+        return (root, query, criteriaBuilder) -> {
+            if (scheduleId == null) return null;
+            return criteriaBuilder.equal(root.get("showSchedule").get("id"), scheduleId);
+        };
+    }
+
     public static Specification<Reservation> equalUser(User user) {
         return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("user"), user);
     }

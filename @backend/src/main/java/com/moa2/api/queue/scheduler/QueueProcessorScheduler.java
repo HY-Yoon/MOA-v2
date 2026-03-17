@@ -5,11 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
+import java.util.*;
 
 import org.springframework.context.annotation.Profile;
 
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Profile;
  * V2: 대기열 처리 스케줄러
  * - 주기적으로 대기열에서 상위 N명을 꺼내 토큰 발급
  * - ShedLock으로 다중 서버 환경에서 중복 실행 방지
+ * - Redis Pipeline으로 네트워크 왕복 최소화 (리전 무관 영구 최적화)
  */
 @Slf4j
 @Profile("v2")
@@ -27,7 +29,7 @@ public class QueueProcessorScheduler {
     private final RedisTemplate<String, String> redisTemplate;
     private final TokenService tokenService;
 
-    @Value("${queue.scheduler.batch-size:100}")
+    @Value("${queue.scheduler.batch-size:30}")
     private int batchSize;
 
     private static final String QUEUE_KEY_PREFIX = "waiting:queue:";
@@ -35,7 +37,7 @@ public class QueueProcessorScheduler {
 
     /**
      * 대기열 처리
-     * - 1초마다 실행 (interval-ms 설정)
+     * - 설정된 간격(기본 1초)마다 실행
      * - ShedLock으로 단일 서버만 실행 보장
      */
     @Scheduled(fixedDelayString = "${queue.scheduler.interval-ms:1000}")
@@ -63,14 +65,18 @@ public class QueueProcessorScheduler {
     }
 
     /**
-     * 특정 스케줄의 대기열 처리
-     * - 상위 batchSize명에게 토큰 발급
-     * - 대기열에서 제거
+     * 특정 스케줄의 대기열 처리 (Pipeline 최적화)
+     *
+     * [기존] 유저당 Redis 3~5회 직렬 호출 → N명이면 N×5회 왕복
+     * [개선] Pipeline 2~3회 왕복으로 N명 전체 처리
+     *
+     * 1차: Pipeline MGET - 모든 유저의 기존 토큰 일괄 조회
+     * 2차: Pipeline SET + ZREM - 새 토큰 발급 + 대기열 제거 일괄 실행
      */
     private void processScheduleQueue(Long scheduleId) {
         String queueKey = QUEUE_KEY_PREFIX + scheduleId;
 
-        // 상위 batchSize명 조회 (0 ~ batchSize - 1)
+        // 상위 batchSize명 조회
         Set<String> userIds = redisTemplate.opsForZSet().range(queueKey, 0, batchSize - 1);
 
         if (userIds == null || userIds.isEmpty()) {
@@ -79,35 +85,52 @@ public class QueueProcessorScheduler {
             return;
         }
 
-        int issuedCount = 0;
-        for (String userIdStr : userIds) {
-            try {
-                Long userId = Long.parseLong(userIdStr);
+        List<String> userIdList = new ArrayList<>(userIds);
 
-                // 이미 토큰이 있는지 확인 (중복 발급 방지)
-                String existingToken = tokenService.findTokenByUser(userId, scheduleId);
-                if (existingToken != null) {
-                    // 이미 토큰 있음 - 대기열에서만 제거
-                    redisTemplate.opsForZSet().remove(queueKey, userIdStr);
-                    log.debug("이미 토큰 보유 - 대기열 제거: userId={}", userId);
-                    continue;
-                }
+        // ============================================================
+        // [1차 Pipeline] 모든 유저의 기존 토큰 일괄 조회 — Redis 왕복 1회
+        // ============================================================
+        List<long[]> allPairs = new ArrayList<>();
+        for (String userIdStr : userIdList) {
+            allPairs.add(new long[]{Long.parseLong(userIdStr), scheduleId});
+        }
 
-                // 토큰 발급
-                tokenService.issueToken(userId, scheduleId);
+        Map<Long, String> existingTokens = tokenService.findTokensByUserBatch(allPairs);
 
-                // 대기열에서 제거
-                redisTemplate.opsForZSet().remove(queueKey, userIdStr);
+        // 이미 토큰이 있는 유저와 없는 유저 분리
+        List<String> alreadyHaveToken = new ArrayList<>();
+        List<long[]> needToken = new ArrayList<>();
 
-                issuedCount++;
-
-            } catch (Exception e) {
-                log.error("토큰 발급 실패: userId={}, scheduleId={}", userIdStr, scheduleId, e);
+        for (String userIdStr : userIdList) {
+            Long userId = Long.parseLong(userIdStr);
+            if (existingTokens.containsKey(userId)) {
+                alreadyHaveToken.add(userIdStr);
+            } else {
+                needToken.add(new long[]{userId, scheduleId});
             }
         }
 
-        if (issuedCount > 0) {
-            log.info("토큰 발급 완료: scheduleId={}, count={}", scheduleId, issuedCount);
+        // ============================================================
+        // [2차 Pipeline] 새 토큰 일괄 발급 — Redis 왕복 1회
+        // ============================================================
+        Map<Long, String> issuedTokens = tokenService.issueTokenBatch(needToken);
+
+        // ============================================================
+        // [3차 Pipeline] 대기열에서 일괄 제거 — Redis 왕복 1회
+        // ============================================================
+        List<String> allToRemove = new ArrayList<>();
+        allToRemove.addAll(alreadyHaveToken);
+        for (long[] pair : needToken) {
+            allToRemove.add(String.valueOf(pair[0]));
+        }
+
+        if (!allToRemove.isEmpty()) {
+            redisTemplate.opsForZSet().remove(queueKey, allToRemove.toArray());
+        }
+
+        if (!issuedTokens.isEmpty()) {
+            log.info("토큰 발급 완료: scheduleId={}, newCount={}, skipped={}",
+                    scheduleId, issuedTokens.size(), alreadyHaveToken.size());
         }
 
         // 대기열이 완전히 비었는지 확인

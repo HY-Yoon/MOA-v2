@@ -103,6 +103,7 @@ public class ShowDto {
                                 .cast(show.getCast())
                                 .salePeriod(mapToDetailSalePeriod(show))
                                 .schedules(scheduleInfos)
+                                .serverCurrentTime(LocalDateTime.now())
                                 .build();
         }
 
@@ -384,7 +385,7 @@ public class ShowDto {
         // ===== Response DTOs =====
 
         @Builder
-        @Schema(description = "공연 목록 조회 응답")
+        @Schema(name = "ShowListResponse", description = "공연 목록 조회 응답")
         public record ListResponse(
                         @Schema(description = "공연 ID", example = "1") Long id,
                         @Schema(description = "제목", example = "레미제라블") String title,
@@ -441,7 +442,7 @@ public class ShowDto {
         }
 
         @Builder
-        @Schema(description = "공연 상세 조회 응답 (사용자용)")
+        @Schema(name = "ShowDetailResponse", description = "공연 상세 조회 응답 (사용자용)")
         public record DetailResponse(
                         @Schema(description = "공연 ID", example = "1") Long id,
                         @Schema(description = "제목") String title,
@@ -453,7 +454,8 @@ public class ShowDto {
                         @Schema(description = "상영 시간") String runningTime,
                         @Schema(description = "출연진") String cast,
                         @Schema(description = "판매 기간") SalePeriod salePeriod,
-                        @Schema(description = "일정 목록") List<ScheduleInfo> schedules) {
+                        @Schema(description = "일정 목록") List<ScheduleInfo> schedules,
+                        @Schema(description = "현재 서버 시간") LocalDateTime serverCurrentTime) {
                 @Builder
                 public record LocationInfo(String region, String venue, String hallName) {
                 }

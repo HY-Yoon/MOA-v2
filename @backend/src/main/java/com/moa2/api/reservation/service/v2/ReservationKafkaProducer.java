@@ -8,9 +8,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka 예매 이벤트 발행자
- * - 예매 요청 정보를 reservation-request 토픽에 비동기 발행
- * - 실패 시 호출자(ServiceV2)에서 보상 트랜잭션 처리
+ * Kafka 결제 완료 알림 이벤트 발행자
+ * - 결제 완료 후 이메일/SMS 알림용 이벤트를 payment-notification 토픽에 발행
  */
 @Slf4j
 @Profile("v2")
@@ -18,13 +17,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReservationKafkaProducer {
 
-    private static final String TOPIC = "reservation-request";
+    private static final String TOPIC = "payment-notification";
 
     private final KafkaTemplate<String, ReservationRequestEvent> kafkaTemplate;
 
     public void send(ReservationRequestEvent event) {
-        log.info("Kafka 이벤트 발행 - eventId: {}, userId: {}, scheduleId: {}",
-                event.getEventId(), event.getUserId(), event.getScheduleId());
+        log.info("결제 완료 알림 이벤트 발행 - eventId: {}, userId: {}",
+                event.getEventId(), event.getUserId());
         kafkaTemplate.send(TOPIC, String.valueOf(event.getUserId()), event);
     }
 }

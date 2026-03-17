@@ -1,6 +1,6 @@
 package com.moa2.api.reservation.controller;
 
-import com.moa2.api.reservation.controller.docs.ReservationControllerDocs;
+import com.moa2.api.reservation.controller.docs.UserReservationControllerDocs;
 import com.moa2.api.reservation.dto.ReservationDto;
 import com.moa2.api.reservation.dto.ReservationSearchCondition;
 import com.moa2.api.reservation.service.ReservationService;
@@ -18,15 +18,15 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 마이페이지 - 예매 내역 API
- * Cookie 기반 인증 사용
+ * 사용자 예매 내역 Controller
+ * - 마이페이지 - 내 예매 내역 조회 및 상세 조회
+ * - Cookie 기반 인증 사용 (UserPrincipal 사용)
  */
 @Slf4j
 @RestController
-@Profile("v1")
-@RequestMapping("/api/v1/reservations")
+@RequestMapping("/api/v1/user/reservations")
 @RequiredArgsConstructor
-public class ReservationController implements ReservationControllerDocs {
+public class UserReservationController implements UserReservationControllerDocs {
 
   private final ReservationService reservationService;
 

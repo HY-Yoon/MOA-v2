@@ -1,11 +1,11 @@
 package com.moa2.api.reservation.controller.docs;
 
 import com.moa2.api.reservation.dto.ReservationDto;
+import com.moa2.api.reservation.dto.ReservationSearchCondition;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.dto.PageResponse;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
-import com.moa2.api.reservation.dto.ReservationSearchCondition;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -15,8 +15,8 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@Tag(name = "마이페이지 - 예매 내역", description = "내 예매 내역 조회 및 취소 API")
-public interface ReservationControllerDocs {
+@Tag(name = "사용자 예매 API", description = "내 예매 내역 조회 및 상세 조회 API")
+public interface UserReservationControllerDocs {
 
   @Operation(summary = "내 예매 내역 목록 조회", description = "로그인한 사용자의 예매 내역을 조회합니다.\n\n" +
       "**인증 방식:** Cookie (accessToken)\n\n" +
@@ -29,7 +29,7 @@ public interface ReservationControllerDocs {
       "- `startDate`, `endDate` 파라미터로 기간별 조회 가능\n" +
       "- `dateType` 파라미터로 날짜 기준 선택 (RESERVATION: 예매일, SHOW: 공연일)\n\n" +
       "**정렬:** 최신 예매순 (createdAt DESC)\n\n" +
-      "**페이지네이션:** page, size 파라미터 사용")
+      "**페이지네이션:** page, size 파라미터 사용 (기본값: page=0, size=20)")
   @ApiResponses(value = {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "성공 응답", value = """
           {
@@ -66,7 +66,7 @@ public interface ReservationControllerDocs {
               "currentPage": 0,
               "totalPages": 1,
               "totalCount": 1,
-              "pageSize": 10
+              "pageSize": 20
             },
             "message": null
           }

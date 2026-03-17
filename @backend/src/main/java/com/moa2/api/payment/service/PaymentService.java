@@ -597,7 +597,7 @@ public class PaymentService {
                                 .findByScheduleIdAndScheduleSeatIdsForUpdate(
                                                 reservation.getShowSchedule().getId(), scheduleSeatIds);
 
-                // 좌석 상태 검증 (LOCKED 또는 RESERVED 상태여야 markAsSold 가능)
+                // 좌석 상태 검증 (LOCKED 상태여야 markAsSold 가능 — V2에서 RESERVED 상태 없음)
                 Long bookerId = reservation.getUser().getId();
                 for (ScheduleSeat seat : scheduleSeats) {
                         if (seat.getStatus() == com.moa2.global.model.SeatStatus.AVAILABLE) {
@@ -621,7 +621,6 @@ public class PaymentService {
                                                                         seat.getLockedUntil()));
                                 }
                         }
-                        // RESERVED 상태는 그대로 진행 (이미 예약된 상태)
                 }
 
                 scheduleSeats.forEach(ScheduleSeat::markAsSold);
