@@ -10,6 +10,8 @@ export const DATE_FORMAT = {
   HH_MM_ONLY: 'HH:mm',
   YEAR_MONTH: 'YYYY-MM',
   COMPACT_TIMESTAMP: 'YYMMDD-HHmmss',
+  DATE_KR: 'YYYY년 MM월 DD일',
+  TIME_KR: 'HH시 mm분',
 } as const;
 
 export const DATE_UNIT = {
