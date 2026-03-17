@@ -3,7 +3,7 @@
 import type { User } from '@/lib/auth/AuthContext';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { Button } from '@/components/atoms/button';
-import { Card, CardContent } from '@/components/atoms/card';
+import { PageCard } from '@/components/molecules/PageCard';
 import { useMutation } from '@tanstack/react-query';
 import { deleteUser } from '@/lib/api/auth/auth';
 import { useAlert } from '@/components/molecules/AlertContext';
@@ -49,16 +49,16 @@ export default function MyPage() {
   return (
     <section>
       <h1 className="mb-6 text-2xl font-bold">내 정보</h1>
-      <Card>
-        <CardContent className="px-6 py-4">
+      <PageCard>
+        <PageCard.Content>
           {INFO_FIELDS.map(({ label, getValue }) => (
             <div key={label} className="flex py-3">
               <span className="text-muted-foreground w-28 shrink-0 text-sm">{label}</span>
               <span className="text-sm font-medium">{getValue(user)}</span>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </PageCard.Content>
+      </PageCard>
 
       <div className="mt-8 flex justify-end gap-2">
         <Button variant="secondary" onClick={handleDeleteUser}>

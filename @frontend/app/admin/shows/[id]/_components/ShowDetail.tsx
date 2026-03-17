@@ -1,26 +1,17 @@
 'use client';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/atoms';
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/atoms';
 import { useAlert } from '@/components/molecules/AlertContext';
 import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 import { changeSaleStatus, deleteShow, getShow } from '@/lib/api/admin/show';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, TrashIcon } from 'lucide-react';
+import { TrashIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import ShowDetailBasicInfo from './ShowDetailBasicInfo';
 import ShowDetailReservations from './ShowDetailReservations';
 import { ButtonGroup } from '@/components/atoms/button-group';
+import { PageCard } from '@/components/molecules/PageCard';
 
 interface Props {
   id: string;
@@ -97,29 +88,24 @@ export default function ShowDetail({ id }: Props) {
   if (!showId) return;
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="size-6" />
-            </Button>
-            <CardTitle className="text-2xl font-bold">{data?.title || '공연 상세'}</CardTitle>
-          </div>
-
+    <PageCard>
+      <PageCard.Title
+        useRouteBack={true}
+        buttonGroups={
           <ButtonGroup>
-            {buttonItems &&
-              buttonItems.map((item) => (
-                <Button key={item.label} variant={item.variant || 'outline'} onClick={item.onClick}>
-                  {item.label === '삭제' && <TrashIcon />}
-                  {item.label}
-                </Button>
-              ))}
+            {buttonItems?.map((item) => (
+              <Button key={item.label} variant={item.variant || 'outline'} onClick={item.onClick}>
+                {item.label === '삭제' && <TrashIcon />}
+                {item.label}
+              </Button>
+            ))}
           </ButtonGroup>
-        </div>
-      </CardHeader>
+        }
+      >
+        {data?.title || '공연 상세'}
+      </PageCard.Title>
 
-      <CardContent>
+      <PageCard.Content>
         <Tabs defaultValue="basic" className="w-full">
           <TabsList variant="line" className="mb-6 w-fit">
             <TabsTrigger value="basic">기본정보</TabsTrigger>
@@ -136,7 +122,7 @@ export default function ShowDetail({ id }: Props) {
             <ShowDetailReservations showId={showId} />
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </PageCard.Content>
+    </PageCard>
   );
 }
