@@ -12,3 +12,17 @@ export const fetchReservationList = (params: Reservation.ListParams) => ({
     return response?.data.data;
   },
 });
+
+export const fetchReservationDetail = (id: number) => ({
+  queryKey: ['user', 'reservations', 'detail', id],
+  queryFn: async () => {
+    const response = await axiosInstance.get<Api.Response<Reservation.Detail>>(`${BASE_URL}/${id}`);
+    return response?.data.data;
+  },
+  enabled: !!id && id > 0,
+});
+
+export const cancelReservation = () => ({
+  mutationKey: ['user', 'reservations', 'cancel'],
+  mutationFn: async (id: number) => await axiosInstance.delete(`${BASE_URL}/${id}`),
+});
