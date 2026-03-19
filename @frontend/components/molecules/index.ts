@@ -11,3 +11,6 @@ export * from './Pagination';
 export * from './SearchBar';
 export { default as ShowListItemCard } from './ShowListItemCard';
 export { default as ScrollToTopButton } from './ScrollToTopButton';
+export { default as InfoField } from './InfoField';
+export { default as SectionLayout } from './SectionLayout';
+export { default as HorizontalTable } from './HorizontalTable';

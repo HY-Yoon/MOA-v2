@@ -1,4 +1,4 @@
-import ReservationDetail from '@/app/my-page/reservations/[id]/_components/ReservationDetail';
+import { ReservationDetail } from '@/components/organisms';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -6,5 +6,10 @@ interface Props {
 
 export default async function ReservationDetailPage({ params }: Props) {
   const { id } = await params;
-  return <ReservationDetail id={id} />;
+  return (
+    <section>
+      <h1 className="mb-6 text-2xl font-bold">예매내역 상세</h1>
+      <ReservationDetail id={id} variant="user" />
+    </section>
+  );
 }

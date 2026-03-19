@@ -1,10 +1,10 @@
 'use client';
 
-import InfoField from './InfoField';
-import HorizontalTable from './HorizontalTable';
+import InfoField from '@/components/molecules/InfoField';
+import HorizontalTable from '@/components/molecules/HorizontalTable';
 import dayjs, { Dayjs } from 'dayjs';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
-import SectionLayout from './SectionLayout';
+import SectionLayout from '@/components/molecules/SectionLayout';
 import { RESERVATION_STATUS_LABELS } from '@/constants/common/reservationStatus';
 import { PAYMENT_STATUS_LABELS } from '@/constants/common/paymentStatus';
 import { Button } from '@/components/atoms';

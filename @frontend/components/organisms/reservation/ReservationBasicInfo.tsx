@@ -1,9 +1,9 @@
 'use client';
 
-import InfoField from './InfoField';
+import InfoField from '@/components/molecules/InfoField';
 import dayjs from '@/plugins/dayjs';
 import { DATE_FORMAT } from '@/constants/common/dateFormat';
-import SectionLayout from './SectionLayout';
+import SectionLayout from '@/components/molecules/SectionLayout';
 
 interface Props {
   data: Reservation.Detail;
