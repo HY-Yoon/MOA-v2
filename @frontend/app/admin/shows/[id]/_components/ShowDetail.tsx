@@ -117,7 +117,7 @@ export default function ShowDetail({ id }: Props) {
             <ShowDetailBasicInfo data={data} loading={loading} />
           </TabsContent>
 
-          {/*TODO: 예매내역*/}
+          {/*예매내역*/}
           <TabsContent value="reservations">
             <ShowDetailReservations showId={showId} />
           </TabsContent>

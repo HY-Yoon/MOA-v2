@@ -1,6 +1,6 @@
 'use client';
 
-import SectionLayout from './SectionLayout';
+import SectionLayout from '@/components/molecules/SectionLayout';
 
 const NOTICE_TEXT = `• 예매수수료는 예매일 이후 취소시에는 환불되지 않습니다.
 • 이미 배송이 시작된 티켓의 경우 인터넷 및 전화로 취소할 수 없습니다. 반드시 취소마감 시간 이전에 티켓이 고객센터로 반송되어야 취소가능하며, 취소 수수료는 도착일자 기준으로 부과됩니다. 
