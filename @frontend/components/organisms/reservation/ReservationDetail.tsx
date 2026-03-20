@@ -75,9 +75,10 @@ export default function ReservationDetail({ id, variant = 'user' }: ReservationD
     });
     if (!confirmed) return;
 
-    await onCancelReservation(reservationId);
-    await queryClient.invalidateQueries({ queryKey: ['user', 'reservations', 'list'] });
-    router.push(MY_PAGE_ROUTES.RESERVATIONS);
+    // TODO: 예매 취소 api 테스트
+    // await onCancelReservation(reservationId);
+    // await queryClient.invalidateQueries({ queryKey: ['user', 'reservations', 'list'] });
+    // router.push(MY_PAGE_ROUTES.RESERVATIONS);
   };
 
   if (!reservationId) return;
