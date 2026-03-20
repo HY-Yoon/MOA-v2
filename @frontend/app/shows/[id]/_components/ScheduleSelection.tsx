@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useReservationPopup } from '@/hooks/useReservationPopup';
 
 interface Props {
   schedules?: ShowCatalog.Schedule[];
@@ -21,6 +22,8 @@ const sessionButtonClass = {
 } as const;
 
 export default function ScheduleSelection({ schedules = [] }: Props) {
+  const { openReservationPopup } = useReservationPopup();
+
   const params = useParams();
   const showId = Number(params?.id) ?? 0;
 
@@ -79,11 +82,16 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
     setSelectedScheduleKey(firstOnDate?.keyId ?? null);
   }
 
-  function handleBooking() {
+  async function handleBooking() {
     if (showId <= 0 || !selectedScheduleKey) return;
 
     // TODO: 예매하기 페이지 이동 (showId, selectedScheduleKey 전달)
     console.log('showId', showId, 'selectedScheduleKey', selectedScheduleKey);
+    await openReservationPopup({
+      showId,
+      scheduleId: selectedScheduleKey,
+      showDate: selectedDate ? formatDateOnly(selectedDate) : undefined,
+    });
   }
 
   const isBookingDisabled = !selectedDate || !selectedScheduleKey || selectedDetail?.isSoldOut;

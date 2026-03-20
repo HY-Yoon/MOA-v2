@@ -2,12 +2,15 @@
 
 import { HEADER_ROUTES } from '@/constants/route/userRoutes';
 import { enterQueue, getQueueStatus } from '@/lib/api/queue';
+import { getShowDetail } from '@/lib/api/show';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 interface QueueWaitingScreenProps {
+  showId: number;
   scheduleId: number;
   title?: string | null;
   showDate?: string | null;
@@ -39,9 +42,15 @@ const formatNumber = (value: number | null) => {
   return new Intl.NumberFormat('ko-KR').format(Math.max(0, Math.floor(value)));
 };
 
-export default function QueueWaitingScreen({ scheduleId, title, showDate }: QueueWaitingScreenProps) {
+export default function QueueWaitingScreen({
+  showId,
+  scheduleId,
+  title,
+  showDate,
+}: QueueWaitingScreenProps) {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { data: showDetail } = useQuery(getShowDetail(showId));
   const [queueToken, setQueueToken] = useState<string | null>(null);
   const [position, setPosition] = useState<number | null>(null);
   const [estimatedWaitTimeSeconds, setEstimatedWaitTimeSeconds] = useState<number | null>(null);
@@ -51,12 +60,14 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number>(1);
+  const queryTitle = title?.trim();
+  const displayTitle = queryTitle && queryTitle !== '-' ? queryTitle : (showDetail?.title ?? '공연');
 
   const handleEnterQueue = useCallback(
     async () => {
-      if (!scheduleId || Number.isNaN(scheduleId)) {
+      if (!showId || Number.isNaN(showId) || !scheduleId || Number.isNaN(scheduleId)) {
         setPhase('ERROR');
-        setErrorMessage('스케줄 식별자가 없습니다.');
+        setErrorMessage('공연 또는 스케줄 식별자가 없습니다.');
         return;
       }
       if (!user?.providerId) {
@@ -88,7 +99,7 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
         setErrorMessage('대기열 진입에 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     },
-    [router, scheduleId, user?.providerId],
+    [router, scheduleId, showId, user?.providerId],
   );
 
   useEffect(() => {
@@ -170,12 +181,12 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
 
   if (phase === 'WAITING') {
     return (
-      <section className="min-h-screen m-auto flex flex-col justify-center w-full max-w-3xl p-8">
+      <section className="m-auto flex min-h-screen w-full max-w-3xl flex-col justify-center p-8">
         <div className="space-y-2">
           <p className="text-2xl font-bold text-black">접속 인원이 많아 대기 중입니다.</p>
           <p className="text-2xl font-bold text-violet-600">조금만 기다려주세요.</p>
           <p className="pt-2 text-slate-700">
-            {title ?? '공연'}
+            {displayTitle}
             {showDate ? ` · ${showDate}` : ''}
           </p>
         </div>
@@ -205,9 +216,39 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
     );
   }
 
+  if (phase === 'READY') {
+    return (
+      <section className="mx-auto max-w-3xl space-y-4 p-8">
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-lg font-semibold text-black">입장 가능합니다.</p>
+          <p className="mt-2 text-sm text-slate-600">
+            입장 토큰이 발급되었습니다. 회차 선택 단계로 이동해 주세요.
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/shows/reservation/schedule?showId=${showId}&scheduleId=${scheduleId}`)}
+              className="inline-flex items-center rounded-md bg-black px-3 py-2 text-xs font-medium text-white hover:bg-black/90"
+            >
+              회차 선택으로 이동
+            </button>
+            <button
+              type="button"
+              onClick={() => window.close()}
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              현재 창 종료
+            </button>
+          </div>
+          <p className="text-muted-foreground mt-4 text-xs">queueToken: {queueToken ?? '-'}</p>
+        </div>
+      </section>
+    );
+  }
+
   if (phase === 'EXPIRED') {
     return (
-      <section className="min-h-screen m-auto flex flex-col justify-center max-w-3xl space-y-4 p-8">
+      <section className="m-auto flex min-h-screen max-w-3xl flex-col justify-center space-y-4 p-8">
         <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <p className="text-2xl font-semibold text-violet-600">대기열이 만료되었습니다.</p>
           <p className="mt-2 text-sm text-slate-600">
@@ -216,8 +257,15 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
           <div className="mt-5 flex items-center gap-2">
             <button
               type="button"
+              onClick={() => void handleEnterQueue()}
+              className="inline-flex items-center rounded-md bg-black px-3 py-2 text-xs font-medium text-white hover:bg-black/90"
+            >
+              대기열 재진입
+            </button>
+            <button
+              type="button"
               onClick={() => window.close()}
-              className="mt-5 inline-flex items-center rounded-md bg-black px-3 py-2 text-xs font-medium text-white hover:bg-black/90"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               현재 창 종료
             </button>
@@ -227,7 +275,25 @@ export default function QueueWaitingScreen({ scheduleId, title, showDate }: Queu
     );
   }
 
-  
+  if (phase === 'ERROR') {
+    return (
+      <section className="mx-auto max-w-3xl space-y-4 p-8">
+        <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-lg font-semibold text-red-600">문제가 발생했습니다.</p>
+          <p className="mt-2 text-sm text-slate-600">
+            {errorMessage ?? '요청 처리 중 오류가 발생했습니다.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleEnterQueue()}
+            className="mt-5 inline-flex items-center rounded-md bg-black px-3 py-2 text-xs font-medium text-white hover:bg-black/90"
+          >
+            다시 시도
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return null;
 }
