@@ -96,6 +96,42 @@ export default function ReservationScheduleSelection({
       return nextMap;
     });
   }, []);
+  const moveToPaymentPage = useCallback(
+    (
+      scheduleId: number,
+      scheduleSeatIds: string[],
+      seatCount: number,
+      remainingSeconds: number,
+      totalAmount: number,
+      showTitle: string,
+      scheduleText: string,
+      seats: SelectedSeatInfo[],
+    ) => {
+      const expiresAt = Date.now() + remainingSeconds * 1000;
+      const params = new URLSearchParams({
+        showId: String(showId),
+        scheduleId: String(scheduleId),
+        scheduleSeatIds: scheduleSeatIds.join(','),
+        seatCount: String(seatCount),
+        remainingSeconds: String(remainingSeconds),
+        expiresAt: String(expiresAt),
+        totalAmount: String(totalAmount),
+        showTitle,
+        scheduleText,
+        seats: JSON.stringify(
+          seats.map((seat) => ({
+            seatId: seat.seatId,
+            sectionName: seat.sectionName,
+            row: seat.row,
+            number: seat.number,
+            price: seat.price,
+          })),
+        ),
+      });
+      router.push(`/shows/reservation/payment?${params.toString()}`);
+    },
+    [router, showId],
+  );
 
   const schedules = useMemo(() => data?.schedules ?? [], [data?.schedules]);
 
@@ -115,6 +151,10 @@ export default function ReservationScheduleSelection({
     if (selectedScheduleKeyId === null) return schedules[0];
     return schedules.find((schedule) => schedule.keyId === selectedScheduleKeyId) ?? schedules[0];
   }, [schedules, selectedScheduleKeyId]);
+  const selectedScheduleDisplayText = useMemo(
+    () => formatScheduleDisplay(selectedSchedule),
+    [selectedSchedule],
+  );
   const isQueueInProgress = phase === 'IDLE' || phase === 'ENTERING' || phase === 'WAITING';
   const isSchedulePanelActive = !isQueueInProgress && sidePanelMode === 'schedule';
 
@@ -380,9 +420,29 @@ export default function ReservationScheduleSelection({
                 const scheduleSeatIds = selectedSeats
                   .map((seat) => seat.scheduleSeatId)
                   .filter((id): id is number => typeof id === 'number');
+                const fallbackScheduleSeatIds = selectedSeats.map((seat, index) =>
+                  seat.scheduleSeatId ? String(seat.scheduleSeatId) : `${index + 1}`,
+                );
+                const fallbackSeatCount = selectedSeats.length;
+                const fallbackTotalAmount = selectedSeats.reduce(
+                  (sum, seat) => sum + (sectionPriceMap[seat.sectionId] ?? 0),
+                  0,
+                );
+                const fallbackRemainingSeconds = 300;
+                const showTitle = data?.title ?? '공연 정보';
 
                 if (scheduleSeatIds.length === 0) {
-                  window.alert('선택한 좌석 정보가 없습니다. 다시 선택해주세요.');
+                  // 테스트 편의를 위해 scheduleSeatId가 없어도 결제 단계로 이동
+                  moveToPaymentPage(
+                    selectedScheduleKeyId,
+                    fallbackScheduleSeatIds,
+                    fallbackSeatCount,
+                    fallbackRemainingSeconds,
+                    fallbackTotalAmount,
+                    showTitle,
+                    selectedScheduleDisplayText,
+                    selectedSeats,
+                  );
                   return;
                 }
 
@@ -425,11 +485,35 @@ export default function ReservationScheduleSelection({
                       return;
                     }
 
-                    const successData = result.data as { message?: string };
-                    window.alert(successData?.message ?? '좌석 선점 완료');
+                    const successData = result.data as {
+                      seatCount?: number;
+                      remainingSeconds?: number;
+                      totalAmount?: number;
+                      message?: string;
+                    };
+                    moveToPaymentPage(
+                      selectedScheduleKeyId,
+                      scheduleSeatIds.map(String),
+                      successData.seatCount ?? fallbackSeatCount,
+                      successData.remainingSeconds ?? fallbackRemainingSeconds,
+                      successData.totalAmount ?? fallbackTotalAmount,
+                      showTitle,
+                      selectedScheduleDisplayText,
+                      selectedSeats,
+                    );
                   })
                   .catch(() => {
-                    window.alert('좌석 선점 요청에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                    // 테스트 편의를 위해 API 실패 시에도 목업 데이터로 결제 단계 이동
+                    moveToPaymentPage(
+                      selectedScheduleKeyId,
+                      fallbackScheduleSeatIds,
+                      fallbackSeatCount,
+                      fallbackRemainingSeconds,
+                      fallbackTotalAmount,
+                      showTitle,
+                      selectedScheduleDisplayText,
+                      selectedSeats,
+                    );
                   })
                   .finally(() => {
                     setIsSubmittingSeatConfirm(false);
