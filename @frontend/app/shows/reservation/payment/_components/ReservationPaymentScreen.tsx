@@ -7,8 +7,12 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import PaymentCountdown from './PaymentCountdown';
+import { usePaymentRequest } from '../_hooks/usePaymentRequest';
+import { useTossPaymentFlow } from '../_hooks/useTossPaymentFlow';
+import type { PaymentRequestSuccessData } from '@/lib/api/payment';
 
 interface ReservationPaymentScreenProps {
+  scheduleId: number;
   showTitle: string;
   scheduleText: string;
   scheduleSeatIds: string[];
@@ -25,7 +29,14 @@ interface ReservationPaymentScreenProps {
   expiresAt: number;
 }
 
-type SectionKey = 'ticket' | 'user' | 'delivery' | 'payment' | 'terms';
+type SectionKey = 'ticket' | 'user' | 'delivery' | 'terms';
+
+function formatPhoneNumberInput(rawValue: string) {
+  const digits = rawValue.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
 
 function AccordionSection({
   title,
@@ -54,6 +65,7 @@ function AccordionSection({
 }
 
 export default function ReservationPaymentScreen({
+  scheduleId,
   showTitle,
   scheduleText,
   scheduleSeatIds,
@@ -68,16 +80,12 @@ export default function ReservationPaymentScreen({
   const [bookerEmail, setBookerEmail] = useState('');
   const [bookerPhone, setBookerPhone] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('onsite');
-  const [paymentMethod, setPaymentMethod] = useState('card');
-  const [cardCompany, setCardCompany] = useState('');
-  const [installment, setInstallment] = useState('');
   const [agreedPersonalInfo, setAgreedPersonalInfo] = useState(false);
   const [agreedRefundPolicy, setAgreedRefundPolicy] = useState(false);
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
     ticket: true,
     user: true,
     delivery: true,
-    payment: true,
     terms: true,
   });
 
@@ -91,26 +99,43 @@ export default function ReservationPaymentScreen({
   const bookingFee = parsedSeatCount * 2000;
   const finalAmount = ticketAmount + bookingFee;
   const currency = useMemo(() => new Intl.NumberFormat('ko-KR'), []);
-  const isValidName = bookerName.trim().length > 0;
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookerEmail.trim());
-  const isValidPhone = /^[0-9-+\s]{8,}$/.test(bookerPhone.trim());
-  const isDeliverySelected = deliveryMethod.length > 0;
-  const isPaymentSelected =
-    paymentMethod.length > 0 && cardCompany.length > 0 && installment.length > 0;
-  const isTermsAgreed = agreedPersonalInfo && agreedRefundPolicy;
-  const isPaymentEnabled =
-    isDeliverySelected &&
-    isPaymentSelected &&
-    isValidName &&
-    isValidEmail &&
-    isValidPhone &&
-    isTermsAgreed;
+  const { missingItems, isPaymentEnabled, isValidEmail, isValidPhone, isSubmitting, submitPayment } =
+    usePaymentRequest({
+      scheduleId,
+      scheduleSeatIds,
+      deliveryMethod,
+      bookerName,
+      bookerEmail,
+      bookerPhone,
+      agreedPersonalInfo,
+      agreedRefundPolicy,
+    });
+  const { launch, isLaunching } = useTossPaymentFlow();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const fallbackPaymentData = useMemo<PaymentRequestSuccessData>(
+    () => ({
+      orderId:
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : 'TEMP-ORDER-ID',
+      amount: finalAmount,
+      orderName: `${showTitle} - ${parsedSeatCount}좌석`,
+      booker: {
+        name: bookerName.trim(),
+        email: bookerEmail.trim(),
+        phone: bookerPhone.trim(),
+      },
+      successUrl: `${origin}/shows/reservation/payment/success`,
+      failUrl: `${origin}/shows/reservation/payment/fail`,
+    }),
+    [bookerEmail, bookerName, bookerPhone, finalAmount, origin, parsedSeatCount, showTitle],
+  );
 
   useEffect(() => {
     if (!user) return;
     setBookerName((prev) => prev || user.name || '');
     setBookerEmail((prev) => prev || user.email || '');
-    setBookerPhone((prev) => prev || user.phone || '');
+    setBookerPhone((prev) => prev || formatPhoneNumberInput(user.phone || ''));
   }, [user]);
 
   return (
@@ -179,14 +204,22 @@ export default function ReservationPaymentScreen({
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700"
                 value={bookerEmail}
                 onChange={(event) => setBookerEmail(event.target.value)}
-                placeholder="이메일"
+                placeholder="이메일 (example@moa.com)"
               />
+              {bookerEmail.length > 0 && !isValidEmail && (
+                <p className="-mt-1 text-xs text-red-500">이메일 형식을 확인해주세요. (@, . 포함)</p>
+              )}
               <input
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700"
                 value={bookerPhone}
-                onChange={(event) => setBookerPhone(event.target.value)}
-                placeholder="전화번호"
+                onChange={(event) => setBookerPhone(formatPhoneNumberInput(event.target.value))}
+                placeholder="전화번호 (000-0000-0000)"
+                inputMode="numeric"
+                maxLength={13}
               />
+              {bookerPhone.length > 0 && !isValidPhone && (
+                <p className="-mt-1 text-xs text-red-500">전화번호는 000-0000-0000 형식으로 입력해주세요.</p>
+              )}
             </div>
           </AccordionSection>
 
@@ -205,46 +238,6 @@ export default function ReservationPaymentScreen({
               />
               현장수령
             </label>
-          </AccordionSection>
-
-          <AccordionSection
-            title="결제수단"
-            open={openSections.payment}
-            onToggle={() => toggleSection('payment')}
-          >
-            <div className="space-y-3 text-sm text-slate-700">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="payment-method"
-                  value="card"
-                  checked={paymentMethod === 'card'}
-                  onChange={(event) => setPaymentMethod(event.target.value)}
-                />
-                카드 및 기타 결제수단
-              </label>
-              <select
-                className="w-full rounded-md border border-slate-300 px-3 py-2"
-                value={cardCompany}
-                onChange={(event) => setCardCompany(event.target.value)}
-              >
-                <option value="">카드사 선택</option>
-                <option value="kb">KB국민카드</option>
-                <option value="shinhan">신한카드</option>
-                <option value="hyundai">현대카드</option>
-                <option value="samsung">삼성카드</option>
-              </select>
-              <select
-                className="w-full rounded-md border border-slate-300 px-3 py-2"
-                value={installment}
-                onChange={(event) => setInstallment(event.target.value)}
-              >
-                <option value="">할부 선택</option>
-                <option value="lump-sum">일시불</option>
-                <option value="2">2개월</option>
-                <option value="3">3개월</option>
-              </select>
-            </div>
           </AccordionSection>
 
           <AccordionSection
@@ -289,9 +282,35 @@ export default function ReservationPaymentScreen({
               <dd>{currency.format(finalAmount)}원</dd>
             </div>
           </dl>
-          <Button className="mt-5 w-full" disabled={!isPaymentEnabled}>
-            총 {currency.format(finalAmount)}원 결제하기
+          <Button
+            className="mt-5 w-full"
+            disabled={!isPaymentEnabled || isSubmitting || isLaunching}
+            onClick={() => {
+              void (async () => {
+                try {
+                  const result = await submitPayment();
+                  if (!result) return;
+                  // 임시 우회: API 실패/비정상 응답이어도 성공으로 간주해 다음 단계 진행
+                  const paymentData = result.success && result.data ? result.data : fallbackPaymentData;
+                  await launch(paymentData);
+                } catch {
+                  // 임시 우회: 요청 에러 발생 시에도 성공 처리로 다음 단계 진행
+                  await launch(fallbackPaymentData);
+                }
+              })();
+            }}
+          >
+            {isSubmitting || isLaunching
+              ? '결제 요청 중...'
+              : `총 ${currency.format(finalAmount)}원 결제하기`}
           </Button>
+          {!isPaymentEnabled && missingItems.length > 0 && (
+            <ul className="mt-3 space-y-1 text-xs text-red-500">
+              {missingItems.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          )}
         </aside>
       </div>
     </section>

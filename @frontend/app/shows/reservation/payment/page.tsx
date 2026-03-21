@@ -2,6 +2,7 @@ import ReservationPaymentScreen from './_components/ReservationPaymentScreen';
 
 type ReservationPaymentPageProps = {
   searchParams: Promise<{
+    scheduleId?: string | string[];
     showTitle?: string | string[];
     scheduleText?: string | string[];
     scheduleSeatIds?: string | string[];
@@ -17,6 +18,7 @@ const toSingleValue = (value?: string | string[]) => (Array.isArray(value) ? val
 
 export default async function ReservationPaymentPage({ searchParams }: ReservationPaymentPageProps) {
   const params = await searchParams;
+  const scheduleId = Number(toSingleValue(params?.scheduleId) ?? 0);
   const showTitle = toSingleValue(params?.showTitle) ?? '공연 정보';
   const scheduleText = toSingleValue(params?.scheduleText) ?? '-';
   const scheduleSeatIdsParam = toSingleValue(params?.scheduleSeatIds) ?? '';
@@ -47,6 +49,7 @@ export default async function ReservationPaymentPage({ searchParams }: Reservati
 
   return (
     <ReservationPaymentScreen
+      scheduleId={scheduleId}
       showTitle={showTitle}
       scheduleText={scheduleText}
       scheduleSeatIds={scheduleSeatIds}
