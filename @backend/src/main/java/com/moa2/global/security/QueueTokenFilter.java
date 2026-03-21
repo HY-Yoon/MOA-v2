@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -47,6 +48,13 @@ public class QueueTokenFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String uri = request.getRequestURI();
+        String method = request.getMethod();
+
+        // CORS preflight(OPTIONS)는 토큰 검증 없이 통과
+        if (HttpMethod.OPTIONS.matches(method)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // V2 예매 API 경로가 아니면 그냥 통과
         if (!pathMatcher.match(V2_RESERVATION_PATTERN, uri)) {
@@ -68,7 +76,9 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         String token = request.getHeader(QUEUE_TOKEN_HEADER);
         if (token == null || token.isBlank()) {
             log.debug("대기열 토큰 누락 - URI: {}", uri);
-            writeError(response, HttpStatus.BAD_REQUEST, "대기열 토큰이 필요합니다. 대기열을 통해 입장해주세요.");
+            writeError(response, HttpStatus.BAD_REQUEST,
+                    "대기열 토큰이 필요합니다. 대기열을 통해 입장해주세요.",
+                    "QUEUE_TOKEN_MISSING");
             return;
         }
 
@@ -78,7 +88,9 @@ public class QueueTokenFilter extends OncePerRequestFilter {
 
         if (exists == null || !exists) {
             log.debug("유효하지 않은 대기열 토큰 - token: {}", token);
-            writeError(response, HttpStatus.BAD_REQUEST, "유효하지 않은 대기열 토큰입니다. 토큰이 만료되었거나 존재하지 않습니다.");
+            writeError(response, HttpStatus.BAD_REQUEST,
+                    "유효하지 않은 대기열 토큰입니다. 토큰이 만료되었거나 존재하지 않습니다.",
+                    "QUEUE_TOKEN_INVALID");
             return;
         }
 
@@ -87,10 +99,11 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void writeError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+    private void writeError(HttpServletResponse response, HttpStatus status, String message, String code)
+            throws IOException {
         response.setStatus(status.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message)));
+        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message, code, null)));
     }
 }
