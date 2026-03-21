@@ -42,14 +42,16 @@ public interface ShowRepository extends JpaRepository<Show, Long> {
          * - 장르, 지역, 키워드, 날짜 필터 지원
          */
         @Query("SELECT s FROM Show s " +
-                        "WHERE s.saleStatus = 'ALLOWED' " +
-                        "AND s.status IN ('WAITING', 'ON_SALE', 'SOLD_OUT') " + // 임시: WAITING 포함
+                        "WHERE s.saleStatus = :saleStatus " +
+                        "AND s.status IN :statuses " + // 임시: WAITING 포함
                         "AND (:genre IS NULL OR s.genre = :genre) " +
                         "AND (:region IS NULL OR s.venue.region = :region) " +
                         "AND (:keyword IS NULL OR LOWER(s.title) LIKE :keyword) " +
                         "AND (CAST(:startDate AS date) IS NULL OR s.startDate >= :startDate) " +
                         "AND (CAST(:endDate AS date) IS NULL OR s.endDate <= :endDate)")
         Page<Show> findShowsForUser(
+                        @Param("saleStatus") SaleStatus saleStatus,
+                        @Param("statuses") java.util.List<ShowStatus> statuses,
                         @Param("genre") Genre genre,
                         @Param("region") Region region,
                         @Param("keyword") String keyword,
