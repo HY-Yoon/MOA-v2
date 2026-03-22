@@ -97,21 +97,20 @@ export const getScheduleSeatMap = (scheduleId: number) => ({
   enabled: !!scheduleId && scheduleId > 0,
 });
 
-export const getScheduleSeats = (scheduleId: number, queueToken?: string | null) => {
-  const normalizedQueueToken = queueToken?.trim() ?? '';
+export const getScheduleSeats = (scheduleId: number) => {
+  const headers: Record<string, string> = {
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  };
   return {
-    queryKey: ['reservation', 'seats', scheduleId, normalizedQueueToken],
+    queryKey: ['reservation', 'seats', scheduleId],
     queryFn: async (): Promise<ScheduleSeatStatusData> => {
       const response = await axiosInstance.get<Api.Response<ScheduleSeatStatusData>>(
         `/api/v1/schedules/${scheduleId}/seats`,
         {
           withCredentials: true,
-          headers: {
-            'X-Queue-Token': normalizedQueueToken,
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-            Pragma: 'no-cache',
-            Expires: '0',
-          },
+          headers,
         },
       );
       const payload = response?.data?.data;
@@ -120,24 +119,19 @@ export const getScheduleSeats = (scheduleId: number, queueToken?: string | null)
       }
       return payload;
     },
-    enabled: !!scheduleId && scheduleId > 0 && normalizedQueueToken.length > 0,
+    enabled: !!scheduleId && scheduleId > 0,
     retry: false,
   };
 };
 
 export const confirmScheduleSeats = async (
   request: ConfirmSeatsRequest,
-  queueToken?: string | null,
 ): Promise<ConfirmSeatsResponse> => {
-  const normalizedQueueToken = queueToken?.trim() ?? '';
   const response = await axiosInstance.post<ConfirmSeatsResponse>(
     '/api/v2/reservations/reserve',
     request,
     {
       withCredentials: true,
-      headers: {
-        'X-Queue-Token': normalizedQueueToken,
-      },
     },
   );
 

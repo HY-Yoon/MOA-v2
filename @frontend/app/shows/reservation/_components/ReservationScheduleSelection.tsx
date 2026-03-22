@@ -72,7 +72,6 @@ export default function ReservationScheduleSelection({
   );
   const [sidePanelMode, setSidePanelMode] = useState<'schedule' | 'seat'>('schedule');
   const [phase, setPhase] = useState<QueuePhase>('IDLE');
-  const [queueToken, setQueueToken] = useState<string | null>(null);
   const [position, setPosition] = useState<number | null>(null);
   const [estimatedWaitTimeSeconds, setEstimatedWaitTimeSeconds] = useState<number | null>(null);
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number>(1);
@@ -159,7 +158,6 @@ export default function ReservationScheduleSelection({
   const isSchedulePanelActive = !isQueueInProgress && sidePanelMode === 'schedule';
 
   useEffect(() => {
-    setQueueToken(null);
     setPosition(null);
     setEstimatedWaitTimeSeconds(null);
     setRetryAfterSeconds(1);
@@ -205,7 +203,6 @@ export default function ReservationScheduleSelection({
         setRetryAfterSeconds(1);
 
         if (queueData.token) {
-          setQueueToken(queueData.token);
           setPhase('READY');
           return;
         }
@@ -253,12 +250,10 @@ export default function ReservationScheduleSelection({
         if (status.status === 'READY') {
           setPosition(status.position);
           setEstimatedWaitTimeSeconds(status.estimatedWaitTimeSeconds);
-          setQueueToken(status.token);
           setPhase('READY');
           return;
         }
 
-        setQueueToken(null);
         setPhase('EXPIRED');
       } catch {
         if (!cancelled) {
@@ -364,7 +359,6 @@ export default function ReservationScheduleSelection({
               <div className="relative h-full px-5 py-6">
                 <SeatMapCanvas
                   scheduleId={selectedScheduleKeyId ?? 0}
-                  queueToken={queueToken}
                   disabled={isSchedulePanelActive}
                   selectedSeatIds={selectedSeatIds}
                   onSelectedSeatIdsChange={setSelectedSeatIds}
@@ -416,7 +410,7 @@ export default function ReservationScheduleSelection({
                 setQueueRequestKey((prev) => prev + 1);
               }}
               onConfirmSeatSelection={() => {
-                if (!selectedScheduleKeyId || !queueToken) return;
+                if (!selectedScheduleKeyId) return;
                 const scheduleSeatIds = selectedSeats
                   .map((seat) => seat.scheduleSeatId)
                   .filter((id): id is number => typeof id === 'number');
@@ -433,7 +427,6 @@ export default function ReservationScheduleSelection({
                     scheduleId: selectedScheduleKeyId,
                     scheduleSeatIds,
                   },
-                  queueToken,
                 )
                   .then((result) => {
                     if (!result.success) {
@@ -457,7 +450,6 @@ export default function ReservationScheduleSelection({
 
                       if (data?.code === 'QUEUE_EXPIRED') {
                         setPhase('EXPIRED');
-                        setQueueToken(null);
                         window.alert(result.message ?? '토큰이 만료되었거나 유효하지 않습니다.');
                         return;
                       }
