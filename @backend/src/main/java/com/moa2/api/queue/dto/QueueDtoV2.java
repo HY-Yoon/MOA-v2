@@ -67,6 +67,19 @@ public class QueueDtoV2 {
                     .message("입장 가능합니다. 토큰이 발급되었습니다.")
                     .build();
         }
+
+        /** 쿠키로 토큰을 발급했으므로 Body의 token 필드를 null로 마스킹 */
+        public EnterResponse withTokenMasked() {
+            return EnterResponse.builder()
+                    .status(this.status())
+                    .position(this.position())
+                    .totalWaiting(this.totalWaiting())
+                    .estimatedWaitTimeSeconds(this.estimatedWaitTimeSeconds())
+                    .retryAfterSeconds(this.retryAfterSeconds())
+                    .token(null)  // HttpOnly 쿠키로 전달하므로 Body에는 노출 안함
+                    .message(this.message())
+                    .build();
+        }
     }
 
     /**
@@ -119,6 +132,19 @@ public class QueueDtoV2 {
                     .retryAfterSeconds(0L)
                     .token(token)
                     .message("입장 가능합니다. 5분 내에 예매를 진행해주세요.")
+                    .build();
+        }
+
+        /** 쿠키로 토큰을 발급했으므로 Body의 token 필드를 null로 마스킹 */
+        public StatusResponse withTokenMasked() {
+            return StatusResponse.builder()
+                    .status(this.status())
+                    .position(this.position())
+                    .totalWaiting(this.totalWaiting())
+                    .estimatedWaitTimeSeconds(this.estimatedWaitTimeSeconds())
+                    .retryAfterSeconds(this.retryAfterSeconds())
+                    .token(null)  // HttpOnly 쿠키로 전달하므로 Body에는 노출 안함
+                    .message(this.message())
                     .build();
         }
 

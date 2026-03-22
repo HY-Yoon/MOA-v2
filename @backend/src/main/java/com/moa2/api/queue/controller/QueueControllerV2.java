@@ -6,12 +6,17 @@ import com.moa2.api.queue.service.v2.QueueServiceV2;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
+import com.moa2.global.model.QueueStatus;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,18 +40,34 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
     private final QueueServiceV2 queueServiceV2;
     private final UserRepository userRepository;
 
+    private static final String QUEUE_TOKEN_COOKIE = "QUEUE-TOKEN";
+    private static final int QUEUE_TOKEN_TTL_SECONDS = 300; // Redis TTL과 동기화
+
+    @Value("${security.cookie.secure:true}")
+    private boolean cookieSecure;
+
+    @Value("${security.cookie.same-site:None}")
+    private String cookieSameSite;
+
     /**
      * 대기열 진입
      */
     @Override
     @PostMapping("/enter")
     public ResponseEntity<ApiResponse<QueueDtoV2.EnterResponse>> enterQueue(
-            @Valid @RequestBody QueueDtoV2.EnterRequest request) {
+            @Valid @RequestBody QueueDtoV2.EnterRequest request,
+            HttpServletResponse httpServletResponse) {
 
         try {
             Long userId = getAuthenticatedUserId();
             QueueDtoV2.EnterResponse response = queueServiceV2.enterQueue(userId, request.scheduleId());
-            return ResponseEntity.ok(ApiResponse.success(response));
+
+            // READY 상태 전환 시 token을 HttpOnly 쿠키로 발급
+            if (response.status() == QueueStatus.READY && response.token() != null) {
+                issueQueueTokenCookie(httpServletResponse, response.token());
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(response.withTokenMasked()));
 
         } catch (IllegalArgumentException e) {
             log.warn("V2 대기열 진입 실패: {}", e.getMessage());
@@ -61,12 +82,19 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
     @Override
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<QueueDtoV2.StatusResponse>> getQueueStatus(
-            @RequestParam Long scheduleId) {
+            @RequestParam Long scheduleId,
+            HttpServletResponse httpServletResponse) {
 
         try {
             Long userId = getAuthenticatedUserId();
             QueueDtoV2.StatusResponse response = queueServiceV2.getQueueStatus(userId, scheduleId);
-            return ResponseEntity.ok(ApiResponse.success(response));
+
+            // READY 상태 전환 시 token을 HttpOnly 쿠키로 발급
+            if (response.status() == QueueStatus.READY && response.token() != null) {
+                issueQueueTokenCookie(httpServletResponse, response.token());
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(response.withTokenMasked()));
 
         } catch (IllegalArgumentException e) {
             log.warn("V2 대기 상태 조회 실패: {}", e.getMessage());
@@ -76,6 +104,21 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
     }
 
     // --- Private Methods ---
+
+    /**
+     * READY 상태 전환 시 QUEUE-TOKEN 을 HttpOnly 쿠키로 발급
+     */
+    private void issueQueueTokenCookie(HttpServletResponse response, String token) {
+        ResponseCookie cookie = ResponseCookie.from(QUEUE_TOKEN_COOKIE, token)
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/")
+                .maxAge(QUEUE_TOKEN_TTL_SECONDS)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        log.info("✅ [QueueControllerV2] QUEUE-TOKEN 쿠키 발급 완료");
+    }
 
     private Long getAuthenticatedUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

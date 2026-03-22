@@ -34,7 +34,7 @@ import org.springframework.lang.NonNull;
 @RequiredArgsConstructor
 public class QueueTokenFilter extends OncePerRequestFilter {
 
-    private static final String QUEUE_TOKEN_HEADER = "X-Queue-Token";
+    private static final String QUEUE_TOKEN_COOKIE = "QUEUE-TOKEN";
     private static final String TOKEN_PREFIX = "token:";
     private static final String V2_RESERVATION_PATTERN = "/api/v2/reservations/**";
 
@@ -72,10 +72,10 @@ public class QueueTokenFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 1. X-Queue-Token 헤더 확인
-        String token = request.getHeader(QUEUE_TOKEN_HEADER);
+        // 1. QUEUE-TOKEN 쿠키 확인
+        String token = extractQueueTokenFromCookie(request);
         if (token == null || token.isBlank()) {
-            log.warn("🚨 [QueueTokenFilter] API 차단 - 'X-Queue-Token' 헤더가 누락되었습니다! 프론트엔드 헤더 설정을 확인해주세요. (요청 URI: {})", uri);
+            log.warn("🚨 [QueueTokenFilter] API 차단 - 'QUEUE-TOKEN' 쿠키가 누락되었습니다! 프론트엔드 credentials 설정을 확인해주세요. (요청 URI: {})", uri);
             writeError(response, HttpStatus.BAD_REQUEST,
                     "대기열 토큰이 필요합니다. 대기열을 통해 입장해주세요.",
                     "QUEUE_TOKEN_MISSING");
@@ -95,7 +95,7 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         }
 
         // 3. 토큰이 Redis에 존재 → 통과 (세부 검증은 ReservationFacade에서)
-        log.info("✅ [QueueTokenFilter] 대기열 토큰 정상 인증 완료 - 토큰이 통과되었습니다. (token: {})", token);
+        log.info("✅ [QueueTokenFilter] 대기열 토큰 정상 인증 - 쿠키 토큰이 통과되었습니다.");
         filterChain.doFilter(request, response);
     }
 
@@ -105,5 +105,19 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message, code, null)));
+    }
+
+    /**
+     * 요청에서 QUEUE-TOKEN 쿠키 값을 추출
+     */
+    private String extractQueueTokenFromCookie(HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (jakarta.servlet.http.Cookie cookie : cookies) {
+            if (QUEUE_TOKEN_COOKIE.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 }

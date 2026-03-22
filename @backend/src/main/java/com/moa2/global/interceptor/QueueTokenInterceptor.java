@@ -32,7 +32,7 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
 
     private static final Pattern SCHEDULE_SEATS_URI_PATTERN = Pattern.compile("^/api/v1/schedules/(\\d+)/seats$");
 
-    private static final String QUEUE_TOKEN_HEADER = "X-Queue-Token";
+    private static final String QUEUE_TOKEN_COOKIE = "QUEUE-TOKEN";
     private static final String TOKEN_PREFIX = "token:";
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -57,10 +57,10 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // X-Queue-Token 헤더 확인
-        String token = request.getHeader(QUEUE_TOKEN_HEADER);
+        // QUEUE-TOKEN 쿠키 확인
+        String token = extractQueueTokenFromCookie(request);
         if (token == null || token.isBlank()) {
-            log.warn("🚨 [QueueTokenInterceptor] V2 좌석 조회 차단 - 'X-Queue-Token' 헤더가 누락되었습니다! (요청 URI: {})", uri);
+            log.warn("🚨 [QueueTokenInterceptor] V2 좌석 조회 차단 - 'QUEUE-TOKEN' 쿠키가 누락되었습니다! (요청 URI: {})", uri);
             writeError(response, HttpStatus.FORBIDDEN,
                     "대기열을 통과한 사용자만 접근할 수 있습니다. 먼저 대기열에 진입해주세요.",
                     "QUEUE_TOKEN_MISSING");
@@ -131,5 +131,19 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
         response.setContentType("application/json;charset=UTF-8");
         
         response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(message, code, data)));
+    }
+
+    /**
+     * 요청에서 QUEUE-TOKEN 쿠키 값을 추출
+     */
+    private String extractQueueTokenFromCookie(HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (jakarta.servlet.http.Cookie cookie : cookies) {
+            if (QUEUE_TOKEN_COOKIE.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 }

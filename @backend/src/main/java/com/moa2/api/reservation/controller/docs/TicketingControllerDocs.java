@@ -27,8 +27,7 @@ public interface TicketingControllerDocs {
       4. 토큰 소진 (재사용 방지)
       5. 200 OK + 선점 정보 응답
 
-      **필수 헤더:** `X-Queue-Token`
-      **인증 방식:** Cookie (accessToken)
+      **인증 방식:** Cookie (QUEUE-TOKEN HttpOnly 쿠키 자동 전송 / accessToken)
       """)
   @ApiResponses(value = {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "좌석 선점 성공", content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
@@ -64,7 +63,8 @@ public interface TicketingControllerDocs {
       }))
   })
   ResponseEntity<?> reserve(
-      @Parameter(description = "대기열 통과 토큰", required = true) String token,
+      jakarta.servlet.http.HttpServletRequest httpRequest,
+      jakarta.servlet.http.HttpServletResponse httpResponse,
       @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "좌석 선점 요청", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = ReservationDtoV2.ReserveRequest.class))) ReservationDtoV2.ReserveRequest request);
 
   @Operation(summary = "주문 미리보기 (V2)", description = """

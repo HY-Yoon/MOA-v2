@@ -13,10 +13,15 @@ import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,22 +42,45 @@ public class TicketingController implements TicketingControllerDocs {
     private final ReservationFacade reservationFacade;
     private final UserRepository userRepository;
 
+    private static final String QUEUE_TOKEN_COOKIE = "QUEUE-TOKEN";
+
+    @Value("${security.cookie.secure:true}")
+    private boolean cookieSecure;
+
+    @Value("${security.cookie.same-site:None}")
+    private String cookieSameSite;
+
     /**
      * [1단계] 좌석 선점
-     * - X-Queue-Token 헤더로 토큰 전달
+     * - QUEUE-TOKEN 쿠키에서 토큰 추출
      * - Redis에 좌석 선점만 저장 (DB Write 없음)
-     * - 즉시 200 OK 응답
+     * - 선점 성공 시 QUEUE-TOKEN 쿠키 즉시 삭제 (토큰 소진)
      */
     @Operation(summary = "V2 좌석 선점", description = "Redis 기반 좌석 선점 API. DB Write 없이 즉시 200 응답합니다.")
     @PostMapping("/reserve")
     @Override
     public ResponseEntity<?> reserve(
-            @RequestHeader("X-Queue-Token") String token,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse,
             @Valid @RequestBody ReservationDtoV2.ReserveRequest request) {
 
         try {
             Long userId = getAuthenticatedUserId();
+            // 쿠키에서 QUEUE-TOKEN 추출
+            String token = extractQueueTokenFromCookie(httpRequest);
+            if (token == null || token.isBlank()) {
+                log.warn("V2 좌석 선점 실패 - QUEUE-TOKEN 쿠키 누락");
+                return ResponseEntity.badRequest()
+                        .body(com.moa2.global.dto.ApiResponse.error(
+                                "대기열 토큰이 없습니다. 대기열을 통해 입장해주세요.",
+                                ErrorResponse.of(ErrorCode.QUEUE_EXPIRED)));
+            }
+
             ReservationDtoV2.ReserveSeatResponse response = reservationFacade.reserve(token, userId, request);
+
+            // 선점 성공 후 QUEUE-TOKEN 쿠키 즉시 삭제 (토큰 소진)
+            expireQueueTokenCookie(httpResponse);
+
             return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
 
         } catch (SeatConflictException e) {
@@ -151,6 +179,35 @@ public class TicketingController implements TicketingControllerDocs {
 
     // --- Private Methods ---
 
+    /**
+     * 요청에서 QUEUE-TOKEN 쿠키 값을 추출
+     */
+    private String extractQueueTokenFromCookie(HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (jakarta.servlet.http.Cookie cookie : cookies) {
+            if (QUEUE_TOKEN_COOKIE.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * QUEUE-TOKEN 쿠키 즉시 만료 (토큰 소진 후 재사용 방지)
+     */
+    private void expireQueueTokenCookie(HttpServletResponse response) {
+        ResponseCookie expireCookie = ResponseCookie.from(QUEUE_TOKEN_COOKIE, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .path("/")
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, expireCookie.toString());
+        log.info("✅ [TicketingController] QUEUE-TOKEN 쿠키 소진 완료");
+    }
+
     private Long getAuthenticatedUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -161,7 +218,7 @@ public class TicketingController implements TicketingControllerDocs {
 
         Object principalObj = authentication.getPrincipal();
         if (!(principalObj instanceof UserPrincipal userPrincipal)) {
-            throw new IllegalStateException("인증 정보(principal)가 올바르지 않습니다. 다시 로그인해주세요.");
+            throw new IllegalStateException("인증 정보(principal)이 올바르지 않습니다. 다시 로그인해주세요.");
         }
 
         String email = userPrincipal.getEmail();
