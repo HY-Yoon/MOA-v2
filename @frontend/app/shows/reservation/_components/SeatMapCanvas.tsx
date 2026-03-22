@@ -331,6 +331,25 @@ export default function SeatMapCanvas({
     context.fillText('STAGE', stageX + stageWidth / 2, stageY + stageHeight / 2);
 
     const radius = Math.max(4, seatMapData.canvas.seatRadius * scale);
+    const firstSeatByRow = new Map<string, ScheduleSeatMapSeat>();
+    seats.forEach((seat) => {
+      const key = `${seat.sectionId}::${seat.row}`;
+      const current = firstSeatByRow.get(key);
+      if (!current || seat.x < current.x) {
+        firstSeatByRow.set(key, seat);
+      }
+    });
+
+    context.fillStyle = '#64748b';
+    context.font = `${Math.max(10, 14 * scale)}px sans-serif`;
+    context.textAlign = 'right';
+    context.textBaseline = 'middle';
+    firstSeatByRow.forEach((seat) => {
+      const x = offsetX + seat.x * scale - radius * 1.8;
+      const y = offsetY + seat.y * scale;
+      context.fillText(seat.row, x, y);
+    });
+
     seats.forEach((seat) => {
       const section =
         sectionByAnyKey.get(normalizeSeatKey(seat.sectionId)) ?? sectionMap.get(seat.sectionId);
