@@ -1,6 +1,8 @@
 namespace Reservation {
   type ReservationStatus = import('@shared/enums').ReservationStatus;
   type PaymentStatus = import('@shared/enums').PaymentStatus;
+  type Genre = import('@shared/enums').Genre;
+  type Region = import('@shared/enums').Region;
 
   type DateType = 'RESERVATION' | 'SHOW';
   interface ListParams {
@@ -15,7 +17,7 @@ namespace Reservation {
     showId: number;
     title: string;
     posterUrl: string;
-    genre: string;
+    genre: Genre;
     runningTime: string;
     cast: string;
   }
@@ -25,7 +27,7 @@ namespace Reservation {
     showDate: string;
     showTime: string;
     location: {
-      region: string;
+      region: Region;
       venue: string;
       hallName: string;
       address: string;
@@ -44,5 +46,35 @@ namespace Reservation {
     totalAmount: number;
     canCancel: boolean;
     cancellationDeadline: string | null;
+  }
+
+  interface Seats {
+    sectionName: string;
+    row: string;
+    number: number;
+    price: number;
+  }
+
+  interface Booker {
+    name: string;
+    phone: string;
+    email: string;
+  }
+
+  interface Payment {
+    orderId: string;
+    paymentKey: string;
+    totalAmount: number;
+    paymentMethod: string;
+    paymentStatus: PaymentStatus;
+    paidAt: string;
+  }
+
+  interface Detail extends List {
+    seats: Seats[];
+    booker: Booker;
+    payment: Payment;
+    canCancel: boolean;
+    cancelledAt: string | null;
   }
 }
