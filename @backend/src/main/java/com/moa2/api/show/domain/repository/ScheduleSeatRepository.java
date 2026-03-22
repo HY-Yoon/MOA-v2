@@ -30,22 +30,7 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
                      "WHERE ss.schedule.id = :scheduleId")
        List<ScheduleSeat> findSeatMapByScheduleId(@Param("scheduleId") Long scheduleId);
 
-       /**
-        * 회차별 특정 좌석 조회 (비관적 락)
-        * 좌석 선점 시 동시성 제어용
-        */
-       @Lock(LockModeType.PESSIMISTIC_WRITE)
-       @QueryHints({
-                     // 👇 [핵심] "락을 얻으려고 3초(3000ms) 이상 기다리지 마라"
-                     @QueryHint(name = "javax.persistence.lock.timeout", value = "3000")
-       })
-       @Query("SELECT ss FROM ScheduleSeat ss " +
-                     "WHERE ss.schedule.id = :scheduleId " +
-                     "AND ss.id IN :seatIds " +
-                     "ORDER BY ss.id ASC")
-       List<ScheduleSeat> findByScheduleIdAndSeatIdInForUpdate(
-                     @Param("scheduleId") Long scheduleId,
-                     @Param("seatIds") List<Long> seatIds);
+
 
        /**
         * schedule_seat_id로 직접 조회 (비관적 락)

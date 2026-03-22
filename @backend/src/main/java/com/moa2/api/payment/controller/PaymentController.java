@@ -4,7 +4,10 @@ import com.moa2.api.payment.controller.docs.PaymentControllerDocs;
 import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
 import com.moa2.api.payment.facade.PaymentFacade;
+import com.moa2.api.payment.service.PaymentNotificationProducer;
 import com.moa2.api.payment.service.PaymentService;
+import com.moa2.api.reservation.dto.ReservationDtoV2;
+import com.moa2.api.reservation.service.v2.ReservationFacade;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
@@ -38,6 +41,8 @@ public class PaymentController implements PaymentControllerDocs {
         private final PaymentService paymentService;
         private final PaymentFacade paymentFacade;
         private final UserRepository userRepository;
+        private final org.springframework.beans.factory.ObjectProvider<ReservationFacade> reservationFacadeProvider;
+        private final PaymentNotificationProducer paymentNotificationProducer;
 
         @Value("${app.payment.frontend-complete-url:http://localhost:5173/payment/complete}")
         private String frontendCompleteUrl;
@@ -48,25 +53,6 @@ public class PaymentController implements PaymentControllerDocs {
         @Value("${app.payment.test-no-redirect:false}")
         private boolean testNoRedirect;
 
-        @Override
-        @GetMapping("/buyer-info")
-        public ResponseEntity<ApiResponse<PaymentDto.BuyerInfoResponse>> getBuyerInfo() {
-                try {
-                        Long userId = getAuthenticatedUserId();
-                        User user = userRepository.findById(userId)
-                                        .orElseThrow(() -> new PaymentException(
-                                                        HttpStatus.NOT_FOUND,
-                                                        "USER_NOT_FOUND",
-                                                        "사용자를 찾을 수 없습니다."));
-
-                        return ResponseEntity.ok(ApiResponse.success(PaymentDto.BuyerInfoResponse.from(user)));
-
-                } catch (PaymentException e) {
-                        log.warn("예매자 정보 조회 실패: code={}, message={}", e.getCode(), e.getMessage());
-                        return ResponseEntity.status(e.getStatus())
-                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
-                }
-        }
 
         @Override
         @PostMapping("/request")
@@ -74,13 +60,44 @@ public class PaymentController implements PaymentControllerDocs {
                         @Valid @RequestBody PaymentDto.Request request) {
                 try {
                         Long userId = getAuthenticatedUserId();
-                        PaymentDto.RequestResponse response = paymentService.requestPayment(request, userId);
+
+                        // v2 프로필에서는 티켓팅 주문 생성(ReservationFacade.createOrder) 경로와 동일하게 처리한다.
+                        ReservationFacade reservationFacade = reservationFacadeProvider.getIfAvailable();
+                        PaymentDto.RequestResponse response;
+                        if (reservationFacade != null) {
+                                ReservationDtoV2.CreateOrderResponse v2Response = reservationFacade.createOrder(
+                                                userId,
+                                                new ReservationDtoV2.CreateOrderRequest(
+                                                                request.scheduleId(),
+                                                                request.scheduleSeatIds(),
+                                                                request.bookerName(),
+                                                                request.bookerPhone(),
+                                                                request.bookerEmail()));
+
+                                response = new PaymentDto.RequestResponse(
+                                                v2Response.orderId(),
+                                                v2Response.totalAmount(),
+                                                v2Response.orderName(),
+                                                new PaymentDto.RequestResponse.BookerInfo(
+                                                                v2Response.booker().name(),
+                                                                v2Response.booker().email(),
+                                                                v2Response.booker().phone()),
+                                                v2Response.successUrl(),
+                                                v2Response.failUrl());
+                        } else {
+                                response = paymentService.requestPayment(request, userId);
+                        }
+
                         return ResponseEntity.ok(ApiResponse.success(response));
 
                 } catch (PaymentException e) {
                         log.warn("결제 요청 실패: code={}, message={}", e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
                                         .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
+                } catch (IllegalArgumentException | IllegalStateException e) {
+                        log.warn("결제 요청 실패(v2): message={}", e.getMessage());
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", null));
                 }
         }
 
@@ -91,6 +108,13 @@ public class PaymentController implements PaymentControllerDocs {
                 try {
                         Long userId = getAuthenticatedUserId();
                         PaymentDto.SuccessResponse response = paymentFacade.confirmPayment(request, userId);
+                        
+                        try {
+                                paymentNotificationProducer.sendPaymentNotification(response.orderId(), getAuthenticatedUserEmail());
+                        } catch (Exception e) {
+                                log.warn("결제 알림 Kafka 이벤트 발행 실패(POST confirm): {}", e.getMessage());
+                        }
+                        
                         return ResponseEntity.ok(ApiResponse.success(response));
 
                 } catch (PaymentException e) {
@@ -121,11 +145,34 @@ public class PaymentController implements PaymentControllerDocs {
                         @RequestParam(required = false) String paymentKey,
                         @RequestParam(required = false) Long amount,
                         @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                return handleSuccessRedirect(orderId, paymentKey, amount, noRedirect, "/success");
+        }
+
+        /**
+         * 토스 SDK 리다이렉트 호환용 엔드포인트
+         * - 과거 설정에서 successUrl을 /confirm 으로 둔 경우를 안전하게 수용한다.
+         * - SDK는 successUrl을 GET으로 호출하므로 POST /confirm 과는 별개로 처리한다.
+         */
+        @GetMapping("/confirm")
+        public ResponseEntity<?> confirmRedirectHandler(
+                        @RequestParam(required = false) String orderId,
+                        @RequestParam(required = false) String paymentKey,
+                        @RequestParam(required = false) Long amount,
+                        @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                return handleSuccessRedirect(orderId, paymentKey, amount, noRedirect, "/confirm");
+        }
+
+        private ResponseEntity<?> handleSuccessRedirect(
+                        String orderId,
+                        String paymentKey,
+                        Long amount,
+                        String noRedirect,
+                        String sourcePath) {
                 Long userId;
                 try {
                         userId = getAuthenticatedUserId();
                 } catch (PaymentException e) {
-                        log.warn("결제 성공 핸들러 인증 실패: {}", e.getMessage());
+                        log.warn("결제 성공 핸들러 인증 실패: sourcePath={}, message={}", sourcePath, e.getMessage());
                         if (testNoRedirect && "1".equals(noRedirect)) {
                                 return ResponseEntity.status(e.getStatus())
                                                 .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
@@ -139,8 +186,8 @@ public class PaymentController implements PaymentControllerDocs {
 
                 if (orderId == null || orderId.isBlank() || paymentKey == null || paymentKey.isBlank()
                                 || amount == null) {
-                        log.warn("결제 성공 핸들러 파라미터 누락: orderId={}, paymentKey={}, amount={}", orderId, paymentKey,
-                                        amount);
+                        log.warn("결제 성공 핸들러 파라미터 누락: sourcePath={}, orderId={}, paymentKey={}, amount={}",
+                                        sourcePath, orderId, paymentKey, amount);
                         if (testNoRedirect && "1".equals(noRedirect)) {
                                 return ResponseEntity.badRequest()
                                                 .body(ApiResponse.error("결제 정보가 올바르지 않습니다.", "INVALID_PARAMS", null));
@@ -159,6 +206,13 @@ public class PaymentController implements PaymentControllerDocs {
                                 paymentFacade.confirmPaymentMock(
                                                 paymentKey,
                                                 orderId, amount);
+                                
+                                try {
+                                        paymentNotificationProducer.sendPaymentNotification(orderId, getAuthenticatedUserEmail());
+                                } catch (Exception e) {
+                                        log.warn("결제 알림 Kafka 이벤트 발행 실패(mock): {}", e.getMessage());
+                                }
+                                
                                 String rn = paymentService.getReservationNumberByOrderId(orderId);
                                 PaymentDto.CompletionResponse completion = paymentService.getCompletionInfo(rn, userId);
                                 return ResponseEntity.ok(ApiResponse.success(completion));
@@ -172,13 +226,21 @@ public class PaymentController implements PaymentControllerDocs {
                 try {
                         PaymentDto.SuccessResponse resp = paymentFacade.confirmPayment(
                                         new PaymentDto.ConfirmRequest(paymentKey, orderId, amount), userId);
+                        
+                        try {
+                                paymentNotificationProducer.sendPaymentNotification(resp.orderId(), getAuthenticatedUserEmail());
+                        } catch (Exception e) {
+                                log.warn("결제 알림 Kafka 이벤트 발행 실패(redirect handler): {}", e.getMessage());
+                        }
+                        
                         String redirectUrl = UriComponentsBuilder.fromUriString(frontendCompleteUrl)
-                                        .queryParam("reservationNumber", resp.reservationNumber())
+                                        .queryParam("orderId", resp.orderId())
+                                        .queryParam("paymentKey", resp.paymentKey())
                                         .build().toUriString();
                         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
                 } catch (PaymentException e) {
-                        log.warn("결제 승인 실패(핸들러): orderId={}, code={}, message={}",
-                                        orderId, e.getCode(), e.getMessage());
+                        log.warn("결제 승인 실패(핸들러): sourcePath={}, orderId={}, code={}, message={}",
+                                        sourcePath, orderId, e.getCode(), e.getMessage());
                         String failUrl = UriComponentsBuilder.fromUriString(frontendFailUrl)
                                         .queryParam("code", e.getCode() != null ? e.getCode() : "CONFIRM_FAILED")
                                         .queryParam("message", e.getMessage())
@@ -226,24 +288,23 @@ public class PaymentController implements PaymentControllerDocs {
         @GetMapping("/complete")
         @Override
         public ResponseEntity<ApiResponse<PaymentDto.CompletionResponse>> getComplete(
-                @RequestParam(required = false) String reservationNumber,
-                @RequestParam(required = false) Long reservationId) {
+                @RequestParam(required = false) String orderId,
+                @RequestParam(required = false) String paymentKey) {
 
-                boolean hasNumber = reservationNumber != null && !reservationNumber.isBlank();
-                boolean hasId = reservationId != null;
-                if (hasNumber == hasId) {
+                boolean hasOrderId = orderId != null && !orderId.isBlank();
+                boolean hasPaymentKey = paymentKey != null && !paymentKey.isBlank();
+                if (!hasOrderId && !hasPaymentKey) {
                         return ResponseEntity.badRequest()
-                                        .body(ApiResponse.error("reservationNumber 또는 reservationId 중 하나만 필수입니다."));
+                                        .body(ApiResponse.error("orderId 또는 paymentKey 중 하나는 필수입니다."));
                 }
                 try {
                         Long userId = getAuthenticatedUserId();
-                        PaymentDto.CompletionResponse response = hasId
-                                        ? paymentService.getCompletionInfoByReservationId(reservationId, userId)
-                                        : paymentService.getCompletionInfo(reservationNumber, userId);
+                        PaymentDto.CompletionResponse response = paymentService.getCompletionInfoByPaymentIdentifiers(
+                                        orderId, paymentKey, userId);
                         return ResponseEntity.ok(ApiResponse.success(response));
                 } catch (PaymentException e) {
-                        log.warn("결제 완료 정보 조회 실패: reservationNumber={}, reservationId={}, code={}, message={}",
-                                        reservationNumber, reservationId, e.getCode(), e.getMessage());
+                        log.warn("결제 완료 정보 조회 실패: orderId={}, paymentKey={}, code={}, message={}",
+                                        orderId, paymentKey, e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
                                         .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
                 }
@@ -288,5 +349,13 @@ public class PaymentController implements PaymentControllerDocs {
                                                 "존재하지 않는 사용자입니다."));
 
                 return user.getId();
+        }
+
+        private String getAuthenticatedUserEmail() {
+                Object principalObj = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                if (principalObj instanceof UserPrincipal userPrincipal) {
+                        return userPrincipal.getEmail();
+                }
+                return "unknown@example.com";
         }
 }

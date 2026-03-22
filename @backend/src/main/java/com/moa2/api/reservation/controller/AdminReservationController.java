@@ -49,9 +49,9 @@ public class AdminReservationController implements AdminReservationControllerDoc
     }
 
     @Override
-    @GetMapping("/detail")
+    @GetMapping("/{reservationId}")
     public ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.DetailResponse>>> getReservationDetails(
-            @RequestParam Long reservationId) {
+            @PathVariable Long reservationId) {
         PageResponse<AdminReservationDto.DetailResponse> response =
                 adminReservationService.getReservationDetails(reservationId);
         return ResponseEntity.ok(ApiResponse.success(response));

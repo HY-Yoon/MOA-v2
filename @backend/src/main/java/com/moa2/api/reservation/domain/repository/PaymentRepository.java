@@ -48,4 +48,16 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
                      "JOIN FETCH sch.show s " +
                      "WHERE p.orderId = :orderId")
        Optional<Payment> findByOrderIdWithReservationReadOnly(@Param("orderId") String orderId);
+
+       /**
+        * paymentKey로 결제 정보 조회 (예약 정보 포함, 락 없음)
+        * 결제 완료 페이지 단순 조회 시 사용
+        */
+       @Query("SELECT p FROM Payment p " +
+                     "JOIN FETCH p.reservation r " +
+                     "JOIN FETCH r.user u " +
+                     "JOIN FETCH r.showSchedule sch " +
+                     "JOIN FETCH sch.show s " +
+                     "WHERE p.paymentKey = :paymentKey")
+       Optional<Payment> findByPaymentKeyWithReservationReadOnly(@Param("paymentKey") String paymentKey);
 }

@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Tag(name = "예매 관리 API", description = "관리자 예매 관리 API")
 public interface AdminReservationControllerDocs {
@@ -81,10 +81,10 @@ public interface AdminReservationControllerDocs {
                         - 결제 정보
                         """)
         @Parameters({
-                @Parameter(name = "reservationId", in = ParameterIn.QUERY, required = true,
+                @Parameter(name = "reservationId", in = ParameterIn.PATH, required = true,
                         description = "예매 ID (해당 예매 단건 상세 조회)", example = "1",
                         schema = @Schema(type = "integer", format = "int64"))
         })
         ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.DetailResponse>>> getReservationDetails(
-                        @RequestParam Long reservationId);
+                        @PathVariable Long reservationId);
 }
