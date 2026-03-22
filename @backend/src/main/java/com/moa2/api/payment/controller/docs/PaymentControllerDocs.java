@@ -13,28 +13,48 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Tag(name = "결제 API", description = "토스페이먼츠 결제 연동 API")
 public interface PaymentControllerDocs {
 
-  @Operation(summary = "예매자 확인 정보 조회", description = """
-      결제 과정 중 예매자 확인 단계에서 호출합니다.
-
-      **반환 정보:**
-      - 이름 (name): 로그인 정보에 등록된 이름
-      - 이메일 (email): 로그인 정보에 등록된 이메일
-      - 연락처 (phone): 로그인 정보에 등록된 연락처 (없을 수 있음)
-
-      **권한:** 인증된 사용자만 가능 (쿠키 기반 인증)
-      """)
-  ResponseEntity<ApiResponse<PaymentDto.BuyerInfoResponse>> getBuyerInfo();
-
   @Operation(summary = "결제 요청", description = """
-      프론트에서 토스 결제 위젯을 띄우기 전에 호출합니다.
+      결제하기 버튼 클릭 시 가장 먼저 호출하는 API입니다.
+      V2 기준 주문 생성의 기본 엔드포인트이며, 토스 위젯 초기화에 필요한 값을 반환합니다.
 
       **처리 내용:**
-      1. 좌석 선점 상태 검증 (LOCKED 상태, 본인 선점 여부)
+      1. (V2) Redis 선점 유효성 검증 (만료/충돌/권한 확인)
       2. Reservation, Payment 생성 (PENDING 상태)
-      3. 토스 위젯에 전달할 정보 반환
+      3. 토스 위젯에 전달할 orderId/successUrl/failUrl 반환
+
+      **요청 필드 핵심:**
+      - scheduleId: 공연 회차 ID
+      - scheduleSeatIds: 선택한 회차 좌석 ID 목록
+      - bookerName/bookerPhone/bookerEmail: 예매자 정보
+
+      **권장 호출 순서:**
+      1. `/api/v2/reservations/reserve`로 좌석 선점
+      2. `/api/v1/payment/request`로 orderId 발급
+      3. 프론트에서 토스 SDK 호출
 
       **권한:** 인증된 사용자만 가능
       """)
+  @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "주문 생성 성공", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json", examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = """
+          {
+            "success": true,
+            "data": {
+              "orderId": "MOA-abc123def456ghi789jk",
+              "amount": 136000,
+              "orderName": "뮤지컬 <ANNE> 10th Anniversary - 2좌석",
+              "booker": {
+                "name": "홍길동",
+                "email": "hong@example.com",
+                "phone": "010-1234-5678"
+              },
+              "successUrl": "https://api.example.com/api/v1/payment/success?orderId=MOA-abc123def456ghi789jk",
+              "failUrl": "https://api.example.com/api/v1/payment/fail?orderId=MOA-abc123def456ghi789jk"
+            }
+          }
+          """))),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 검증 실패(선점 만료/좌석 불일치 등)"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
+  })
   ResponseEntity<ApiResponse<PaymentDto.RequestResponse>> requestPayment(
       @RequestBody(description = "결제 요청 정보", required = true) PaymentDto.Request request);
 

@@ -27,7 +27,7 @@ import org.springframework.data.redis.core.RedisCallback;
  * 1. Redis 분산 락 획득 + 좌석 유효성 검증
  * 2. Redis에 좌석 선점 상태 저장 (SETNX + TTL)
  * 3. 즉시 200 OK 응답 (DB Write 없음!)
- * 4. /order API에서 예약자 정보와 함께 DB 저장
+ * 4. /api/v1/payment/request API에서 예약자 정보와 함께 DB 저장
  */
 @Slf4j
 @Profile("v2")

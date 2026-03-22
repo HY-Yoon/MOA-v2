@@ -1,6 +1,5 @@
 package com.moa2.api.reservation.controller;
 
-import com.moa2.api.reservation.controller.docs.TicketingControllerDocs;
 import com.moa2.api.reservation.dto.ReservationDtoV2;
 import com.moa2.api.reservation.exception.SeatConflictException;
 import com.moa2.api.reservation.service.v2.ReservationFacade;
@@ -12,14 +11,12 @@ import java.util.List;
 import com.moa2.global.model.SocialProvider;
 import com.moa2.global.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -30,14 +27,13 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 티켓팅 전용 컨트롤러 (V2)
  * - [1단계] 좌석 선점: POST /reserve → Redis 선점만 (DB 없음) → 200
- * - [2단계] 주문 생성: POST /order  → DB 저장 (Reservation + Payment) → 200
  * - [3단계] 결제 완료: PaymentController에서 처리 (기존 유지)
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/v2/reservations")
 @RequiredArgsConstructor
-public class TicketingController implements TicketingControllerDocs {
+public class TicketingController {
 
     private final ReservationFacade reservationFacade;
     private final UserRepository userRepository;
@@ -58,7 +54,6 @@ public class TicketingController implements TicketingControllerDocs {
      */
     @Operation(summary = "V2 좌석 선점", description = "Redis 기반 좌석 선점 API. DB Write 없이 즉시 200 응답합니다.")
     @PostMapping("/reserve")
-    @Override
     public ResponseEntity<?> reserve(
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse,
@@ -127,37 +122,6 @@ public class TicketingController implements TicketingControllerDocs {
                             ErrorResponse.of(ErrorCode.BAD_REQUEST)));
         } catch (IllegalArgumentException e) {
             log.warn("V2 주문 미리보기 실패: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
-                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
-        }
-    }
-
-    /**
-     * [2단계] 주문 생성
-     * - 예약자 정보를 받아 DB에 Reservation + Payment(PENDING) 생성
-     * - orderId를 반환하여 Toss 위젯 초기화
-     */
-    @Operation(summary = "V2 주문 생성", description = "예약자 정보를 입력받아 주문을 생성합니다. Toss 결제 위젯 초기화에 필요한 orderId를 반환합니다.")
-    @PostMapping("/order")
-    @Override
-    public ResponseEntity<?> createOrder(
-            @Valid @RequestBody ReservationDtoV2.CreateOrderRequest request) {
-
-        try {
-            Long userId = getAuthenticatedUserId();
-            ReservationDtoV2.CreateOrderResponse response = reservationFacade.createOrder(userId, request);
-            return ResponseEntity.ok(com.moa2.global.dto.ApiResponse.success(response));
-
-        } catch (IllegalStateException e) {
-            // 선점 만료 또는 인증 오류
-            log.warn("V2 주문 생성 실패 (상태 오류): {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
-                            ErrorResponse.of(ErrorCode.BAD_REQUEST)));
-
-        } catch (IllegalArgumentException e) {
-            log.warn("V2 주문 생성 실패: {}", e.getMessage());
             return ResponseEntity.badRequest()
                     .body(com.moa2.global.dto.ApiResponse.error(e.getMessage(),
                             ErrorResponse.of(ErrorCode.BAD_REQUEST)));

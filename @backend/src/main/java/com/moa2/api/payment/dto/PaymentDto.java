@@ -159,24 +159,6 @@ public class PaymentDto {
         }
 
         /**
-         * 예매자 확인 정보 응답 DTO
-         */
-        @Schema(description = "예매자 확인 정보")
-        public record BuyerInfoResponse(
-                        @Schema(description = "예매자 이름", example = "홍길동") String name,
-
-                        @Schema(description = "예매자 이메일", example = "test@example.com") String email,
-
-                        @Schema(description = "예매자 연락처", example = "010-1234-5678") String phone) {
-                public static BuyerInfoResponse from(User user) {
-                        return new BuyerInfoResponse(
-                                        user.getName(),
-                                        user.getEmail(),
-                                        user.getPhone());
-                }
-        }
-
-        /**
          * 결제 완료 페이지용 응답 DTO
          */
         @Schema(description = "결제 완료 페이지 응답 정보")

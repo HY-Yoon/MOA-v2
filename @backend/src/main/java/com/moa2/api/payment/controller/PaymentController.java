@@ -5,6 +5,8 @@ import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
 import com.moa2.api.payment.facade.PaymentFacade;
 import com.moa2.api.payment.service.PaymentService;
+import com.moa2.api.reservation.dto.ReservationDtoV2;
+import com.moa2.api.reservation.service.v2.ReservationFacade;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.ApiResponse;
@@ -38,6 +40,7 @@ public class PaymentController implements PaymentControllerDocs {
         private final PaymentService paymentService;
         private final PaymentFacade paymentFacade;
         private final UserRepository userRepository;
+        private final org.springframework.beans.factory.ObjectProvider<ReservationFacade> reservationFacadeProvider;
 
         @Value("${app.payment.frontend-complete-url:http://localhost:5173/payment/complete}")
         private String frontendCompleteUrl;
@@ -48,25 +51,6 @@ public class PaymentController implements PaymentControllerDocs {
         @Value("${app.payment.test-no-redirect:false}")
         private boolean testNoRedirect;
 
-        @Override
-        @GetMapping("/buyer-info")
-        public ResponseEntity<ApiResponse<PaymentDto.BuyerInfoResponse>> getBuyerInfo() {
-                try {
-                        Long userId = getAuthenticatedUserId();
-                        User user = userRepository.findById(userId)
-                                        .orElseThrow(() -> new PaymentException(
-                                                        HttpStatus.NOT_FOUND,
-                                                        "USER_NOT_FOUND",
-                                                        "사용자를 찾을 수 없습니다."));
-
-                        return ResponseEntity.ok(ApiResponse.success(PaymentDto.BuyerInfoResponse.from(user)));
-
-                } catch (PaymentException e) {
-                        log.warn("예매자 정보 조회 실패: code={}, message={}", e.getCode(), e.getMessage());
-                        return ResponseEntity.status(e.getStatus())
-                                        .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
-                }
-        }
 
         @Override
         @PostMapping("/request")
@@ -74,13 +58,44 @@ public class PaymentController implements PaymentControllerDocs {
                         @Valid @RequestBody PaymentDto.Request request) {
                 try {
                         Long userId = getAuthenticatedUserId();
-                        PaymentDto.RequestResponse response = paymentService.requestPayment(request, userId);
+
+                        // v2 프로필에서는 티켓팅 주문 생성(ReservationFacade.createOrder) 경로와 동일하게 처리한다.
+                        ReservationFacade reservationFacade = reservationFacadeProvider.getIfAvailable();
+                        PaymentDto.RequestResponse response;
+                        if (reservationFacade != null) {
+                                ReservationDtoV2.CreateOrderResponse v2Response = reservationFacade.createOrder(
+                                                userId,
+                                                new ReservationDtoV2.CreateOrderRequest(
+                                                                request.scheduleId(),
+                                                                request.scheduleSeatIds(),
+                                                                request.bookerName(),
+                                                                request.bookerPhone(),
+                                                                request.bookerEmail()));
+
+                                response = new PaymentDto.RequestResponse(
+                                                v2Response.orderId(),
+                                                v2Response.totalAmount(),
+                                                v2Response.orderName(),
+                                                new PaymentDto.RequestResponse.BookerInfo(
+                                                                v2Response.booker().name(),
+                                                                v2Response.booker().email(),
+                                                                v2Response.booker().phone()),
+                                                v2Response.successUrl(),
+                                                v2Response.failUrl());
+                        } else {
+                                response = paymentService.requestPayment(request, userId);
+                        }
+
                         return ResponseEntity.ok(ApiResponse.success(response));
 
                 } catch (PaymentException e) {
                         log.warn("결제 요청 실패: code={}, message={}", e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
                                         .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
+                } catch (IllegalArgumentException | IllegalStateException e) {
+                        log.warn("결제 요청 실패(v2): message={}", e.getMessage());
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST", null));
                 }
         }
 
