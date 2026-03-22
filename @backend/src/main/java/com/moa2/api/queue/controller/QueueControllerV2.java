@@ -117,7 +117,6 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
                 .maxAge(QUEUE_TOKEN_TTL_SECONDS)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-        log.info("✅ [QueueControllerV2] QUEUE-TOKEN 쿠키 발급 완료");
     }
 
     private Long getAuthenticatedUserId() {

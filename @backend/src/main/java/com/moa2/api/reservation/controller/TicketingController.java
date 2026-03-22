@@ -205,7 +205,6 @@ public class TicketingController implements TicketingControllerDocs {
                 .maxAge(0)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, expireCookie.toString());
-        log.info("✅ [TicketingController] QUEUE-TOKEN 쿠키 소진 완료");
     }
 
     private Long getAuthenticatedUserId() {

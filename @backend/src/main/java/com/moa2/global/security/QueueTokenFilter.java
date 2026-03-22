@@ -95,7 +95,6 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         }
 
         // 3. 토큰이 Redis에 존재 → 통과 (세부 검증은 ReservationFacade에서)
-        log.info("✅ [QueueTokenFilter] 대기열 토큰 정상 인증 - 쿠키 토큰이 통과되었습니다.");
         filterChain.doFilter(request, response);
     }
 
