@@ -13,10 +13,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PaymentNotificationConsumer {
 
-    private final JavaMailSender mailSender;    @KafkaListener(
-        topics = "payment-notification", 
-        groupId = "payment-notification-group-2",
-        properties = {"auto.offset.reset=latest"}
+    private final JavaMailSender mailSender;
+
+    @KafkaListener(
+        topics = "payment-notification",
+        groupId = "payment-notification-group-2"
     )
     public void consumePaymentNotification(PaymentEventDto event) {
         log.info("결제 알림 Kafka 이벤트 수신: orderId={}, email={}", event.getOrderId(), event.getEmail());

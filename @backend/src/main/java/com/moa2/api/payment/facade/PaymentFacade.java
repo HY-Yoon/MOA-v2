@@ -6,34 +6,17 @@ import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
 import com.moa2.api.payment.exception.TossPaymentException;
 import com.moa2.api.payment.service.PaymentService;
-import com.moa2.api.reservation.dto.ReservationRequestEvent;
-import com.moa2.api.reservation.service.v2.ReservationKafkaProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class PaymentFacade {
 
     private final PaymentService paymentService;
     private final TossPaymentClient tossPaymentClient;
-
-    // V2 프로필에서만 주입되는 빈 (Optional)
-    private ReservationKafkaProducer kafkaProducer;
-
-    public PaymentFacade(PaymentService paymentService, TossPaymentClient tossPaymentClient) {
-        this.paymentService = paymentService;
-        this.tossPaymentClient = tossPaymentClient;
-    }
-
-    @Autowired(required = false)
-    public void setKafkaProducer(ReservationKafkaProducer kafkaProducer) {
-        this.kafkaProducer = kafkaProducer;
-    }
 
     /**
      * Facade 패턴: 결제 승인
@@ -62,9 +45,6 @@ public class PaymentFacade {
         try {
             PaymentDto.SuccessResponse response = paymentService.completePayment(
                     request.orderId(), request.paymentKey(), tossResponse);
-
-            // Step 4. Kafka 결제 완료 알림 발행 (실패해도 결제 결과에 영향 없음)
-            sendPaymentNotification(userId, response.orderId());
 
             return response;
         } catch (Exception e) {
@@ -103,9 +83,6 @@ public class PaymentFacade {
         try {
             PaymentDto.PaymentSuccessResponse response = paymentService.completePaymentMock(paymentKey, orderId, amount);
 
-            // Step 4. Kafka 결제 완료 알림 발행
-            sendPaymentNotification(null, orderId);
-
             return response;
         } catch (Exception e) {
             log.error("Mock 결제 완료 처리 중 오류 발생: {}", e.getMessage());
@@ -114,26 +91,4 @@ public class PaymentFacade {
         }
     }
 
-    /**
-     * 결제 완료 후 Kafka 알림 이벤트 발행
-     * - V2 프로필에서만 동작 (kafkaProducer가 null이면 스킵)
-     * - 이메일/SMS 알림 전용 (실패해도 결제 결과에 영향 없음)
-     */
-    private void sendPaymentNotification(Long userId, String orderId) {
-        if (kafkaProducer == null) {
-            log.debug("Kafka Producer 미설정 (V1 모드) - 알림 이벤트 발행 스킵");
-            return;
-        }
-
-        try {
-            ReservationRequestEvent event = ReservationRequestEvent.builder()
-                    .eventId(UUID.randomUUID().toString())
-                    .userId(userId != null ? userId : 0L)
-                    .build();
-            kafkaProducer.send(event);
-            log.info("결제 완료 알림 이벤트 발행 성공 - orderId: {}", orderId);
-        } catch (Exception e) {
-            log.warn("결제 완료 알림 이벤트 발행 실패 (무시): {}", e.getMessage());
-        }
-    }
 }
