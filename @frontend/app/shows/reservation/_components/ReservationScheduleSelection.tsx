@@ -77,7 +77,7 @@ export default function ReservationScheduleSelection({
   const [retryAfterSeconds, setRetryAfterSeconds] = useState<number>(1);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<number[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeatInfo[]>([]);
   const [sectionPriceMap, setSectionPriceMap] = useState<Record<string, number>>({});
   const [isSubmittingSeatConfirm, setIsSubmittingSeatConfirm] = useState(false);
@@ -411,9 +411,7 @@ export default function ReservationScheduleSelection({
               }}
               onConfirmSeatSelection={() => {
                 if (!selectedScheduleKeyId) return;
-                const scheduleSeatIds = selectedSeats
-                  .map((seat) => seat.scheduleSeatId)
-                  .filter((id): id is number => typeof id === 'number');
+                const scheduleSeatIds = selectedSeats.map((seat) => seat.scheduleSeatId);
                 const showTitle = data?.title ?? '공연 정보';
 
                 if (scheduleSeatIds.length === 0) {
@@ -433,14 +431,9 @@ export default function ReservationScheduleSelection({
                       const data = result.data as { code?: string; conflictSeatIds?: string[] };
                       if (data?.code === 'SEAT_CONFLICT') {
                         const conflictIds = new Set((data.conflictSeatIds ?? []).map((id) => String(id)));
-                        const conflictSeatIds = selectedSeats
-                          .filter((seat) => conflictIds.has(String(seat.scheduleSeatId)))
-                          .map((seat) => seat.seatId);
-                        if (conflictSeatIds.length > 0) {
-                          setSelectedSeatIds((prev) =>
-                            prev.filter((seatId) => !conflictSeatIds.includes(seatId)),
-                          );
-                        }
+                        setSelectedSeatIds((prev) =>
+                          prev.filter((scheduleSeatId) => !conflictIds.has(String(scheduleSeatId))),
+                        );
                         setSelectedSeats((prev) =>
                           prev.filter((seat) => !conflictIds.has(String(seat.scheduleSeatId))),
                         );
@@ -493,9 +486,9 @@ export default function ReservationScheduleSelection({
               onCloseSchedulePanel={() => {
                 setSidePanelMode('seat');
               }}
-              onRemoveSeat={(seatId) => {
-                setSelectedSeatIds((prev) => prev.filter((id) => id !== seatId));
-                setSelectedSeats((prev) => prev.filter((seat) => seat.seatId !== seatId));
+              onRemoveSeat={(scheduleSeatId) => {
+                setSelectedSeatIds((prev) => prev.filter((id) => id !== scheduleSeatId));
+                setSelectedSeats((prev) => prev.filter((seat) => seat.scheduleSeatId !== scheduleSeatId));
               }}
               onClearSeats={() => {
                 setSelectedSeatIds([]);
