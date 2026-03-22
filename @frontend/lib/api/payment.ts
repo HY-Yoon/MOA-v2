@@ -47,6 +47,56 @@ export interface PaymentApiResponse {
   code?: string | null;
 }
 
+export interface PaymentConfirmSuccessData {
+  reservationId: number;
+  reservationNumber: string;
+  orderId: string;
+  paymentKey: string;
+  amount: number;
+  method: string;
+  orderName: string;
+  approvedAt: string;
+}
+
+export interface PaymentCompleteData {
+  reservationNumber: string;
+  orderId: string;
+  performance: {
+    title: string;
+    date: string;
+    showTime: string;
+    session: number;
+  };
+  seats: Array<{
+    section: string;
+    seatNumber: string;
+  }>;
+  booker: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  payment: {
+    method: string;
+    amount: number;
+    paidAt: string;
+  };
+}
+
+export interface PaymentConfirmResponse {
+  success: boolean;
+  data?: PaymentConfirmSuccessData;
+  message: string | null;
+  code?: string | null;
+}
+
+export interface PaymentCompleteResponse {
+  success: boolean;
+  data?: PaymentCompleteData;
+  message: string | null;
+  code?: string | null;
+}
+
 export const requestPayment = async (
   payload: PaymentRequestPayload,
 ): Promise<PaymentRequestResponse> => {
@@ -67,8 +117,8 @@ export const requestPayment = async (
 
 export const confirmPayment = async (
   payload: PaymentConfirmPayload,
-): Promise<PaymentApiResponse> => {
-  const response = await axiosInstance.post<PaymentApiResponse>(
+): Promise<PaymentConfirmResponse> => {
+  const response = await axiosInstance.post<PaymentConfirmResponse>(
     '/api/v1/payment/confirm',
     payload,
     {
@@ -78,6 +128,25 @@ export const confirmPayment = async (
 
   if (!response?.data) {
     throw new Error('결제 승인 응답 데이터가 없습니다.');
+  }
+
+  return response.data;
+};
+
+export const completePayment = async (
+  orderId: string,
+  paymentKey: string,
+): Promise<PaymentCompleteResponse> => {
+  const response = await axiosInstance.get<PaymentCompleteResponse>('/api/v1/payment/complete', {
+    params: {
+      orderId,
+      paymentKey,
+    },
+    withCredentials: true,
+  });
+
+  if (!response?.data) {
+    throw new Error('결제 완료 상세 응답 데이터가 없습니다.');
   }
 
   return response.data;
