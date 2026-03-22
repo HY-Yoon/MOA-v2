@@ -2,9 +2,9 @@
 
 import { confirmPayment } from '@/lib/api/payment';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const confirmRequestedRef = useRef(false);
@@ -60,5 +60,13 @@ export default function PaymentSuccessPage() {
         <p className="mt-1 text-sm text-slate-700">paymentKey: {paymentKey}</p>
       </div>
     </section>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<section className="min-h-screen bg-slate-50 px-5 py-8" />}>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
