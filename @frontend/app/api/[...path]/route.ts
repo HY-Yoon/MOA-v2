@@ -44,12 +44,19 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
     const backendUrl = `${BE_URL}/api/${pathString}${url.search}`;
     const response = await fetch(backendUrl, fetchOptions);
     const data = await response.text();
+    const responseHeaders = new Headers();
+    const responseContentType = response.headers.get('Content-Type');
+    if (responseContentType) {
+      responseHeaders.set('Content-Type', responseContentType);
+    }
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      responseHeaders.set('set-cookie', setCookie);
+    }
 
     return new NextResponse(data, {
       status: response.status,
-      headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'application/json',
-      },
+      headers: responseHeaders,
     });
   } catch (error) {
     console.error('Proxy Error:', error);
