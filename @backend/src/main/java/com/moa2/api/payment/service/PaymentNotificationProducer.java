@@ -9,9 +9,7 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PaymentNotificationProducer {
-
-    private static final String TOPIC = "payment-notification";
+public class PaymentNotificationProducer {    private static final String TOPIC = "payment-notification";
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void sendPaymentNotification(String orderId, String email) {
