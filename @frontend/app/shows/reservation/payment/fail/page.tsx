@@ -2,9 +2,9 @@
 
 import { reportPaymentFail } from '@/lib/api/payment';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 
-export default function PaymentFailPage() {
+function PaymentFailContent() {
   const searchParams = useSearchParams();
   const failReportedRef = useRef(false);
   const orderId = searchParams.get('orderId');
@@ -33,5 +33,13 @@ export default function PaymentFailPage() {
         <p className="mt-1 text-sm text-slate-700">실패 사유: {message}</p>
       </div>
     </section>
+  );
+}
+
+export default function PaymentFailPage() {
+  return (
+    <Suspense fallback={<section className="min-h-screen bg-slate-50 px-5 py-8" />}>
+      <PaymentFailContent />
+    </Suspense>
   );
 }
