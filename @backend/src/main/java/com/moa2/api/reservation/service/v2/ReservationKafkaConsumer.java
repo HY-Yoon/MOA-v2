@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReservationKafkaConsumer {
 
-    @KafkaListener(topics = "payment-notification", groupId = "notification-group")
+    @KafkaListener(topics = "reservation-notification", groupId = "reservation-notification-group")
     public void consume(ReservationRequestEvent event, Acknowledgment ack) {
         String eventId = event.getEventId();
         log.info("결제 완료 알림 이벤트 수신 - eventId: {}, userId: {}", eventId, event.getUserId());

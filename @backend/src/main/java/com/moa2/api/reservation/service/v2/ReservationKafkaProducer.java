@@ -16,8 +16,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ReservationKafkaProducer {
-
-    private static final String TOPIC = "payment-notification";
+    private static final String TOPIC = "reservation-notification";
 
     private final KafkaTemplate<String, ReservationRequestEvent> kafkaTemplate;
 
