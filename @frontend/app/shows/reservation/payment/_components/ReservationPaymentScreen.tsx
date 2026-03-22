@@ -9,7 +9,6 @@ import { useEffect, useMemo, useState } from 'react';
 import PaymentCountdown from './PaymentCountdown';
 import { usePaymentRequest } from '../_hooks/usePaymentRequest';
 import { useTossPaymentFlow } from '../_hooks/useTossPaymentFlow';
-import type { PaymentRequestSuccessData } from '@/lib/api/payment';
 
 interface ReservationPaymentScreenProps {
   scheduleId: number;
@@ -111,25 +110,6 @@ export default function ReservationPaymentScreen({
       agreedRefundPolicy,
     });
   const { launch, isLaunching } = useTossPaymentFlow();
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const fallbackPaymentData = useMemo<PaymentRequestSuccessData>(
-    () => ({
-      orderId:
-        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : 'TEMP-ORDER-ID',
-      amount: finalAmount,
-      orderName: `${showTitle} - ${parsedSeatCount}좌석`,
-      booker: {
-        name: bookerName.trim(),
-        email: bookerEmail.trim(),
-        phone: bookerPhone.trim(),
-      },
-      successUrl: `${origin}/shows/reservation/payment/success`,
-      failUrl: `${origin}/shows/reservation/payment/fail`,
-    }),
-    [bookerEmail, bookerName, bookerPhone, finalAmount, origin, parsedSeatCount, showTitle],
-  );
 
   useEffect(() => {
     if (!user) return;
@@ -290,12 +270,13 @@ export default function ReservationPaymentScreen({
                 try {
                   const result = await submitPayment();
                   if (!result) return;
-                  // 임시 우회: API 실패/비정상 응답이어도 성공으로 간주해 다음 단계 진행
-                  const paymentData = result.success && result.data ? result.data : fallbackPaymentData;
-                  await launch(paymentData);
+                  if (!result.success || !result.data) {
+                    window.alert(result.message ?? '결제 요청 처리 중 문제가 발생했습니다.');
+                    return;
+                  }
+                  await launch(result.data);
                 } catch {
-                  // 임시 우회: 요청 에러 발생 시에도 성공 처리로 다음 단계 진행
-                  await launch(fallbackPaymentData);
+                  window.alert('결제 요청 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
                 }
               })();
             }}
