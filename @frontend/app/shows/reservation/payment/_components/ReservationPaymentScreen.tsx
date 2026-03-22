@@ -5,12 +5,14 @@ import { HEADER_ROUTES, MY_PAGE_ROUTES, USER_ROUTES } from '@/constants/route/us
 import { useAuth } from '@/lib/auth/AuthContext';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import PaymentCountdown from './PaymentCountdown';
 import { usePaymentRequest } from '../_hooks/usePaymentRequest';
 import { useTossPaymentFlow } from '../_hooks/useTossPaymentFlow';
 
 interface ReservationPaymentScreenProps {
+  showId: number;
   scheduleId: number;
   showTitle: string;
   scheduleText: string;
@@ -64,6 +66,7 @@ function AccordionSection({
 }
 
 export default function ReservationPaymentScreen({
+  showId,
   scheduleId,
   showTitle,
   scheduleText,
@@ -74,6 +77,7 @@ export default function ReservationPaymentScreen({
   remainingSeconds,
   expiresAt,
 }: ReservationPaymentScreenProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const [bookerName, setBookerName] = useState('');
   const [bookerEmail, setBookerEmail] = useState('');
@@ -139,9 +143,25 @@ export default function ReservationPaymentScreen({
 
       <div className="border-b border-slate-200 px-5 py-3">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4">
-          <p className="truncate text-sm font-semibold text-slate-800">
-            {showTitle} · {scheduleText}
-          </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const params = new URLSearchParams({
+                  showId: String(showId),
+                  scheduleId: String(scheduleId),
+                });
+                router.push(`/shows/reservation?${params.toString()}`);
+              }}
+            >
+              뒤로가기
+            </Button>
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {showTitle} · {scheduleText}
+            </p>
+          </div>
           <PaymentCountdown expiresAt={expiresAt} fallbackRemainingSeconds={remainingSeconds} />
         </div>
       </div>
