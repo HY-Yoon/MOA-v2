@@ -211,7 +211,8 @@ public class PaymentController implements PaymentControllerDocs {
                         PaymentDto.SuccessResponse resp = paymentFacade.confirmPayment(
                                         new PaymentDto.ConfirmRequest(paymentKey, orderId, amount), userId);
                         String redirectUrl = UriComponentsBuilder.fromUriString(frontendCompleteUrl)
-                                        .queryParam("reservationNumber", resp.reservationNumber())
+                                        .queryParam("orderId", resp.orderId())
+                                        .queryParam("paymentKey", resp.paymentKey())
                                         .build().toUriString();
                         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
                 } catch (PaymentException e) {
@@ -264,24 +265,23 @@ public class PaymentController implements PaymentControllerDocs {
         @GetMapping("/complete")
         @Override
         public ResponseEntity<ApiResponse<PaymentDto.CompletionResponse>> getComplete(
-                @RequestParam(required = false) String reservationNumber,
-                @RequestParam(required = false) Long reservationId) {
+                @RequestParam(required = false) String orderId,
+                @RequestParam(required = false) String paymentKey) {
 
-                boolean hasNumber = reservationNumber != null && !reservationNumber.isBlank();
-                boolean hasId = reservationId != null;
-                if (hasNumber == hasId) {
+                boolean hasOrderId = orderId != null && !orderId.isBlank();
+                boolean hasPaymentKey = paymentKey != null && !paymentKey.isBlank();
+                if (!hasOrderId && !hasPaymentKey) {
                         return ResponseEntity.badRequest()
-                                        .body(ApiResponse.error("reservationNumber 또는 reservationId 중 하나만 필수입니다."));
+                                        .body(ApiResponse.error("orderId 또는 paymentKey 중 하나는 필수입니다."));
                 }
                 try {
                         Long userId = getAuthenticatedUserId();
-                        PaymentDto.CompletionResponse response = hasId
-                                        ? paymentService.getCompletionInfoByReservationId(reservationId, userId)
-                                        : paymentService.getCompletionInfo(reservationNumber, userId);
+                        PaymentDto.CompletionResponse response = paymentService.getCompletionInfoByPaymentIdentifiers(
+                                        orderId, paymentKey, userId);
                         return ResponseEntity.ok(ApiResponse.success(response));
                 } catch (PaymentException e) {
-                        log.warn("결제 완료 정보 조회 실패: reservationNumber={}, reservationId={}, code={}, message={}",
-                                        reservationNumber, reservationId, e.getCode(), e.getMessage());
+                        log.warn("결제 완료 정보 조회 실패: orderId={}, paymentKey={}, code={}, message={}",
+                                        orderId, paymentKey, e.getCode(), e.getMessage());
                         return ResponseEntity.status(e.getStatus())
                                         .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
                 }

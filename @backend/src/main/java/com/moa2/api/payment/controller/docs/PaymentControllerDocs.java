@@ -119,14 +119,12 @@ public interface PaymentControllerDocs {
   @Operation(summary = "결제 완료 정보 조회", description = """
       예매 완료 페이지에서 공연/좌석/예매자/결제 정보를 조회합니다.
 
-      `reservationNumber` 또는 `reservationId` 중 **하나만** 입력하세요.
+      `orderId` 또는 `paymentKey` 중 **하나 이상** 입력하세요.
+      둘 다 입력하면 동일 결제 건인지 검증합니다.
 
       **실제 토스 결제 흐름:**
-      `/payment/success` 핸들러 → 프론트 `/payment/complete?reservationNumber=RES-xxx` 리다이렉트
+      `/payment/success` 핸들러 → 프론트 `/payment/complete?orderId=MOA-xxx` 리다이렉트
       → 프론트가 이 API 호출
-
-      **Mock 결제 흐름:**
-      `/payment/mock` 응답의 `reservationId`로 직접 호출
 
       **권한:** 인증된 사용자 (본인 예매만)
       """, responses = {
@@ -156,17 +154,17 @@ public interface PaymentControllerDocs {
             }
           }
           """))),
-      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "파라미터 오류 (reservationNumber, reservationId 둘 다 입력하거나 둘 다 미입력)", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json", examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = """
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "파라미터 오류 (orderId/paymentKey 모두 미입력 또는 불일치)", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json", examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = """
           {
             "success": false,
             "data": null,
-            "message": "reservationNumber 또는 reservationId 중 하나만 필수입니다."
+            "message": "orderId 또는 paymentKey 중 하나는 필수입니다."
           }
           """))),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "예매 정보 없음 또는 본인 예매 아님")
   })
   @GetMapping("/complete")
   ResponseEntity<ApiResponse<PaymentDto.CompletionResponse>> getComplete(
-      @Parameter(description = "예매 번호 (reservationNumber). reservationId와 둘 중 하나만 입력", example = "RES-20260225-9827CD") @RequestParam(required = false) String reservationNumber,
-      @Parameter(description = "예약 ID. reservationNumber와 둘 중 하나만 입력", example = "8") @RequestParam(required = false) Long reservationId);
+      @Parameter(description = "주문번호 (orderId). paymentKey와 둘 중 하나 이상 입력", example = "MOA-abc123def456ghi789jk") @RequestParam(required = false) String orderId,
+      @Parameter(description = "결제키 (paymentKey). orderId와 둘 중 하나 이상 입력", example = "tgen_20260322164218kXh22") @RequestParam(required = false) String paymentKey);
 }

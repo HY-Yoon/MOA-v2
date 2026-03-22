@@ -215,6 +215,58 @@ public class PaymentService {
                 return buildCompletionResponse(reservation, payment);
         }
 
+        /**
+         * orderId/paymentKey 기반 결제 완료 정보 조회
+         * - 둘 중 하나는 필수
+         * - 둘 다 전달된 경우 같은 결제 건인지 일치 검증
+         */
+        @Transactional(readOnly = true)
+        public PaymentDto.CompletionResponse getCompletionInfoByPaymentIdentifiers(
+                        String orderId,
+                        String paymentKey,
+                        Long userId) {
+                boolean hasOrderId = orderId != null && !orderId.isBlank();
+                boolean hasPaymentKey = paymentKey != null && !paymentKey.isBlank();
+
+                if (!hasOrderId && !hasPaymentKey) {
+                        throw new PaymentException("INVALID_PARAMS", "orderId 또는 paymentKey 중 하나는 필수입니다.");
+                }
+
+                Payment paymentByOrderId = null;
+                if (hasOrderId) {
+                        paymentByOrderId = paymentRepository.findByOrderIdWithReservationReadOnly(orderId)
+                                        .orElseThrow(() -> PaymentException.notFound("결제 정보를 찾을 수 없습니다."));
+                }
+
+                Payment paymentByKey = null;
+                if (hasPaymentKey) {
+                        paymentByKey = paymentRepository.findByPaymentKeyWithReservationReadOnly(paymentKey)
+                                        .orElseThrow(() -> PaymentException.notFound("결제 정보를 찾을 수 없습니다."));
+                }
+
+                Payment payment;
+                if (paymentByOrderId != null && paymentByKey != null) {
+                        if (!paymentByOrderId.getId().equals(paymentByKey.getId())) {
+                                throw new PaymentException("INVALID_PARAMS", "orderId와 paymentKey가 같은 결제 건이 아닙니다.");
+                        }
+                        payment = paymentByOrderId;
+                } else {
+                        payment = paymentByOrderId != null ? paymentByOrderId : paymentByKey;
+                }
+
+                Reservation reservation = payment.getReservation();
+
+                if (!reservation.getUser().getId().equals(userId)) {
+                        throw PaymentException.unauthorized("본인의 예매만 조회할 수 있습니다.");
+                }
+
+                if (payment.getStatus() != com.moa2.global.model.PaymentStatus.COMPLETED) {
+                        throw PaymentException.invalidState("결제가 완료된 예매만 조회할 수 있습니다. 상태: " + payment.getStatus());
+                }
+
+                return buildCompletionResponse(reservation, payment);
+        }
+
         private PaymentDto.CompletionResponse buildCompletionResponse(Reservation reservation,
                         com.moa2.api.reservation.domain.entity.Payment payment) {
                 var sch = reservation.getShowSchedule();
