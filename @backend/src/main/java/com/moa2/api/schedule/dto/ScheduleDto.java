@@ -19,7 +19,7 @@ public class ScheduleDto {
          */
         @Schema(description = "좌석 선점 요청")
         public record SeatLockRequest(
-                        @NotEmpty(message = "seatIds는 최소 1개 이상 필요합니다") @Schema(description = "선점할 좌석 ID 목록", example = "[10, 11]") List<Long> seatIds) {
+                        @NotEmpty(message = "scheduleSeatIds는 최소 1개 이상 필요합니다") @Schema(description = "선점할 좌석 ID 목록", example = "[4901, 4902]") List<Long> scheduleSeatIds) {
         }
 
         /**
@@ -38,7 +38,7 @@ public class ScheduleDto {
          */
         @Schema(description = "좌석 선점 해제 요청")
         public record SeatUnlockRequest(
-                        @NotEmpty(message = "seatIds는 최소 1개 이상 필요합니다") @Schema(description = "선점 해제할 좌석 ID 목록", example = "[10, 11]") List<Long> seatIds) {
+                        @NotEmpty(message = "scheduleSeatIds는 최소 1개 이상 필요합니다") @Schema(description = "선점 해제할 좌석 ID 목록", example = "[4901, 4902]") List<Long> scheduleSeatIds) {
         }
 
         /**

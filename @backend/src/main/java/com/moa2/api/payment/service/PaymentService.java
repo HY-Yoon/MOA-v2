@@ -64,8 +64,8 @@ public class PaymentService {
          */
         @Transactional
         public PaymentDto.RequestResponse requestPayment(PaymentDto.Request request, Long userId) {
-                log.info("결제 요청 시작: userId={}, scheduleId={}, seatIds={}",
-                                userId, request.scheduleId(), request.seatIds());
+                log.info("결제 요청 시작: userId={}, scheduleId={}, scheduleSeatIds={}",
+                                userId, request.scheduleId(), request.scheduleSeatIds());
 
                 // 1. 사용자 조회
                 User user = userRepository.findById(userId)
@@ -77,9 +77,9 @@ public class PaymentService {
 
                 // 3. 좌석 조회 및 선점 상태 검증 (비관적 락)
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
-                                .findByScheduleIdAndSeatIdInForUpdate(request.scheduleId(), request.seatIds());
+                                .findByScheduleIdAndScheduleSeatIdsForUpdate(request.scheduleId(), request.scheduleSeatIds());
 
-                if (scheduleSeats.size() != request.seatIds().size()) {
+                if (scheduleSeats.size() != request.scheduleSeatIds().size()) {
                         throw PaymentException.notFound("일부 좌석을 찾을 수 없습니다.");
                 }
 
@@ -87,11 +87,11 @@ public class PaymentService {
                 for (ScheduleSeat seat : scheduleSeats) {
                         if (!seat.isLockedBy(userId)) {
                                 throw PaymentException.seatNotLocked(
-                                                "좌석이 선점되지 않았거나 다른 사용자가 선점했습니다. 좌석: " + seat.getSeat().getSeatNumber());
+                                                "좌석이 선점되지 않았거나 다른 사용자가 선점했습니다. 좌석(scheduleSeatId): " + seat.getId());
                         }
                         if (seat.isLockExpired()) {
                                 throw PaymentException.lockExpired(
-                                                "좌석 선점 시간이 만료되었습니다. 좌석: " + seat.getSeat().getSeatNumber());
+                                                "좌석 선점 시간이 만료되었습니다. 좌석(scheduleSeatId): " + seat.getId());
                         }
                 }
 
@@ -309,24 +309,24 @@ public class PaymentService {
                 List<ReservationSeat> reservationSeats = reservationSeatRepository
                                 .findByReservationWithSeat(reservation);
 
-                List<Long> seatIds = reservationSeats.stream()
-                                .map(rs -> rs.getSeat().getId())
+                List<Long> scheduleSeatIds = reservationSeats.stream()
+                                .map(ReservationSeat::getScheduleSeatId)
                                 .toList();
 
                 // 실제 좌석만 Lock
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
-                                .findByScheduleIdAndSeatIdInForUpdate(
-                                                reservation.getShowSchedule().getId(), seatIds);
+                                .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                reservation.getShowSchedule().getId(), scheduleSeatIds);
 
                 // 5. 3단 검증
                 for (ScheduleSeat seat : scheduleSeats) {
                         if (!seat.isLockedBy(userId)) {
                                 throw PaymentException.seatNotLocked(
-                                                "좌석 선점 권한이 없습니다. 좌석: " + seat.getSeat().getSeatNumber());
+                                                "좌석 선점 권한이 없습니다. 좌석(scheduleSeatId): " + seat.getId());
                         }
                         if (seat.isLockExpired()) {
                                 throw PaymentException.lockExpired(
-                                                "좌석 선점 시간이 만료되었습니다. 좌석: " + seat.getSeat().getSeatNumber());
+                                                "좌석 선점 시간이 만료되었습니다. 좌석(scheduleSeatId): " + seat.getId());
                         }
                 }
                 if (!payment.getAmount().equals(amount.intValue())) { // Assuming Payment.amount is Integer
@@ -382,11 +382,11 @@ public class PaymentService {
 
                 List<ReservationSeat> reservationSeats = reservationSeatRepository
                                 .findByReservationWithSeat(reservation);
-                List<Long> seatIds = reservationSeats.stream().map(rs -> rs.getSeat().getId()).toList();
+                List<Long> scheduleSeatIds = reservationSeats.stream().map(ReservationSeat::getScheduleSeatId).toList();
 
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
-                                .findByScheduleIdAndSeatIdInForUpdate(
-                                                reservation.getShowSchedule().getId(), seatIds);
+                                .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                reservation.getShowSchedule().getId(), scheduleSeatIds);
                 scheduleSeats.forEach(ScheduleSeat::markAsSold);
 
                 log.info("결제 승인 완료: orderId={}", orderId);
@@ -412,13 +412,13 @@ public class PaymentService {
                         List<ReservationSeat> reservationSeats = reservationSeatRepository
                                         .findByReservationWithSeat(payment.getReservation());
 
-                        List<Long> seatIds = reservationSeats.stream()
-                                        .map(rs -> rs.getSeat().getId())
+                        List<Long> scheduleSeatIds = reservationSeats.stream()
+                                        .map(ReservationSeat::getScheduleSeatId)
                                         .toList();
 
                         List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
-                                        .findByScheduleIdAndSeatIdInForUpdate(
-                                                        payment.getReservation().getShowSchedule().getId(), seatIds);
+                                        .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                        payment.getReservation().getShowSchedule().getId(), scheduleSeatIds);
 
                         scheduleSeats.forEach(ScheduleSeat::releaseLock);
                 }
@@ -484,28 +484,23 @@ public class PaymentService {
                 Long bookerId = reservation.getUser().getId();
 
                 for (ScheduleSeat seat : scheduleSeats) {
-                        log.debug("Mock 결제 준비: 좌석 검증 중. scheduleSeatId={}, seatId={}, seatNumber={}, status={}, lockedByUserId={}, bookerId={}",
-                                        seat.getId(), seat.getSeat().getId(), seat.getSeat().getSeatNumber(),
-                                        seat.getStatus(), seat.getLockedByUserId(), bookerId);
+                        log.debug("Mock 결제 준비: 좌석 검증 중. scheduleSeatId={}, status={}, lockedByUserId={}, bookerId={}",
+                                        seat.getId(), seat.getStatus(), seat.getLockedByUserId(), bookerId);
 
                         // Mock 테스트라도 LOCKED 상태여야 정상적인 흐름
                         if (!seat.isLockedBy(bookerId)) {
-                                log.error("Mock 결제 준비 실패: 좌석 선점 권한 없음. scheduleSeatId={}, seatNumber={}, status={}, lockedByUserId={}, bookerId={}",
-                                                seat.getId(), seat.getSeat().getSeatNumber(), seat.getStatus(),
-                                                seat.getLockedByUserId(), bookerId);
+                                log.error("Mock 결제 준비 실패: 좌석 선점 권한 없음. scheduleSeatId={}, status={}, lockedByUserId={}, bookerId={}",
+                                                seat.getId(), seat.getStatus(), seat.getLockedByUserId(), bookerId);
                                 throw PaymentException.seatNotLocked(
-                                                String.format("좌석 선점 권한이 없거나 선점이 해제되었습니다. 좌석: %s (scheduleSeatId: %d, status: %s, lockedByUserId: %s)",
-                                                                seat.getSeat().getSeatNumber(), seat.getId(),
-                                                                seat.getStatus(),
-                                                                seat.getLockedByUserId()));
+                                                String.format("좌석 선점 권한이 없거나 선점이 해제되었습니다. 좌석(scheduleSeatId: %d), status: %s, lockedByUserId: %s",
+                                                                seat.getId(), seat.getStatus(), seat.getLockedByUserId()));
                         }
                         if (seat.isLockExpired()) {
-                                log.error("Mock 결제 준비 실패: 좌석 선점 만료. scheduleSeatId={}, seatNumber={}, lockedUntil={}",
-                                                seat.getId(), seat.getSeat().getSeatNumber(), seat.getLockedUntil());
+                                log.error("Mock 결제 준비 실패: 좌석 선점 만료. scheduleSeatId={}, lockedUntil={}",
+                                                seat.getId(), seat.getLockedUntil());
                                 throw PaymentException.lockExpired(
-                                                String.format("좌석 선점 시간이 만료되었습니다. 좌석: %s (scheduleSeatId: %d, lockedUntil: %s)",
-                                                                seat.getSeat().getSeatNumber(), seat.getId(),
-                                                                seat.getLockedUntil()));
+                                                String.format("좌석 선점 시간이 만료되었습니다. 좌석(scheduleSeatId: %d), lockedUntil: %s",
+                                                                seat.getId(), seat.getLockedUntil()));
                         }
                 }
 
@@ -603,22 +598,21 @@ public class PaymentService {
                         if (seat.getStatus() == com.moa2.global.model.SeatStatus.AVAILABLE) {
                                 throw PaymentException.seatNotLocked(
                                                 String.format(
-                                                                "좌석 선점이 해제되었습니다. 좌석 선점 후 5분 이내에 결제를 완료해주세요. 좌석: %s, scheduleSeatId: %d",
-                                                                seat.getSeat().getSeatNumber(), seat.getId()));
+                                                                "좌석 선점이 해제되었습니다. 좌석 선점 후 5분 이내에 결제를 완료해주세요. 좌석(scheduleSeatId: %d)",
+                                                                seat.getId()));
                         }
                         if (seat.getStatus() == com.moa2.global.model.SeatStatus.LOCKED) {
                                 // LOCKED 상태이면 본인 선점인지 확인
                                 if (!seat.isLockedBy(bookerId)) {
                                         throw PaymentException.seatNotLocked(
-                                                        String.format("좌석 선점 권한이 없습니다. 좌석: %s, scheduleSeatId: %d",
-                                                                        seat.getSeat().getSeatNumber(), seat.getId()));
+                                                        String.format("좌석 선점 권한이 없습니다. 좌석(scheduleSeatId: %d)",
+                                                                        seat.getId()));
                                 }
                                 if (seat.isLockExpired()) {
                                         throw PaymentException.lockExpired(
                                                         String.format(
-                                                                        "좌석 선점 시간이 만료되었습니다. 다시 선점 후 결제를 진행해주세요. 좌석: %s, scheduleSeatId: %d, lockedUntil: %s",
-                                                                        seat.getSeat().getSeatNumber(), seat.getId(),
-                                                                        seat.getLockedUntil()));
+                                                                        "좌석 선점 시간이 만료되었습니다. 다시 선점 후 결제를 진행해주세요. 좌석(scheduleSeatId: %d), lockedUntil: %s",
+                                                                        seat.getId(), seat.getLockedUntil()));
                                 }
                         }
                 }
@@ -716,13 +710,13 @@ public class PaymentService {
                 List<ReservationSeat> reservationSeats = reservationSeatRepository
                                 .findByReservationWithSeat(reservation);
 
-                List<Long> seatIds = reservationSeats.stream()
-                                .map(rs -> rs.getSeat().getId())
+                List<Long> scheduleSeatIds = reservationSeats.stream()
+                                .map(ReservationSeat::getScheduleSeatId)
                                 .toList();
 
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
-                                .findByScheduleIdAndSeatIdInForUpdate(
-                                                reservation.getShowSchedule().getId(), seatIds);
+                                .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                reservation.getShowSchedule().getId(), scheduleSeatIds);
 
                 scheduleSeats.forEach(ScheduleSeat::releaseLock);
 

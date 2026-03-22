@@ -24,7 +24,7 @@ import org.springframework.lang.NonNull;
 /**
  * V2: 대기열 토큰 사전 검증 필터
  * - /api/v2/reservations/** 경로에만 적용
- * - X-Queue-Token 헤더의 토큰을 Redis에서 존재 여부만 확인
+ * - API 요청 시 QUEUE-TOKEN 쿠키의 토큰을 Redis에서 존재 여부만 확인
  * - 유효하지 않은 토큰은 Controller/DB에 도달하기 전에 즉시 400 반환
  * - DB 접근 없이 Redis 조회 1회로 가짜 트래픽을 빠르게 차단
  */

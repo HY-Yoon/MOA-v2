@@ -41,7 +41,7 @@ public class ScheduleSeatLockController implements ScheduleSeatLockControllerDoc
             @Valid @org.springframework.web.bind.annotation.RequestBody ScheduleDto.SeatLockRequest request) {
         try {
             Long userId = getAuthenticatedUserId();
-            LocalDateTime expiresAt = scheduleSeatLockService.lockSeats(scheduleId, request.seatIds(), userId);
+            LocalDateTime expiresAt = scheduleSeatLockService.lockSeats(scheduleId, request.scheduleSeatIds(), userId);
 
             // DTO에 맞게 응답 생성
             ScheduleDto.SeatLockResponse response = ScheduleDto.SeatLockResponse.builder()
@@ -74,7 +74,7 @@ public class ScheduleSeatLockController implements ScheduleSeatLockControllerDoc
             @Valid @org.springframework.web.bind.annotation.RequestBody ScheduleDto.SeatUnlockRequest request) {
         try {
             Long userId = getAuthenticatedUserId();
-            scheduleSeatUnlockService.unlockSeats(scheduleId, request.seatIds(), userId);
+            scheduleSeatUnlockService.unlockSeats(scheduleId, request.scheduleSeatIds(), userId);
 
             // DTO에 맞게 응답 생성
             ScheduleDto.SeatUnlockResponse response = ScheduleDto.SeatUnlockResponse.builder()

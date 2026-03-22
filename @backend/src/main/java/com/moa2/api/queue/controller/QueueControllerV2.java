@@ -67,7 +67,7 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
                 issueQueueTokenCookie(httpServletResponse, response.token());
             }
 
-            return ResponseEntity.ok(ApiResponse.success(response.withTokenMasked()));
+            return ResponseEntity.ok(ApiResponse.success(response));
 
         } catch (IllegalArgumentException e) {
             log.warn("V2 대기열 진입 실패: {}", e.getMessage());
@@ -94,7 +94,7 @@ public class QueueControllerV2 implements QueueControllerV2Docs {
                 issueQueueTokenCookie(httpServletResponse, response.token());
             }
 
-            return ResponseEntity.ok(ApiResponse.success(response.withTokenMasked()));
+            return ResponseEntity.ok(ApiResponse.success(response));
 
         } catch (IllegalArgumentException e) {
             log.warn("V2 대기 상태 조회 실패: {}", e.getMessage());

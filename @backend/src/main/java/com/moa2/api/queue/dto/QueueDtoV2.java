@@ -1,5 +1,6 @@
 package com.moa2.api.queue.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.moa2.global.model.QueueStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -37,7 +38,9 @@ public class QueueDtoV2 {
 
             @Schema(description = "폴링 권장 간격(초) (WAITING: totalWaiting 10만↑이면 10초, 기본 3초)", example = "3") Long retryAfterSeconds,
 
-            @Schema(description = "입장 토큰 (READY 상태일 때만)", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") String token,
+            @JsonIgnore
+            @Schema(hidden = true)
+            String token,
 
             @Schema(description = "메시지", example = "대기열에 등록되었습니다") String message) {
 
@@ -67,19 +70,6 @@ public class QueueDtoV2 {
                     .message("입장 가능합니다. 토큰이 발급되었습니다.")
                     .build();
         }
-
-        /** 쿠키로 토큰을 발급했으므로 Body의 token 필드를 null로 마스킹 */
-        public EnterResponse withTokenMasked() {
-            return EnterResponse.builder()
-                    .status(this.status())
-                    .position(this.position())
-                    .totalWaiting(this.totalWaiting())
-                    .estimatedWaitTimeSeconds(this.estimatedWaitTimeSeconds())
-                    .retryAfterSeconds(this.retryAfterSeconds())
-                    .token(null)  // HttpOnly 쿠키로 전달하므로 Body에는 노출 안함
-                    .message(this.message())
-                    .build();
-        }
     }
 
     /**
@@ -105,7 +95,9 @@ public class QueueDtoV2 {
 
             @Schema(description = "폴링 권장 간격(초) (WAITING: totalWaiting 10만↑이면 10초, 기본 3초)", example = "3") Long retryAfterSeconds,
 
-            @Schema(description = "입장 토큰 (READY 상태일 때만)", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") String token,
+            @JsonIgnore
+            @Schema(hidden = true)
+            String token,
 
             @Schema(description = "메시지", example = "현재 42번째입니다") String message) {
 
@@ -132,19 +124,6 @@ public class QueueDtoV2 {
                     .retryAfterSeconds(0L)
                     .token(token)
                     .message("입장 가능합니다. 5분 내에 예매를 진행해주세요.")
-                    .build();
-        }
-
-        /** 쿠키로 토큰을 발급했으므로 Body의 token 필드를 null로 마스킹 */
-        public StatusResponse withTokenMasked() {
-            return StatusResponse.builder()
-                    .status(this.status())
-                    .position(this.position())
-                    .totalWaiting(this.totalWaiting())
-                    .estimatedWaitTimeSeconds(this.estimatedWaitTimeSeconds())
-                    .retryAfterSeconds(this.retryAfterSeconds())
-                    .token(null)  // HttpOnly 쿠키로 전달하므로 Body에는 노출 안함
-                    .message(this.message())
                     .build();
         }
 

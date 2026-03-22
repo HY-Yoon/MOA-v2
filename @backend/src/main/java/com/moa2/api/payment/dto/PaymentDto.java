@@ -33,7 +33,7 @@ public class PaymentDto {
         public record Request(
                         @Schema(description = "스케줄 ID", example = "1") @NotNull(message = "스케줄 ID는 필수입니다") Long scheduleId,
 
-                        @Schema(description = "선점할 좌석 ID 목록", example = "[10, 11]") @NotEmpty(message = "좌석 ID 목록은 필수입니다") List<Long> seatIds,
+                        @Schema(description = "선점할 스케줄 좌석 ID 목록", example = "[4901, 4902]") @NotEmpty(message = "스케줄 좌석 ID 목록은 필수입니다") List<Long> scheduleSeatIds,
 
                         @Schema(description = "예매자 이름", example = "홍길동") @NotBlank(message = "예매자 이름은 필수입니다") String bookerName,
 

@@ -21,7 +21,7 @@ import org.springframework.lang.NonNull;
 /**
  * V2: 좌석 조회 전 Redis 토큰 보유 여부 검증 인터셉터
  * - /api/v1/schedules/{scheduleId}/seats 경로 보호
- * - X-Queue-Token 헤더의 토큰이 Redis에 존재하는지만 확인 (DB 접근 없음)
+ * - API 요청 시 QUEUE-TOKEN 쿠키의 토큰이 Redis에 존재하는지만 확인 (DB 접근 없음)
  * - QueueReadyInterceptor(DB 기반, V1용)를 V2에서 대체
  */
 @Slf4j

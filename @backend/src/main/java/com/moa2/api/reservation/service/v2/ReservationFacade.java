@@ -77,13 +77,13 @@ public class ReservationFacade {
     public ReservationDtoV2.PreviewResponse getPreviewInfo(
             Long userId,
             Long scheduleId,
-            List<Long> seatIds) {
+            List<Long> scheduleSeatIds) {
         log.info("V2 주문 미리보기 Facade 시작 - userId: {}, scheduleId: {}", userId, scheduleId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        return reservationServiceV2.getPreviewInfo(userId, scheduleId, seatIds, user);
+        return reservationServiceV2.getPreviewInfo(userId, scheduleId, scheduleSeatIds, user);
     }
 
     /**
