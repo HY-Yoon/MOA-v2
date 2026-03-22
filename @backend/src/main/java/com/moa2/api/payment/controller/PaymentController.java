@@ -4,6 +4,7 @@ import com.moa2.api.payment.controller.docs.PaymentControllerDocs;
 import com.moa2.api.payment.dto.PaymentDto;
 import com.moa2.api.payment.exception.PaymentException;
 import com.moa2.api.payment.facade.PaymentFacade;
+import com.moa2.api.payment.service.PaymentNotificationProducer;
 import com.moa2.api.payment.service.PaymentService;
 import com.moa2.api.reservation.dto.ReservationDtoV2;
 import com.moa2.api.reservation.service.v2.ReservationFacade;
@@ -41,6 +42,7 @@ public class PaymentController implements PaymentControllerDocs {
         private final PaymentFacade paymentFacade;
         private final UserRepository userRepository;
         private final org.springframework.beans.factory.ObjectProvider<ReservationFacade> reservationFacadeProvider;
+        private final PaymentNotificationProducer paymentNotificationProducer;
 
         @Value("${app.payment.frontend-complete-url:http://localhost:5173/payment/complete}")
         private String frontendCompleteUrl;
@@ -106,6 +108,13 @@ public class PaymentController implements PaymentControllerDocs {
                 try {
                         Long userId = getAuthenticatedUserId();
                         PaymentDto.SuccessResponse response = paymentFacade.confirmPayment(request, userId);
+                        
+                        try {
+                                paymentNotificationProducer.sendPaymentNotification(response.orderId(), getAuthenticatedUserEmail());
+                        } catch (Exception e) {
+                                log.warn("결제 알림 Kafka 이벤트 발행 실패(POST confirm): {}", e.getMessage());
+                        }
+                        
                         return ResponseEntity.ok(ApiResponse.success(response));
 
                 } catch (PaymentException e) {
@@ -197,6 +206,13 @@ public class PaymentController implements PaymentControllerDocs {
                                 paymentFacade.confirmPaymentMock(
                                                 paymentKey,
                                                 orderId, amount);
+                                
+                                try {
+                                        paymentNotificationProducer.sendPaymentNotification(orderId, getAuthenticatedUserEmail());
+                                } catch (Exception e) {
+                                        log.warn("결제 알림 Kafka 이벤트 발행 실패(mock): {}", e.getMessage());
+                                }
+                                
                                 String rn = paymentService.getReservationNumberByOrderId(orderId);
                                 PaymentDto.CompletionResponse completion = paymentService.getCompletionInfo(rn, userId);
                                 return ResponseEntity.ok(ApiResponse.success(completion));
@@ -210,6 +226,13 @@ public class PaymentController implements PaymentControllerDocs {
                 try {
                         PaymentDto.SuccessResponse resp = paymentFacade.confirmPayment(
                                         new PaymentDto.ConfirmRequest(paymentKey, orderId, amount), userId);
+                        
+                        try {
+                                paymentNotificationProducer.sendPaymentNotification(resp.orderId(), getAuthenticatedUserEmail());
+                        } catch (Exception e) {
+                                log.warn("결제 알림 Kafka 이벤트 발행 실패(redirect handler): {}", e.getMessage());
+                        }
+                        
                         String redirectUrl = UriComponentsBuilder.fromUriString(frontendCompleteUrl)
                                         .queryParam("orderId", resp.orderId())
                                         .queryParam("paymentKey", resp.paymentKey())
@@ -326,5 +349,13 @@ public class PaymentController implements PaymentControllerDocs {
                                                 "존재하지 않는 사용자입니다."));
 
                 return user.getId();
+        }
+
+        private String getAuthenticatedUserEmail() {
+                Object principalObj = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                if (principalObj instanceof UserPrincipal userPrincipal) {
+                        return userPrincipal.getEmail();
+                }
+                return "unknown@example.com";
         }
 }
