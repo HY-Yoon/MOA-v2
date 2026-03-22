@@ -1,11 +1,16 @@
 'use client';
 
-import { getScheduleSeatMap, getScheduleSeats, type ScheduleSeatMapSeat } from '@/lib/api/reservation';
+import {
+  getScheduleSeatMap,
+  getScheduleSeats,
+  type ScheduleSeatMapSeat,
+  type ScheduleSeatMapSection,
+} from '@/lib/api/reservation';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface SelectedSeatInfo {
-  scheduleSeatId?: number;
+  scheduleSeatId: number;
   seatId: string;
   sectionId: string;
   sectionName: string;
@@ -17,8 +22,8 @@ export interface SelectedSeatInfo {
 interface SeatMapCanvasProps {
   scheduleId: number;
   disabled?: boolean;
-  selectedSeatIds?: string[];
-  onSelectedSeatIdsChange?: (seatIds: string[]) => void;
+  selectedSeatIds?: number[];
+  onSelectedSeatIdsChange?: (scheduleSeatIds: number[]) => void;
   onSelectedSeatsChange?: (seats: SelectedSeatInfo[]) => void;
   onSectionPriceMapChange?: (sectionPriceMap: Record<string, number>) => void;
 }
@@ -93,12 +98,12 @@ export default function SeatMapCanvas({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [internalSelectedSeatIds, setInternalSelectedSeatIds] = useState<string[]>([]);
+  const [internalSelectedSeatIds, setInternalSelectedSeatIds] = useState<number[]>([]);
   const [isHoverSelectableSeat, setIsHoverSelectableSeat] = useState(false);
   const isControlled = selectedSeatIds !== undefined;
   const effectiveSelectedSeatIds = isControlled ? selectedSeatIds : internalSelectedSeatIds;
 
-  const updateSelectedSeatIds = useCallback((nextSeatIds: string[]) => {
+  const updateSelectedSeatIds = useCallback((nextSeatIds: number[]) => {
     if (!isControlled) {
       setInternalSelectedSeatIds(nextSeatIds);
     }
@@ -225,15 +230,29 @@ export default function SeatMapCanvas({
     });
   }, [seatMapData, seatStatusData]);
   const maxSelectable = seatStatusData?.maxSelectable ?? 6;
+  const selectedScheduleSeatIdSet = useMemo(
+    () => new Set(effectiveSelectedSeatIds),
+    [effectiveSelectedSeatIds],
+  );
 
   const sectionMap = useMemo(() => {
     return new Map((seatMapData?.sections ?? []).map((section) => [section.sectionId, section]));
   }, [seatMapData?.sections]);
+  const sectionByAnyKey = useMemo(() => {
+    const map = new Map<string, ScheduleSeatMapSection>();
+    (seatMapData?.sections ?? []).forEach((section) => {
+      map.set(normalizeSeatKey(section.sectionId), section);
+      map.set(normalizeSeatKey(section.name), section);
+    });
+    return map;
+  }, [seatMapData?.sections]);
 
   useEffect(() => {
-    const sectionPriceMap = Object.fromEntries(
-      (seatMapData?.sections ?? []).map((section) => [section.sectionId, section.price ?? 0]),
-    );
+    const sectionPriceMapEntries = (seatMapData?.sections ?? []).flatMap((section) => [
+      [section.sectionId, section.price ?? 0] as const,
+      [section.name, section.price ?? 0] as const,
+    ]);
+    const sectionPriceMap = Object.fromEntries(sectionPriceMapEntries);
     onSectionPriceMapChange?.(sectionPriceMap);
   }, [onSectionPriceMapChange, seatMapData?.sections]);
 
@@ -242,14 +261,21 @@ export default function SeatMapCanvas({
   }, [scheduleId, updateSelectedSeatIds]);
 
   useEffect(() => {
-    const infos: SelectedSeatInfo[] = effectiveSelectedSeatIds.flatMap((seatId) => {
-      const seat = seats.find((item) => item.seatId === seatId);
+    const seatByScheduleSeatId = new Map(
+      seats
+        .filter((seat): seat is ScheduleSeatMapSeat & { scheduleSeatId: number } => typeof seat.scheduleSeatId === 'number')
+        .map((seat) => [seat.scheduleSeatId, seat]),
+    );
+
+    const infos: SelectedSeatInfo[] = effectiveSelectedSeatIds.flatMap((scheduleSeatId) => {
+      const seat = seatByScheduleSeatId.get(scheduleSeatId);
       if (!seat) return [];
-      const section = sectionMap.get(seat.sectionId);
+      const section =
+        sectionByAnyKey.get(normalizeSeatKey(seat.sectionId)) ?? sectionMap.get(seat.sectionId);
       return [
         {
-          seatId: seat.seatId,
           scheduleSeatId: seat.scheduleSeatId,
+          seatId: seat.seatId,
           sectionId: seat.sectionId,
           sectionName: section?.name ?? seat.sectionId,
           row: seat.row,
@@ -259,7 +285,7 @@ export default function SeatMapCanvas({
       ];
     });
     onSelectedSeatsChange?.(infos);
-  }, [effectiveSelectedSeatIds, onSelectedSeatsChange, sectionMap, seats]);
+  }, [effectiveSelectedSeatIds, onSelectedSeatsChange, sectionByAnyKey, sectionMap, seats]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -306,10 +332,12 @@ export default function SeatMapCanvas({
 
     const radius = Math.max(4, seatMapData.canvas.seatRadius * scale);
     seats.forEach((seat) => {
-      const section = sectionMap.get(seat.sectionId);
+      const section =
+        sectionByAnyKey.get(normalizeSeatKey(seat.sectionId)) ?? sectionMap.get(seat.sectionId);
       const defaultColor = '#7c6cf3';
       const baseColor = section?.color ?? defaultColor;
-      const isSelected = effectiveSelectedSeatIds.includes(seat.seatId);
+      const isSelected =
+        typeof seat.scheduleSeatId === 'number' && selectedScheduleSeatIdSet.has(seat.scheduleSeatId);
       const normalizedStatus = String(seat.status ?? '').toUpperCase();
       const isReserved =
         normalizedStatus === 'LOCKED' ||
@@ -366,7 +394,15 @@ export default function SeatMapCanvas({
       context.lineWidth = Math.max(1.2, radius * 0.16);
       context.stroke();
     });
-  }, [effectiveSelectedSeatIds, seatMapData, sectionMap, seats, zoom]);
+  }, [
+    effectiveSelectedSeatIds,
+    seatMapData,
+    sectionByAnyKey,
+    sectionMap,
+    seats,
+    selectedScheduleSeatIdSet,
+    zoom,
+  ]);
 
   const getSelectableSeatAtPoint = (pointX: number, pointY: number) => {
     if (!seatMapData || !wrapperRef.current) return undefined;
@@ -381,6 +417,7 @@ export default function SeatMapCanvas({
     const radius = Math.max(4, seatMapData.canvas.seatRadius * scale);
 
     return seats.find((seat) => {
+      if (typeof seat.scheduleSeatId !== 'number') return false;
       if (isSeatReservedStatus(seat.status)) return false;
       const x = offsetX + seat.x * scale;
       const y = offsetY + seat.y * scale;
@@ -420,11 +457,14 @@ export default function SeatMapCanvas({
 
     if (!targetSeat) return;
 
-    const nextSeatIds = effectiveSelectedSeatIds.includes(targetSeat.seatId)
-      ? effectiveSelectedSeatIds.filter((seatId) => seatId !== targetSeat.seatId)
+    if (typeof targetSeat.scheduleSeatId !== 'number') return;
+    const isAlreadySelected = selectedScheduleSeatIdSet.has(targetSeat.scheduleSeatId);
+
+    const nextSeatIds = isAlreadySelected
+      ? effectiveSelectedSeatIds.filter((selectedId) => selectedId !== targetSeat.scheduleSeatId)
       : effectiveSelectedSeatIds.length >= maxSelectable
         ? effectiveSelectedSeatIds
-        : [...effectiveSelectedSeatIds, targetSeat.seatId];
+        : [...effectiveSelectedSeatIds, targetSeat.scheduleSeatId];
 
     updateSelectedSeatIds(nextSeatIds);
   };

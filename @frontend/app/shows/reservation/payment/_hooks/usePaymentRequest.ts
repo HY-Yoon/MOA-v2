@@ -73,7 +73,7 @@ export function usePaymentRequest({
     mutationFn: () =>
       requestPayment({
         scheduleId,
-        seatIds: parsedSeatIds,
+        scheduleSeatIds: parsedSeatIds,
         bookerName: normalizedName,
         bookerPhone: normalizedPhone,
         bookerEmail: normalizedEmail,

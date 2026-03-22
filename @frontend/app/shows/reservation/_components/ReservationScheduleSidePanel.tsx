@@ -16,7 +16,7 @@ interface ReservationScheduleSidePanelProps {
   onConfirmSchedule: (scheduleKeyId: number) => void;
   onConfirmSeatSelection: () => void;
   onCloseSchedulePanel: () => void;
-  onRemoveSeat: (seatId: string) => void;
+  onRemoveSeat: (scheduleSeatId: number) => void;
   onClearSeats: () => void;
   isSubmittingSeatConfirm?: boolean;
 }
@@ -90,9 +90,9 @@ export default function ReservationScheduleSidePanel({
             {hasSelectedSeats ? (
               <ul className="divide-y divide-slate-200">
                 {selectedSeats.map((seat) => (
-                  <li key={seat.seatId} className="flex items-center justify-between py-4">
+                  <li key={seat.scheduleSeatId} className="flex items-center justify-between py-4">
                     <div>
-                      <p className="text-base font-semibold text-slate-900">{seat.sectionName}석</p>
+                      <p className="text-base font-semibold text-slate-900">{seat.sectionName}구역</p>
                       <p className="mt-1 text-sm text-slate-500">
                         {seat.row}열 {seat.number}번
                       </p>
@@ -103,7 +103,7 @@ export default function ReservationScheduleSidePanel({
                       </p>
                       <button
                         type="button"
-                        onClick={() => onRemoveSeat(seat.seatId)}
+                        onClick={() => onRemoveSeat(seat.scheduleSeatId)}
                         className="text-slate-400 transition-colors hover:text-slate-700"
                       >
                         <X className="h-4 w-4" />

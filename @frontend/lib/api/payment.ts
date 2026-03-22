@@ -2,7 +2,7 @@ import { axiosInstance } from '@/lib/api-client';
 
 export interface PaymentRequestPayload {
   scheduleId: number;
-  seatIds: number[];
+  scheduleSeatIds: number[];
   bookerName: string;
   bookerPhone: string;
   bookerEmail: string;
