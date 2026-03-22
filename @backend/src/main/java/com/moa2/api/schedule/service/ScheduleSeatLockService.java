@@ -28,8 +28,8 @@ public class ScheduleSeatLockService {
     private static final int LOCK_EXPIRATION_MINUTES = 5;
 
     @Transactional
-    public LocalDateTime lockSeats(Long scheduleId, List<Long> seatIds, Long userId) {
-        validateInputs(scheduleId, seatIds, userId);
+    public LocalDateTime lockSeats(Long scheduleId, List<Long> scheduleSeatIds, Long userId) {
+        validateInputs(scheduleId, scheduleSeatIds, userId);
 
         // 스케줄 확인
         if (!showScheduleRepository.existsById(scheduleId)) {
@@ -37,14 +37,14 @@ public class ScheduleSeatLockService {
         }
 
         // 데드락 방지: ID 정렬
-        List<Long> sortedSeatIds = new ArrayList<>(seatIds);
+        List<Long> sortedSeatIds = new ArrayList<>(scheduleSeatIds);
         sortedSeatIds.sort(Long::compareTo);
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul")).withNano(0);
         LocalDateTime expiresAt = now.plusMinutes(LOCK_EXPIRATION_MINUTES);
 
         // 1. PESSIMISTIC LOCK 획득
-        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndSeatIdInForUpdate(scheduleId, sortedSeatIds);
+        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findByScheduleIdAndScheduleSeatIdsForUpdate(scheduleId, sortedSeatIds);
 
         // 2. 존재하지 않는 좌석 검증
         validateAllSeatsFound(scheduleSeats, sortedSeatIds);
@@ -66,11 +66,11 @@ public class ScheduleSeatLockService {
 
     // --- Private Validation Methods ---
 
-    private void validateInputs(Long scheduleId, List<Long> seatIds, Long userId) {
+    private void validateInputs(Long scheduleId, List<Long> scheduleSeatIds, Long userId) {
         if (scheduleId == null) throw new IllegalArgumentException("scheduleId는 필수입니다.");
         if (userId == null) throw new IllegalArgumentException("userId는 필수입니다.");
-        if (seatIds == null || seatIds.isEmpty()) throw new IllegalArgumentException("seatIds는 최소 1개 이상 필요합니다.");
-        if (new HashSet<>(seatIds).size() != seatIds.size()) throw new IllegalArgumentException("seatIds에 중복 값이 포함되어 있습니다.");
+        if (scheduleSeatIds == null || scheduleSeatIds.isEmpty()) throw new IllegalArgumentException("scheduleSeatIds는 최소 1개 이상 필요합니다.");
+        if (new HashSet<>(scheduleSeatIds).size() != scheduleSeatIds.size()) throw new IllegalArgumentException("scheduleSeatIds에 중복 값이 포함되어 있습니다.");
     }
 
     private void validateAllSeatsFound(List<ScheduleSeat> foundSeats, List<Long> requestedIds) {

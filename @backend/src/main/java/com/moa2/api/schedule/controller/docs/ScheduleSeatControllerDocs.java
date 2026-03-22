@@ -19,8 +19,8 @@ public interface ScheduleSeatControllerDocs {
                         - `seats`: 좌석 목록 (seatId, sectionId, row, number, x, y, status)
 
                         **주의:** 대기열 상태가 READY인 사용자만 조회 가능하며, 만료되면 403을 반환합니다.
+                        **인증 방식:** Cookie (QUEUE-TOKEN - HttpOnly 쿠키)
                         """)
-        @Parameter(name = "X-Queue-Token", description = "대기열 입장 토큰 (V2의 경우 필수)", in = ParameterIn.HEADER, required = false)
         ResponseEntity<ApiResponse<ScheduleDto.SeatsResponse>> getScheduleSeats(
                         @Parameter(description = "스케줄 ID", required = true, example = "10") @PathVariable Long scheduleId);
 
@@ -32,8 +32,8 @@ public interface ScheduleSeatControllerDocs {
                         - `sections`: 구역 목록 (sectionId, name, price, color)
 
                         **주의:** 대기열 상태가 READY인 사용자만 조회 가능하며, 만료되면 403을 반환합니다.
+                        **인증 방식:** Cookie (QUEUE-TOKEN - HttpOnly 쿠키)
                         """)
-        @Parameter(name = "X-Queue-Token", description = "대기열 입장 토큰 (V2의 경우 필수)", in = ParameterIn.HEADER, required = false)
         ResponseEntity<ApiResponse<ScheduleDto.SeatMapResponse>> getSeatMap(
                         @Parameter(description = "스케줄 ID", required = true, example = "10") @PathVariable Long scheduleId);
 }

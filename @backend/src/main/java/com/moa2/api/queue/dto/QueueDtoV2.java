@@ -1,5 +1,6 @@
 package com.moa2.api.queue.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.moa2.global.model.QueueStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -37,7 +38,9 @@ public class QueueDtoV2 {
 
             @Schema(description = "폴링 권장 간격(초) (WAITING: totalWaiting 10만↑이면 10초, 기본 3초)", example = "3") Long retryAfterSeconds,
 
-            @Schema(description = "입장 토큰 (READY 상태일 때만)", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") String token,
+            @JsonIgnore
+            @Schema(hidden = true)
+            String token,
 
             @Schema(description = "메시지", example = "대기열에 등록되었습니다") String message) {
 
@@ -92,7 +95,9 @@ public class QueueDtoV2 {
 
             @Schema(description = "폴링 권장 간격(초) (WAITING: totalWaiting 10만↑이면 10초, 기본 3초)", example = "3") Long retryAfterSeconds,
 
-            @Schema(description = "입장 토큰 (READY 상태일 때만)", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890") String token,
+            @JsonIgnore
+            @Schema(hidden = true)
+            String token,
 
             @Schema(description = "메시지", example = "현재 42번째입니다") String message) {
 
