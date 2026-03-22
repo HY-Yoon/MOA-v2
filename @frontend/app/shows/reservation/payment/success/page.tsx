@@ -62,8 +62,6 @@ function PaymentSuccessContent() {
     </section>
   );
 }
-<<<<<<< HEAD
-=======
 
 export default function PaymentSuccessPage() {
   return (
@@ -72,4 +70,3 @@ export default function PaymentSuccessPage() {
     </Suspense>
   );
 }
->>>>>>> 4702f51bec08b72825287df9967f3554c1546cf3

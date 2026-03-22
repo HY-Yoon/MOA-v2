@@ -11,7 +11,7 @@ type RouterLike = {
 
 // axios 인스턴스 설정
 export const axiosInstance: AxiosInstance = axios.create({
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },

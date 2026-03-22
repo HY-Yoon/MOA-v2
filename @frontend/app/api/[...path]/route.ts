@@ -15,8 +15,10 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
     };
     const authHeader = request.headers.get('authorization');
     const cookie = request.headers.get('cookie');
+    const queueToken = request.headers.get('x-queue-token');
     if (authHeader) headers['Authorization'] = authHeader;
     if (cookie) headers['Cookie'] = cookie;
+    if (queueToken) headers['X-Queue-Token'] = queueToken;
 
     const fetchOptions: RequestInit = {
       method: request.method,
