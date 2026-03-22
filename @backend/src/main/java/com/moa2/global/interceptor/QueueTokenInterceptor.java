@@ -60,7 +60,7 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
         // X-Queue-Token 헤더 확인
         String token = request.getHeader(QUEUE_TOKEN_HEADER);
         if (token == null || token.isBlank()) {
-            log.debug("V2 좌석 조회 차단 - 토큰 없음, URI: {}", uri);
+            log.warn("🚨 [QueueTokenInterceptor] V2 좌석 조회 차단 - 'X-Queue-Token' 헤더가 누락되었습니다! (요청 URI: {})", uri);
             writeError(response, HttpStatus.FORBIDDEN,
                     "대기열을 통과한 사용자만 접근할 수 있습니다. 먼저 대기열에 진입해주세요.",
                     "QUEUE_TOKEN_MISSING");
@@ -72,7 +72,7 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
         String tokenJson = redisTemplate.opsForValue().get(tokenKey);
         
         if (tokenJson == null) {
-            log.debug("V2 좌석 조회 차단 - 유효하지 않은 토큰: {}", token);
+            log.warn("🚨 [QueueTokenInterceptor] V2 좌석 조회 차단 - 유효하지 않거나 만료된 대기열 토큰입니다. (전달받은 토큰: {})", token);
             writeError(response, HttpStatus.FORBIDDEN,
                     "대기열 토큰이 만료되었거나 유효하지 않습니다. 다시 대기열에 진입해주세요.",
                     "QUEUE_TOKEN_INVALID");

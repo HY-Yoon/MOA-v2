@@ -121,11 +121,34 @@ public class PaymentController implements PaymentControllerDocs {
                         @RequestParam(required = false) String paymentKey,
                         @RequestParam(required = false) Long amount,
                         @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                return handleSuccessRedirect(orderId, paymentKey, amount, noRedirect, "/success");
+        }
+
+        /**
+         * 토스 SDK 리다이렉트 호환용 엔드포인트
+         * - 과거 설정에서 successUrl을 /confirm 으로 둔 경우를 안전하게 수용한다.
+         * - SDK는 successUrl을 GET으로 호출하므로 POST /confirm 과는 별개로 처리한다.
+         */
+        @GetMapping("/confirm")
+        public ResponseEntity<?> confirmRedirectHandler(
+                        @RequestParam(required = false) String orderId,
+                        @RequestParam(required = false) String paymentKey,
+                        @RequestParam(required = false) Long amount,
+                        @RequestParam(name = "noRedirect", required = false) String noRedirect) {
+                return handleSuccessRedirect(orderId, paymentKey, amount, noRedirect, "/confirm");
+        }
+
+        private ResponseEntity<?> handleSuccessRedirect(
+                        String orderId,
+                        String paymentKey,
+                        Long amount,
+                        String noRedirect,
+                        String sourcePath) {
                 Long userId;
                 try {
                         userId = getAuthenticatedUserId();
                 } catch (PaymentException e) {
-                        log.warn("결제 성공 핸들러 인증 실패: {}", e.getMessage());
+                        log.warn("결제 성공 핸들러 인증 실패: sourcePath={}, message={}", sourcePath, e.getMessage());
                         if (testNoRedirect && "1".equals(noRedirect)) {
                                 return ResponseEntity.status(e.getStatus())
                                                 .body(ApiResponse.error(e.getMessage(), e.getCode(), null));
@@ -139,8 +162,8 @@ public class PaymentController implements PaymentControllerDocs {
 
                 if (orderId == null || orderId.isBlank() || paymentKey == null || paymentKey.isBlank()
                                 || amount == null) {
-                        log.warn("결제 성공 핸들러 파라미터 누락: orderId={}, paymentKey={}, amount={}", orderId, paymentKey,
-                                        amount);
+                        log.warn("결제 성공 핸들러 파라미터 누락: sourcePath={}, orderId={}, paymentKey={}, amount={}",
+                                        sourcePath, orderId, paymentKey, amount);
                         if (testNoRedirect && "1".equals(noRedirect)) {
                                 return ResponseEntity.badRequest()
                                                 .body(ApiResponse.error("결제 정보가 올바르지 않습니다.", "INVALID_PARAMS", null));
@@ -177,8 +200,8 @@ public class PaymentController implements PaymentControllerDocs {
                                         .build().toUriString();
                         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirectUrl)).build();
                 } catch (PaymentException e) {
-                        log.warn("결제 승인 실패(핸들러): orderId={}, code={}, message={}",
-                                        orderId, e.getCode(), e.getMessage());
+                        log.warn("결제 승인 실패(핸들러): sourcePath={}, orderId={}, code={}, message={}",
+                                        sourcePath, orderId, e.getCode(), e.getMessage());
                         String failUrl = UriComponentsBuilder.fromUriString(frontendFailUrl)
                                         .queryParam("code", e.getCode() != null ? e.getCode() : "CONFIRM_FAILED")
                                         .queryParam("message", e.getMessage())

@@ -39,7 +39,10 @@ public interface PaymentControllerDocs {
       @RequestBody(description = "결제 요청 정보", required = true) PaymentDto.Request request);
 
   @Operation(summary = "결제 승인", description = """
-      토스 결제 인증 성공 후(successUrl 리다이렉트) 호출합니다.
+      결제 승인 API (POST)입니다.
+      토스 SDK의 successUrl 리다이렉트는 GET 방식이므로
+      기본적으로 `/api/v1/payment/success` 또는 `/api/v1/payment/confirm`(GET 호환)에서 처리합니다.
+      프론트에서 수동 승인 플로우를 사용할 때만 이 API를 호출하세요.
 
       **3단 검증:**
       1. 좌석이 LOCKED 상태이고 본인이 선점했는지

@@ -75,7 +75,7 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         // 1. X-Queue-Token 헤더 확인
         String token = request.getHeader(QUEUE_TOKEN_HEADER);
         if (token == null || token.isBlank()) {
-            log.debug("대기열 토큰 누락 - URI: {}", uri);
+            log.warn("🚨 [QueueTokenFilter] API 차단 - 'X-Queue-Token' 헤더가 누락되었습니다! 프론트엔드 헤더 설정을 확인해주세요. (요청 URI: {})", uri);
             writeError(response, HttpStatus.BAD_REQUEST,
                     "대기열 토큰이 필요합니다. 대기열을 통해 입장해주세요.",
                     "QUEUE_TOKEN_MISSING");
@@ -87,7 +87,7 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         Boolean exists = redisTemplate.hasKey(tokenKey);
 
         if (exists == null || !exists) {
-            log.debug("유효하지 않은 대기열 토큰 - token: {}", token);
+            log.warn("🚨 [QueueTokenFilter] API 차단 - 유효하지 않거나 만료된 대기열 토큰입니다. (전달받은 토큰: {})", token);
             writeError(response, HttpStatus.BAD_REQUEST,
                     "유효하지 않은 대기열 토큰입니다. 토큰이 만료되었거나 존재하지 않습니다.",
                     "QUEUE_TOKEN_INVALID");
@@ -95,7 +95,7 @@ public class QueueTokenFilter extends OncePerRequestFilter {
         }
 
         // 3. 토큰이 Redis에 존재 → 통과 (세부 검증은 ReservationFacade에서)
-        log.debug("대기열 토큰 사전 검증 통과 - token: {}", token);
+        log.info("✅ [QueueTokenFilter] 대기열 토큰 정상 인증 완료 - 토큰이 통과되었습니다. (token: {})", token);
         filterChain.doFilter(request, response);
     }
 
