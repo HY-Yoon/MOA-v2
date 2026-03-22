@@ -420,29 +420,10 @@ export default function ReservationScheduleSelection({
                 const scheduleSeatIds = selectedSeats
                   .map((seat) => seat.scheduleSeatId)
                   .filter((id): id is number => typeof id === 'number');
-                const fallbackScheduleSeatIds = selectedSeats.map((seat, index) =>
-                  seat.scheduleSeatId ? String(seat.scheduleSeatId) : `${index + 1}`,
-                );
-                const fallbackSeatCount = selectedSeats.length;
-                const fallbackTotalAmount = selectedSeats.reduce(
-                  (sum, seat) => sum + (sectionPriceMap[seat.sectionId] ?? 0),
-                  0,
-                );
-                const fallbackRemainingSeconds = 300;
                 const showTitle = data?.title ?? '공연 정보';
 
                 if (scheduleSeatIds.length === 0) {
-                  // 테스트 편의를 위해 scheduleSeatId가 없어도 결제 단계로 이동
-                  moveToPaymentPage(
-                    selectedScheduleKeyId,
-                    fallbackScheduleSeatIds,
-                    fallbackSeatCount,
-                    fallbackRemainingSeconds,
-                    fallbackTotalAmount,
-                    showTitle,
-                    selectedScheduleDisplayText,
-                    selectedSeats,
-                  );
+                  window.alert('선점 가능한 좌석 정보가 없습니다. 좌석을 다시 선택해주세요.');
                   return;
                 }
 
@@ -491,29 +472,27 @@ export default function ReservationScheduleSelection({
                       totalAmount?: number;
                       message?: string;
                     };
+                    if (
+                      typeof successData.seatCount !== 'number' ||
+                      typeof successData.remainingSeconds !== 'number' ||
+                      typeof successData.totalAmount !== 'number'
+                    ) {
+                      window.alert('좌석 선점 응답이 올바르지 않습니다. 다시 시도해주세요.');
+                      return;
+                    }
                     moveToPaymentPage(
                       selectedScheduleKeyId,
                       scheduleSeatIds.map(String),
-                      successData.seatCount ?? fallbackSeatCount,
-                      successData.remainingSeconds ?? fallbackRemainingSeconds,
-                      successData.totalAmount ?? fallbackTotalAmount,
+                      successData.seatCount,
+                      successData.remainingSeconds,
+                      successData.totalAmount,
                       showTitle,
                       selectedScheduleDisplayText,
                       selectedSeats,
                     );
                   })
                   .catch(() => {
-                    // 테스트 편의를 위해 API 실패 시에도 목업 데이터로 결제 단계 이동
-                    moveToPaymentPage(
-                      selectedScheduleKeyId,
-                      fallbackScheduleSeatIds,
-                      fallbackSeatCount,
-                      fallbackRemainingSeconds,
-                      fallbackTotalAmount,
-                      showTitle,
-                      selectedScheduleDisplayText,
-                      selectedSeats,
-                    );
+                    window.alert('좌석 확인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
                   })
                   .finally(() => {
                     setIsSubmittingSeatConfirm(false);
