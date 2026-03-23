@@ -6,7 +6,7 @@ import { getShowSchedulesByDate } from '@/lib/api/show';
 import { cn } from '@/lib/utils';
 import dayjs from 'dayjs';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useReservationPopup } from '@/hooks/useReservationPopup';
 
@@ -27,13 +27,32 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
   const params = useParams();
   const showId = Number(params?.id) ?? 0;
 
-  const firstSchedule = schedules[0] ?? null;
-  const defaultDate = firstSchedule ? dayjs(firstSchedule.date).toDate() : undefined;
+  const defaultSchedule = useMemo(() => {
+    if (!schedules.length) return null;
+
+    return (
+      [...schedules]
+        .filter((s) => !dayjs(s.date).isBefore(dayjs(), DATE_UNIT.DAY))
+        .sort((a, b) => {
+          const byDate = a.date.localeCompare(b.date);
+          if (byDate !== 0) return byDate;
+          return a.session - b.session;
+        })[0] ?? null
+    );
+  }, [schedules]);
+
+  const defaultDate = defaultSchedule ? dayjs(defaultSchedule.date).toDate() : undefined;
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(defaultDate);
   const [selectedScheduleKey, setSelectedScheduleKey] = useState<number | null>(
-    firstSchedule?.keyId ?? null,
+    defaultSchedule?.keyId ?? null,
   );
+
+  useEffect(() => {
+    if (!defaultSchedule) return;
+    setSelectedDate((d) => d ?? dayjs(defaultSchedule.date).toDate());
+    setSelectedScheduleKey((k) => k ?? defaultSchedule.keyId);
+  }, [defaultSchedule]);
 
   const scheduleDatesSet = useMemo(() => new Set(schedules.map((s) => s.date)), [schedules]);
 
@@ -60,14 +79,23 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
     return dayjs(d).format(DATE_FORMAT.DATE_ONLY);
   }
 
+  function isScheduleDateBlocked(date: Date): boolean {
+    return (
+      dayjs(date).isBefore(dayjs(), DATE_UNIT.DAY) || !scheduleDatesSet.has(formatDateOnly(date))
+    );
+  }
+
+  const isSelectedDateBlocked = Boolean(selectedDate && isScheduleDateBlocked(selectedDate));
+
   function getRemainingSeatLabel(detail?: ShowCatalog.ScheduleByDate | null): string {
-    if (!detail) return '잔여 0석';
+    if (!detail) return '잔여석 0';
+
     if (detail.seatGrades?.length) {
       return detail.seatGrades
-        .map((g: ShowCatalog.SeatGrades) => `${g.sectionName} ${g.remainingSeats ?? 0}`)
+        .map((g: ShowCatalog.SeatGrades) => `${g.sectionName}석 ${g.remainingSeats ?? 0}`)
         .join(' / ');
     }
-    return `잔여 ${detail.remainingSeats ?? 0}석`;
+    return `잔여석 ${detail.remainingSeats ?? 0}`;
   }
 
   function handleSelectDate(date?: Date) {
@@ -85,8 +113,6 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
   async function handleBooking() {
     if (showId <= 0 || !selectedScheduleKey) return;
 
-    // TODO: 예매하기 페이지 이동 (showId, selectedScheduleKey 전달)
-    console.log('showId', showId, 'selectedScheduleKey', selectedScheduleKey);
     await openReservationPopup({
       showId,
       scheduleId: selectedScheduleKey,
@@ -94,7 +120,8 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
     });
   }
 
-  const isBookingDisabled = !selectedDate || !selectedScheduleKey || selectedDetail?.isSoldOut;
+  const isBookingDisabled =
+    !selectedDate || isSelectedDateBlocked || !selectedScheduleKey || selectedDetail?.isSoldOut;
 
   return (
     <div className="flex flex-col gap-4">
@@ -106,10 +133,7 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
           selected={selectedDate}
           onSelect={handleSelectDate}
           defaultMonth={selectedDate ?? defaultDate}
-          disabled={(date) =>
-            dayjs(date).isBefore(dayjs(), DATE_UNIT.DAY) ||
-            !scheduleDatesSet.has(formatDateOnly(date))
-          }
+          disabled={(date) => isScheduleDateBlocked(date)}
           className="[&_.rdp-weekday]:first-child:text-red-500 [&_.rdp-weekday]:last-child:text-muted-foreground rounded-lg border-0 p-0"
         />
 
@@ -125,10 +149,12 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
                   <li key={s.keyId}>
                     <button
                       type="button"
+                      disabled={isSelectedDateBlocked}
                       onClick={() => setSelectedScheduleKey(s.keyId)}
                       className={cn(
                         sessionButtonClass.base,
                         isSelected ? sessionButtonClass.selected : sessionButtonClass.default,
+                        isSelectedDateBlocked && 'cursor-not-allowed opacity-50',
                       )}
                     >
                       {s.session}회 {s.time as string}
@@ -139,7 +165,7 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
             </ul>
             {selectedScheduleKey != null && (
               <>
-                <p className="text-muted-foreground mt-4 text-sm">
+                <p className="text-muted-foreground mt-4 text-sm font-semibold">
                   {getRemainingSeatLabel(selectedDetail)}
                 </p>
                 <p className="text-muted-foreground mt-1 text-xs">
