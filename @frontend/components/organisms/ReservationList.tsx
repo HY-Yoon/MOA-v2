@@ -211,7 +211,13 @@ export default function ReservationList({
     ],
   );
 
-  const { data, isFetching } = useQuery(getListQuery(params));
+  const { data, isFetching } = useQuery({
+    ...getListQuery(params),
+    // 목록 재진입 시 최신화
+    refetchOnMount: 'always',
+    // 탭 복귀 시 stale이면 재조회
+    refetchOnWindowFocus: true,
+  });
 
   const reservationList = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
