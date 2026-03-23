@@ -26,7 +26,10 @@ interface Props {
 
 export default function ShowDetailBasicInfo({ data, loading }: Props) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [openScheduleId, setOpenScheduleId] = useState<number | null>(null);
+  const [panelTarget, setPanelTarget] = useState<{
+    scheduleId: number;
+    showDate: string;
+  } | null>(null);
 
   const genreLabel = useMemo(
     () => (data?.genre ? (GENRE_LABELS[data.genre] ?? data.genre) : '-'),
@@ -37,9 +40,14 @@ export default function ShowDetailBasicInfo({ data, loading }: Props) {
     [data],
   );
 
-  function handlePanelOpen(scheduleId: number) {
-    setOpenScheduleId(scheduleId);
+  function handlePanelOpen(schedule: Show.Schedules) {
+    setPanelTarget({ scheduleId: schedule.scheduleId, showDate: schedule.showDate });
     setPanelOpen(true);
+  }
+
+  function handlePanelOpenChange(next: boolean) {
+    setPanelOpen(next);
+    if (!next) setPanelTarget(null);
   }
 
   if (loading) {
@@ -141,7 +149,7 @@ export default function ShowDetailBasicInfo({ data, loading }: Props) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => handlePanelOpen(schedule.scheduleId)}
+                      onClick={() => handlePanelOpen(schedule)}
                       aria-label="좌석 현황 보기"
                     >
                       <PanelRightOpen className="h-4 w-4" />
@@ -172,9 +180,11 @@ export default function ShowDetailBasicInfo({ data, loading }: Props) {
       </FormField>
 
       <ShowSeatStatusPanel
-        scheduleId={openScheduleId}
+        showId={data.id}
+        scheduleId={panelTarget?.scheduleId ?? null}
+        showDate={panelTarget?.showDate ?? null}
         open={panelOpen}
-        onOpenChange={setPanelOpen}
+        onOpenChange={handlePanelOpenChange}
       />
     </div>
   );
