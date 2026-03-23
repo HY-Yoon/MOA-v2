@@ -1,5 +1,6 @@
 namespace Reservation {
   type ReservationStatus = import('@shared/enums').ReservationStatus;
+  type PaymentMethod = import('@shared/enums').PaymentMethod;
   type PaymentStatus = import('@shared/enums').PaymentStatus;
   type Genre = import('@shared/enums').Genre;
   type Region = import('@shared/enums').Region;
@@ -46,6 +47,9 @@ namespace Reservation {
     totalAmount: number;
     canCancel: boolean;
     cancellationDeadline: string | null;
+    showTitle?: string;
+    bookerName?: string;
+    bookerId?: string;
   }
 
   interface Seats {
@@ -65,7 +69,7 @@ namespace Reservation {
     orderId: string;
     paymentKey: string;
     totalAmount: number;
-    paymentMethod: string;
+    paymentMethod: PaymentMethod;
     paymentStatus: PaymentStatus;
     paidAt: string;
   }

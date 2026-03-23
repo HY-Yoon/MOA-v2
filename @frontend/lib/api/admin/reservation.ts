@@ -21,7 +21,7 @@ export const fetchShowReservationDetail = (reservationId: number) => ({
   queryKey: ['admin', 'reservations', 'detail', reservationId],
   queryFn: async () => {
     const response = await axiosInstance.get<Api.Response<{ content: Reservation.Detail[] }>>(
-      `/api/v1/admin/reservations/detail?reservationId=${reservationId}`,
+      `${BASE_URL}/${reservationId}`,
     );
     return response?.data?.data?.content[0];
   },

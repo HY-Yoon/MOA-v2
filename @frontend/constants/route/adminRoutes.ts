@@ -4,6 +4,7 @@ export const ADMIN_ROUTES = {
   DASHBOARD: ADMIN,
   SHOW: `${ADMIN}/shows`,
   SHOW_UPSERT: `${ADMIN}/shows/upsert`,
+  RESERVATION: `${ADMIN}/reservations`,
   SEAT: `${ADMIN}/seat`,
   USER: `${ADMIN}/user`,
 } as const;
