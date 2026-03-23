@@ -9,14 +9,12 @@ interface Props {
 }
 
 export default function ShowDetailReservations({ showId }: Props) {
-  const getAdminReservationDetailPath = (reservationId: number) =>
-    `${ADMIN_ROUTES.SHOW}/${showId}/reservations/${reservationId}`;
-
   return (
     <ReservationList
-      getDetailLink={(r) => getAdminReservationDetailPath(r.reservationId)}
+      getDetailLink={(r) => `${ADMIN_ROUTES.RESERVATION}/${r.reservationId}`}
       getListQuery={fetchShowReservationList}
       extraParams={{ showId }}
+      variant="admin"
     />
   );
 }
