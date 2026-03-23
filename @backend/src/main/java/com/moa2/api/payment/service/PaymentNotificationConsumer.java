@@ -4,6 +4,7 @@ import com.moa2.api.payment.dto.PaymentEventDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,7 @@ public class PaymentNotificationConsumer {
         topics = "payment-notification",
         groupId = "payment-notification-group-2"
     )
-    public void consumePaymentNotification(PaymentEventDto event) {
+    public void consumePaymentNotification(PaymentEventDto event, Acknowledgment ack) {
         log.info("결제 알림 Kafka 이벤트 수신: orderId={}, email={}", event.getOrderId(), event.getEmail());
         
         try {
@@ -34,6 +35,9 @@ public class PaymentNotificationConsumer {
             log.info("결제 완료 이메일 발송 성공: email={}", event.getEmail());
         } catch (Exception e) {
             log.error("결제 완료 이메일 발송 실패: email={}, error={}", event.getEmail(), e.getMessage());
+        } finally {
+            // 수동 커밋 (성공하든 실패하든 메시지를 다시 읽지 않도록 커밋)
+            ack.acknowledge();
         }
     }
 }
