@@ -46,3 +46,9 @@ k6/
 
 docker-compose.yml
 
+# Terraform (여기에 추가!)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
