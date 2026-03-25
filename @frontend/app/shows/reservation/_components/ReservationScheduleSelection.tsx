@@ -330,7 +330,7 @@ export default function ReservationScheduleSelection({
             )}
 
             {phase === 'WAITING' && (
-              <div className="max-w-3xl p-8">
+              <div className="max-w-3xl p-8 m-auto">
                 <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
                   <p className="text-center font-semibold text-black">나의 대기순서</p>
                   <p className="mt-4 text-center text-2xl font-black tracking-tight text-black">
@@ -372,7 +372,7 @@ export default function ReservationScheduleSelection({
             )}
 
             {(phase === 'EXPIRED' || phase === 'ERROR') && (
-              <div className="max-w-3xl p-8">
+              <div className="max-w-3xl p-8  m-auto">
                 <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
                   <p className="text-lg font-semibold text-red-600">
                     {phase === 'EXPIRED' ? '대기열이 만료되었습니다.' : '문제가 발생했습니다.'}
