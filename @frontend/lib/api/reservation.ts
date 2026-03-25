@@ -97,14 +97,14 @@ export const getScheduleSeatMap = (scheduleId: number) => ({
   enabled: !!scheduleId && scheduleId > 0,
 });
 
-export const getScheduleSeats = (scheduleId: number) => {
+export const getScheduleSeats = (scheduleId: number, refetchKey = 0) => {
   const headers: Record<string, string> = {
     'Cache-Control': 'no-store, no-cache, must-revalidate',
     Pragma: 'no-cache',
     Expires: '0',
   };
   return {
-    queryKey: ['reservation', 'seats', scheduleId],
+    queryKey: ['reservation', 'seats', scheduleId, refetchKey],
     queryFn: async (): Promise<ScheduleSeatStatusData> => {
       const response = await axiosInstance.get<Api.Response<ScheduleSeatStatusData>>(
         `/api/v1/schedules/${scheduleId}/seats`,
