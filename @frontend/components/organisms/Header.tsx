@@ -30,11 +30,6 @@ const UNAUTHENTICATED_ITEMS = [
     href: HEADER_ROUTES.LOGIN,
     isLogout: false,
   },
-  {
-    label: HEADER_ROUTES_LABELS.unauthenticated[HEADER_ROUTES.JOIN],
-    href: HEADER_ROUTES.JOIN,
-    isLogout: false,
-  },
 ];
 
 // 로그인 했을 때 헤더 유틸 메뉴
