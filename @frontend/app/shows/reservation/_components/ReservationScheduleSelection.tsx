@@ -19,6 +19,7 @@ import SeatMapCanvas, { type SelectedSeatInfo } from './SeatMapCanvas';
 interface ReservationScheduleSelectionProps {
   showId: number;
   initialScheduleKeyId?: number;
+  initialSeatsRefetchKey?: number;
 }
 
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
@@ -62,6 +63,7 @@ function formatNumber(value: number | null) {
 export default function ReservationScheduleSelection({
   showId,
   initialScheduleKeyId,
+  initialSeatsRefetchKey = 0,
 }: ReservationScheduleSelectionProps) {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -82,6 +84,7 @@ export default function ReservationScheduleSelection({
   const [sectionPriceMap, setSectionPriceMap] = useState<Record<string, number>>({});
   const [isSubmittingSeatConfirm, setIsSubmittingSeatConfirm] = useState(false);
   const [queueRequestKey, setQueueRequestKey] = useState(0);
+  const [seatsRefetchKey, setSeatsRefetchKey] = useState(initialSeatsRefetchKey);
   const handleSectionPriceMapChange = useCallback((nextMap: Record<string, number>) => {
     setSectionPriceMap((prevMap) => {
       const prevKeys = Object.keys(prevMap);
@@ -359,6 +362,7 @@ export default function ReservationScheduleSelection({
               <div className="relative h-full px-5 py-6">
                 <SeatMapCanvas
                   scheduleId={selectedScheduleKeyId ?? 0}
+                  seatsRefetchKey={seatsRefetchKey}
                   disabled={isSchedulePanelActive}
                   selectedSeatIds={selectedSeatIds}
                   onSelectedSeatIdsChange={setSelectedSeatIds}
@@ -428,6 +432,7 @@ export default function ReservationScheduleSelection({
                 )
                   .then((result) => {
                     if (!result.success) {
+                      setSeatsRefetchKey((prev) => prev + 1);
                       const data = result.data as { code?: string; conflictSeatIds?: string[] };
                       if (data?.code === 'SEAT_CONFLICT') {
                         const conflictIds = new Set((data.conflictSeatIds ?? []).map((id) => String(id)));
@@ -476,7 +481,17 @@ export default function ReservationScheduleSelection({
                       selectedSeats,
                     );
                   })
-                  .catch(() => {
+                  .catch((error: unknown) => {
+                    setSelectedSeatIds([]);
+                    setSelectedSeats([]);
+
+                    const status = (error as { response?: { status?: number } })?.response?.status;
+                    if (status === 409) {
+                      setSeatsRefetchKey((prev) => prev + 1);
+                      window.alert('이미 선점된 좌석이 있습니다.');
+                      return;
+                    }
+                    setSeatsRefetchKey((prev) => prev + 1);
                     window.alert('좌석 확인 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
                   })
                   .finally(() => {
