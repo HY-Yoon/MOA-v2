@@ -7,6 +7,9 @@ import com.moa2.api.reservation.domain.entity.ReservationSeat;
 import com.moa2.api.reservation.domain.repository.PaymentRepository;
 import com.moa2.api.reservation.domain.repository.ReservationRepository;
 import com.moa2.api.reservation.domain.repository.ReservationSeatRepository;
+import com.moa2.api.reservation.service.v2.ReservationServiceV2;
+import com.moa2.api.show.domain.entity.ScheduleSeat;
+import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.PageResponse;
@@ -14,13 +17,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.moa2.api.reservation.domain.specification.ReservationSpecification;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.util.Objects;
 
 import com.moa2.api.reservation.dto.ReservationSearchCondition;
 
@@ -36,6 +43,8 @@ public class ReservationService {
         private final ReservationSeatRepository reservationSeatRepository;
         private final PaymentRepository paymentRepository;
         private final UserRepository userRepository;
+        private final ScheduleSeatRepository scheduleSeatRepository;
+        private final ObjectProvider<ReservationServiceV2> reservationServiceV2Provider;
 
         /**
          * 내 예매 내역 목록 조회
@@ -104,6 +113,39 @@ public class ReservationService {
 
                 // 비즈니스 로직: 취소 가능 여부 검증 (Entity에게 위임)
                 reservation.validateCancellable();
+
+                List<ReservationSeat> reservationSeats = reservationSeatRepository
+                                .findByReservationWithSeat(reservation);
+                List<Long> scheduleSeatIds = reservationSeats.stream()
+                                .map(ReservationSeat::getScheduleSeatId)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .sorted()
+                                .toList();
+
+                if (!scheduleSeatIds.isEmpty()) {
+                        List<ScheduleSeat> scheduleSeats = scheduleSeatRepository
+                                        .findByScheduleIdAndScheduleSeatIdsForUpdate(
+                                                        reservation.getShowSchedule().getId(), scheduleSeatIds);
+                        if (scheduleSeats.size() != scheduleSeatIds.size()) {
+                                throw new IllegalStateException("예매에 연결된 좌석을 모두 찾을 수 없습니다.");
+                        }
+                        for (ScheduleSeat seat : scheduleSeats) {
+                                seat.releaseAfterSaleCancelled();
+                        }
+
+                        ReservationServiceV2 v2 = reservationServiceV2Provider.getIfAvailable();
+                        if (v2 != null) {
+                                List<Long> redisReleaseIds = List.copyOf(scheduleSeatIds);
+                                TransactionSynchronizationManager.registerSynchronization(
+                                                new TransactionSynchronization() {
+                                                        @Override
+                                                        public void afterCommit() {
+                                                                v2.releaseSeatHold(redisReleaseIds);
+                                                        }
+                                                });
+                        }
+                }
 
                 // 예매 취소 처리
                 reservation.cancel();

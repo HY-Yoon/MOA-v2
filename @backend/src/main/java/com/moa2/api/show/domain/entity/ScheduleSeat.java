@@ -109,6 +109,18 @@ public class ScheduleSeat extends BaseTimeEntity {
     }
 
     /**
+     * 예매 취소(환불) 시 판매 완료 좌석을 다시 판매 가능 상태로 되돌림
+     */
+    public void releaseAfterSaleCancelled() {
+        if (this.status != SeatStatus.SOLD) {
+            throw new IllegalStateException("판매 완료(SOLD) 좌석만 취소 반환이 가능합니다. 현재 상태: " + this.status);
+        }
+        this.status = SeatStatus.AVAILABLE;
+        this.lockedByUserId = null;
+        this.lockedUntil = null;
+    }
+
+    /**
      * 좌석 선점이 만료되었는지 확인
      */
     public boolean isLockExpired() {
