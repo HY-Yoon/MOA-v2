@@ -150,13 +150,14 @@ function PaymentSuccessContent() {
 
           <div className="mt-6 flex gap-3">
             <Link
-              href={USER_ROUTES.HOME}
-              className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-center text-sm text-slate-700"
-            >
-              상세내역
-            </Link>
-            <Link
               href={MY_PAGE_ROUTES.RESERVATIONS}
+              target='_blank'
+              rel="noopener noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                window.open(MY_PAGE_ROUTES.RESERVATIONS, '_blank', 'noopener,noreferrer');
+                window.close();
+              }}
               className="flex-1 rounded-md border border-blue-500 px-4 py-2 text-center text-sm text-blue-600"
             >
               예매내역 확인
