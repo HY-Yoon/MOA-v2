@@ -33,7 +33,7 @@ public class PaymentDto {
         public record Request(
                         @Schema(description = "스케줄 ID", example = "1") @NotNull(message = "스케줄 ID는 필수입니다") Long scheduleId,
 
-                        @Schema(description = "선점할 좌석 ID 목록", example = "[10, 11]") @NotEmpty(message = "좌석 ID 목록은 필수입니다") List<Long> seatIds,
+                        @Schema(description = "선점할 스케줄 좌석 ID 목록", example = "[4901, 4902]") @NotEmpty(message = "스케줄 좌석 ID 목록은 필수입니다") List<Long> scheduleSeatIds,
 
                         @Schema(description = "예매자 이름", example = "홍길동") @NotBlank(message = "예매자 이름은 필수입니다") String bookerName,
 
@@ -155,24 +155,6 @@ public class PaymentDto {
                                 @Schema(description = "연락처", example = "010-1234-5678") String phone,
 
                                 @Schema(description = "이메일", example = "hong@example.com") String email) {
-                }
-        }
-
-        /**
-         * 예매자 확인 정보 응답 DTO
-         */
-        @Schema(description = "예매자 확인 정보")
-        public record BuyerInfoResponse(
-                        @Schema(description = "예매자 이름", example = "홍길동") String name,
-
-                        @Schema(description = "예매자 이메일", example = "test@example.com") String email,
-
-                        @Schema(description = "예매자 연락처", example = "010-1234-5678") String phone) {
-                public static BuyerInfoResponse from(User user) {
-                        return new BuyerInfoResponse(
-                                        user.getName(),
-                                        user.getEmail(),
-                                        user.getPhone());
                 }
         }
 

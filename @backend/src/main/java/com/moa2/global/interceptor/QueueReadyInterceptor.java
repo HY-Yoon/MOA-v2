@@ -98,12 +98,14 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
                 scheduleId,
                 List.of(QueueStatus.WAITING, QueueStatus.READY));
         if (queueOpt.isEmpty()) {
+            log.warn("🚨 [QueueReadyInterceptor(V1)] 접근 차단 - 대기열 DB 기록 없음. 전달받은 URI: {}, 사용자 이메일: {}", uri, email);
             writeError(response, HttpStatus.FORBIDDEN, "대기열을 통과한 사용자만 접근할 수 있습니다. 먼저 대기열에 진입해주세요.", "QUEUE_REQUIRED");
             return false;
         }
 
         Queue queue = queueOpt.get();
         if (queue.getStatus() != QueueStatus.READY) {
+            log.warn("🚨 [QueueReadyInterceptor(V1)] 접근 차단 - 대기열 상태가 READY가 아님. 현재 상태: {}, 사용자 이메일: {}", queue.getStatus(), email);
             writeError(response, HttpStatus.FORBIDDEN, "대기열 READY 상태가 아닙니다. 현재 상태: " + queue.getStatus(),
                     "QUEUE_NOT_READY");
             return false;
@@ -113,6 +115,7 @@ public class QueueReadyInterceptor implements HandlerInterceptor {
             // READY 만료 → EXPIRED 처리
             queue.expire();
             queueRepository.save(queue);
+            log.warn("🚨 [QueueReadyInterceptor(V1)] 접근 차단 - 대기열 세션 만료. 사용자 이메일: {}", email);
             writeError(response, HttpStatus.FORBIDDEN, "대기열 세션이 만료되었습니다. 다시 대기열에 진입해주세요.", "QUEUE_EXPIRED");
             return false;
         }

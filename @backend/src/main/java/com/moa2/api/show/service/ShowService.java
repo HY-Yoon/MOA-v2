@@ -48,7 +48,15 @@ public class ShowService {
                                 ? "%" + request.keyword().trim().toLowerCase() + "%"
                                 : null;
 
+                List<com.moa2.global.model.ShowStatus> includeStatuses = List.of(
+                                com.moa2.global.model.ShowStatus.WAITING,
+                                com.moa2.global.model.ShowStatus.ON_SALE,
+                                com.moa2.global.model.ShowStatus.SOLD_OUT
+                );
+
                 Page<Show> shows = showRepository.findShowsForUser(
+                                com.moa2.global.model.SaleStatus.ALLOWED,
+                                includeStatuses,
                                 request.genre(),
                                 request.region(),
                                 keywordPattern,

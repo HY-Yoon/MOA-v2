@@ -8,6 +8,7 @@ import SectionLayout from '@/components/molecules/SectionLayout';
 import { RESERVATION_STATUS_LABELS } from '@/constants/common/reservationStatus';
 import { PAYMENT_STATUS_LABELS } from '@/constants/common/paymentStatus';
 import { Button } from '@/components/atoms';
+import { PAYMENT_METHOD_LABELS } from '@/constants/common/paymentMethod';
 
 interface Props {
   data: Reservation.Detail;
@@ -45,7 +46,7 @@ export default function ReservationPaymentInfo({
               content={dayjs(reservationDate).format(DATE_FORMAT.DATE_KR)}
             />
             <InfoField label="예매상태" content={RESERVATION_STATUS_LABELS[reservationStatus]} />
-            <InfoField label="결제수단" content={payment.paymentMethod ?? '-'} />
+            <InfoField label="결제수단" content={PAYMENT_METHOD_LABELS[payment.paymentMethod]} />
             <InfoField label="결제상태" content={PAYMENT_STATUS_LABELS[payment.paymentStatus]} />
             <InfoField
               label="총 결제금액"

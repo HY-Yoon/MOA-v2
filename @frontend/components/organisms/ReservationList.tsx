@@ -22,6 +22,16 @@ import Link from 'next/link';
 
 type RangePreset = '7d' | '1m' | '3m' | '6m';
 
+/** `YYYY-MM-DD` → 해당 일 00:00:00.000 (로컬) 기준 ISO8601 */
+function toIso8601StartOfDay(dateOnly: string) {
+  return dayjs(dateOnly).startOf(DATE_UNIT.DAY).toISOString();
+}
+
+/** `YYYY-MM-DD` → 해당 일 23:59:59.999 (로컬) 기준 ISO8601 */
+function toIso8601EndOfDay(dateOnly: string) {
+  return dayjs(dateOnly).endOf(DATE_UNIT.DAY).toISOString();
+}
+
 function ReservationListHeaderFilters({
   draftPreset,
   onChangePreset,
@@ -137,13 +147,18 @@ export interface ReservationListProps {
   getListQuery: (params: ReservationListQueryParams) => ReservationListQueryOptions;
   /** API 요청 시 추가할 쿼리 파라미터 (예: 어드민에서 showId 전달) */
   extraParams?: Record<string, string | number | undefined>;
+  /** 관리자 / 사용자 화면 여부 */
+  variant?: 'user' | 'admin';
 }
 
 export default function ReservationList({
   getDetailLink,
   getListQuery,
   extraParams = {},
+  variant,
 }: ReservationListProps) {
+  const isAdmin = variant === 'admin';
+
   // 페이지네이션
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -174,15 +189,35 @@ export default function ReservationList({
       size: pageSize,
       ...(filterValues.status?.length && { status: filterValues.status[0] }),
       ...(filterValues.paymentStatus?.length && { paymentStatus: filterValues.paymentStatus[0] }),
-      ...(appliedStartDate && { startDate: appliedStartDate }),
-      ...(appliedEndDate && { endDate: appliedEndDate }),
+      ...(appliedStartDate && {
+        startDate: isAdmin ? toIso8601StartOfDay(appliedStartDate) : appliedStartDate,
+      }),
+      ...(appliedEndDate && {
+        endDate: isAdmin ? toIso8601EndOfDay(appliedEndDate) : appliedEndDate,
+      }),
       dateType: appliedDateType,
       ...extraParams,
     }),
-    [page, pageSize, filterValues, appliedStartDate, appliedEndDate, appliedDateType, extraParams],
+    [
+      page,
+      pageSize,
+      filterValues.status,
+      filterValues.paymentStatus,
+      appliedStartDate,
+      isAdmin,
+      appliedEndDate,
+      appliedDateType,
+      extraParams,
+    ],
   );
 
-  const { data, isFetching } = useQuery(getListQuery(params));
+  const { data, isFetching } = useQuery({
+    ...getListQuery(params),
+    // 목록 재진입 시 최신화
+    refetchOnMount: 'always',
+    // 탭 복귀 시 stale이면 재조회
+    refetchOnWindowFocus: true,
+  });
 
   const reservationList = data?.content ?? [];
   const totalPages = data?.totalPages ?? 0;
@@ -232,7 +267,7 @@ export default function ReservationList({
     {
       key: 'showTitle',
       label: '공연명',
-      render: (r) => r.show.title,
+      render: (r) => (isAdmin ? r.showTitle : r.show.title),
     },
     {
       key: 'showDateTime',

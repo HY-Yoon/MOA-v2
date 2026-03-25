@@ -47,8 +47,7 @@ public class KafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.moa2.api.reservation.dto");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
 
         // application-prod.properties의 SSL 속성 자동 주입 (security.protocol, ssl.* 등)
         Map<String, String> sslProps = kafkaProperties.getProperties();

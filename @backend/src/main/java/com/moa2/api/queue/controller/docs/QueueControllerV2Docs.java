@@ -72,7 +72,8 @@ public interface QueueControllerV2Docs {
                     {
                       "scheduleId": 7
                     }
-                    """))) QueueDtoV2.EnterRequest request);
+                    """))) QueueDtoV2.EnterRequest request,
+            jakarta.servlet.http.HttpServletResponse httpServletResponse);
 
     @Operation(summary = "대기 상태 조회 (V2)", description = """
             대기열 상태를 조회합니다. 프론트엔드에서 폴링하여 상태를 확인합니다.
@@ -128,5 +129,6 @@ public interface QueueControllerV2Docs {
             }))
     })
     ResponseEntity<ApiResponse<QueueDtoV2.StatusResponse>> getQueueStatus(
-            @Parameter(description = "스케줄 ID", required = true, example = "7") Long scheduleId);
+            @Parameter(description = "스케줄 ID", required = true, example = "7") Long scheduleId,
+            jakarta.servlet.http.HttpServletResponse httpServletResponse);
 }

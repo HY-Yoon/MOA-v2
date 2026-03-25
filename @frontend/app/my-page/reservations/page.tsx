@@ -14,6 +14,7 @@ export default function ReservationListPage() {
           <ReservationList
             getDetailLink={(r) => `${MY_PAGE_ROUTES.RESERVATIONS}/${r.reservationId}`}
             getListQuery={fetchReservationList}
+            variant="user"
           />
         </PageCard.Content>
       </PageCard>

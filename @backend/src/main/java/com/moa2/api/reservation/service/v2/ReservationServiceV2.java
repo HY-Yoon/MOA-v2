@@ -27,7 +27,7 @@ import org.springframework.data.redis.core.RedisCallback;
  * 1. Redis 분산 락 획득 + 좌석 유효성 검증
  * 2. Redis에 좌석 선점 상태 저장 (SETNX + TTL)
  * 3. 즉시 200 OK 응답 (DB Write 없음!)
- * 4. /order API에서 예약자 정보와 함께 DB 저장
+ * 4. /api/v1/payment/request API에서 예약자 정보와 함께 DB 저장
  */
 @Slf4j
 @Profile("v2")
@@ -54,11 +54,11 @@ public class ReservationServiceV2 {
     public ReservationDtoV2.ReserveSeatResponse reserveSeats(
             Long userId,
             Long scheduleId,
-            List<Long> seatIds) {
-        log.info("V2 좌석 선점 시작 - userId: {}, scheduleId: {}, seatIds: {}", userId, scheduleId, seatIds);
+            List<Long> scheduleSeatIds) {
+        log.info("V2 좌석 선 점 시작 - userId: {}, scheduleId: {}, scheduleSeatIds: {}", userId, scheduleId, scheduleSeatIds);
 
         // 1. 좌석 ID 정렬 (데드락 방지)
-        List<Long> sortedSeatIds = new ArrayList<>(seatIds);
+        List<Long> sortedSeatIds = new ArrayList<>(scheduleSeatIds);
         sortedSeatIds.sort(Long::compareTo);
 
         List<Long> validatedSeatIds = new ArrayList<>();
@@ -157,9 +157,9 @@ public class ReservationServiceV2 {
      * [2단계] 주문 생성 전 Redis 선점 유효성 확인 (Pipeline)
      * - N개 좌석을 Redis 왕복 1회로 확인
      */
-    public void validateSeatHold(Long userId, List<Long> seatIds) {
+    public void validateSeatHold(Long userId, List<Long> scheduleSeatIds) {
         // Pipeline MGET - 왕복 1회
-        List<String> keys = seatIds.stream()
+        List<String> keys = scheduleSeatIds.stream()
                 .map(seatId -> SEAT_STATUS_PREFIX + seatId)
                 .toList();
 
@@ -170,9 +170,9 @@ public class ReservationServiceV2 {
             return null;
         });
 
-        for (int i = 0; i < seatIds.size(); i++) {
+        for (int i = 0; i < scheduleSeatIds.size(); i++) {
             Object result = results.get(i);
-            Long seatId = seatIds.get(i);
+            Long seatId = scheduleSeatIds.get(i);
 
             if (result == null) {
                 throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
@@ -186,17 +186,17 @@ public class ReservationServiceV2 {
     /**
      * 좌석 선점 해제 (결제 실패/취소 시 호출, Pipeline)
      */
-    public void releaseSeatHold(List<Long> seatIds) {
-        if (seatIds.isEmpty()) return;
+    public void releaseSeatHold(List<Long> scheduleSeatIds) {
+        if (scheduleSeatIds.isEmpty()) return;
 
         // Pipeline DEL - 왕복 1회
         redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            for (Long seatId : seatIds) {
+            for (Long seatId : scheduleSeatIds) {
                 connection.keyCommands().del((SEAT_STATUS_PREFIX + seatId).getBytes());
             }
             return null;
         });
-        log.info("좌석 선점 해제 완료: seatIds={}", seatIds);
+        log.info("좌석 선점 해제 완료: scheduleSeatIds={}", scheduleSeatIds);
     }
 
     /**
@@ -205,11 +205,11 @@ public class ReservationServiceV2 {
     public ReservationDtoV2.PreviewResponse getPreviewInfo(
             Long userId,
             Long scheduleId,
-            List<Long> seatIds,
+            List<Long> scheduleSeatIds,
             com.moa2.api.user.domain.entity.User user) {
         
         // 1. 좌석 선점 유효성 확인 및 잔여 시간 조회 (Pipeline - 왕복 2회)
-        List<String> statusKeys = seatIds.stream()
+        List<String> statusKeys = scheduleSeatIds.stream()
                 .map(seatId -> SEAT_STATUS_PREFIX + seatId)
                 .toList();
 
@@ -221,9 +221,9 @@ public class ReservationServiceV2 {
             return null;
         });
 
-        for (int i = 0; i < seatIds.size(); i++) {
+        for (int i = 0; i < scheduleSeatIds.size(); i++) {
             Object result = holdResults.get(i);
-            Long seatId = seatIds.get(i);
+            Long seatId = scheduleSeatIds.get(i);
 
             if (result == null) {
                 throw new IllegalStateException("좌석 선점 시간이 만료되었습니다. 좌석 ID: " + seatId);
@@ -256,7 +256,7 @@ public class ReservationServiceV2 {
         }
 
         // 2. DB에서 좌석 및 스케줄, 공연 정보 조회
-        List<ScheduleSeat> seats = seatIds.stream()
+        List<ScheduleSeat> seats = scheduleSeatIds.stream()
                 .map(id -> scheduleSeatRepository.findById(id)
                         .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + id)))
                 .toList();
