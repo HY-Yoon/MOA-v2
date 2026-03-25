@@ -142,7 +142,7 @@ data "aws_ami" "amazon_linux" {
 # NAT 공유기 역할을 할 EC2 서버 생성 (t3.micro 사이즈)
 resource "aws_instance" "nat_instance" {
   ami           = data.aws_ami.amazon_linux.id
-  instance_type = "t3.micro" # 프리티어 활용 범위 내 [cite: 35]
+  instance_type = "t2.micro" # 프리티어 활용 범위 내 [cite: 35]
   subnet_id     = aws_subnet.public_a.id # 인터넷이 되는 퍼블릭 서브넷에 배치
   vpc_security_group_ids = [aws_security_group.nat_sg.id]
 
@@ -152,11 +152,24 @@ resource "aws_instance" "nat_instance" {
 
   # EC2 부팅 시 자동으로 실행될 리눅스 스크립트 (IP 포워딩 허용 설정)
   user_data = <<-EOF
-              #!/bin/bash
-              sysctl -w net.ipv4.ip_forward=1
-              echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-              iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE
-              EOF
+                #!/bin/bash
+                # 1. iptables-services 먼저 설치
+                dnf install -y iptables-services
+                systemctl enable iptables
+
+                # 2. IP 포워딩 활성화
+                sysctl -w net.ipv4.ip_forward=1
+                echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+
+                # 3. 네트워크 인터페이스 추출
+                ETH=$(ip route show default | awk '/default/ {print $5}')
+
+                # 4. iptables NAT 룰 설정
+                iptables -t nat -A POSTROUTING -o $ETH -j MASQUERADE
+
+                # 5. 설치 완료 후 저장 (재부팅 시 유지)
+                iptables-save > /etc/sysconfig/iptables
+                EOF
 
   tags = { Name = "moa-v2-nat-instance" }
 }
