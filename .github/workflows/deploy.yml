@@ -70,6 +70,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
+      - name: Get Subnet ID from Terraform
+        working-directory: terraform
+        run: |
+          terraform init
+          echo "SUBNET_ID=$(terraform output -raw public_subnet_a_id)" >> $GITHUB_ENV
+
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
@@ -82,5 +88,5 @@ jobs:
         run: |
           packer build \
             -var "app_artifact_path=../../artifacts/app.jar" \
-            -var "subnet_id=${{ secrets.SUBNET_ID }}" \
+            -var "subnet_id=${{ env.SUBNET_ID }}" \
             .

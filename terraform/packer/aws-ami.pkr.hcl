@@ -8,8 +8,6 @@ packer {
 }
 
 source "amazon-ebs" "moa_backend" {
-  access_key = env("AWS_ACCESS_KEY_ID")
-  secret_key = env("AWS_SECRET_ACCESS_KEY")
   region     = var.aws_region
 
   instance_type = var.instance_type

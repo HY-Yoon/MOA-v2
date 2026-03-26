@@ -1,7 +1,7 @@
 variable "aws_region" {
   type        = string
   description = "AWS region for AMI build"
-  default     = env("AWS_REGION")
+  default     = "ap-northeast-2"
 }
 
 variable "subnet_id" {
