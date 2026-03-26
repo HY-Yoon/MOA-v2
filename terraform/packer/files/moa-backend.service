@@ -1,0 +1,16 @@
+[Unit]
+Description=MOA Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=moa
+Group=moa
+WorkingDirectory=/opt/moa/backend
+ExecStart=/usr/bin/java -jar /opt/moa/backend/app.jar
+Restart=always
+RestartSec=5
+Environment=SPRING_PROFILES_ACTIVE=prod
+
+[Install]
+WantedBy=multi-user.target
