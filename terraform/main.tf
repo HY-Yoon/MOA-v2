@@ -102,24 +102,36 @@ resource "aws_route_table_association" "public_c_assoc" {
 }
 
 # ==============================================================================
-# 🔥 [비용 최적화 핵심 포인트] NAT Instance 구성
-# 프라이빗 서브넷에 있는 백엔드 서버들이 인터넷(외부 API 호출, 패키지 다운 등)을 써야 할 때, 
-# AWS에서 제공하는 비싼 NAT Gateway(월 $45) 대신 저렴한(프리티어 가능) EC2 한 대를 NAT 공유기처럼 씁니다[cite: 25, 31].
+# 7.NAT + Nginx 통합 Instance 구성
 # ==============================================================================
-
-# NAT Instance용 보안 그룹 (방화벽 규칙)
 resource "aws_security_group" "nat_sg" {
   name        = "moa-v2-nat-sg"
   vpc_id      = aws_vpc.main_vpc.id
 
-  # Inbound: 프라이빗 서브넷(10.0.3.0/24, 10.0.4.0/24)에서 오는 요청만 받음
+  # 프라이빗 서브넷에서 오는 요청 허용 (NAT 용도)
   ingress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["10.0.3.0/24", "10.0.4.0/24"]
   }
-  # Outbound: 바깥 인터넷으로 다 나갈 수 있게 허용
+
+  # 외부 접속 허용: HTTP 80 (Nginx 프록시 용도)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # 외부 접속 허용: HTTPS 443 (Nginx 프록시 용도)
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -129,7 +141,6 @@ resource "aws_security_group" "nat_sg" {
   tags = { Name = "moa-v2-nat-sg" }
 }
 
-# 최신 Amazon Linux OS 이미지(AMI) 자동 검색
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -139,21 +150,18 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# NAT 공유기 역할을 할 EC2 서버 생성 (t3.micro 사이즈)
 resource "aws_instance" "nat_instance" {
-  ami           = data.aws_ami.amazon_linux.id
-  instance_type = "t2.micro" # 프리티어 활용 범위 내 [cite: 35]
-  subnet_id     = aws_subnet.public_a.id # 인터넷이 되는 퍼블릭 서브넷에 배치
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.nat_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.infra_profile.name
 
-  # ★핵심★: EC2가 내 목적지가 아닌 트래픽도 릴레이(포워딩) 할 수 있도록 보안 검사를 끕니다. 
-  # 이 옵션을 꺼야만 NAT 역할을 할 수 있습니다[cite: 25].
   source_dest_check = false
 
-  # EC2 부팅 시 자동으로 실행될 리눅스 스크립트 (IP 포워딩 허용 설정)
   user_data = <<-EOF
                 #!/bin/bash
-                # 1. iptables-services 먼저 설치
+                # 1. iptables-services 먼저 설치 (NAT 구성)
                 dnf install -y iptables-services
                 systemctl enable iptables
 
@@ -166,9 +174,11 @@ resource "aws_instance" "nat_instance" {
 
                 # 4. iptables NAT 룰 설정
                 iptables -t nat -A POSTROUTING -o $ETH -j MASQUERADE
-
-                # 5. 설치 완료 후 저장 (재부팅 시 유지)
                 iptables-save > /etc/sysconfig/iptables
+
+                # 5. Nginx 설치 및 실행 (ALB 대체용 Reverse Proxy 구성)
+                dnf install -y nginx
+                systemctl enable --now nginx
                 EOF
 
   tags = { Name = "moa-v2-nat-instance" }

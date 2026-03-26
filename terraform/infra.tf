@@ -83,14 +83,14 @@ resource "aws_iam_instance_profile" "infra_profile" {
 # ==============================================================================
 resource "aws_instance" "infra_instance" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.micro"
+  instance_type          = "t2.micro"
   subnet_id              = aws_subnet.private_a.id
   vpc_security_group_ids = [aws_security_group.infra_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.infra_profile.name
 
   # EBS 30GB (프리티어 한도)
   root_block_device {
-    volume_size = 15
+    volume_size = 25
     volume_type = "gp2"
   }
 
@@ -115,7 +115,7 @@ resource "aws_instance" "infra_instance" {
 
     # 4. docker-compose.yml 작성
     mkdir -p /opt/infra
-    cat > /opt/infra/docker-compose.yml <<'COMPOSE'
+    cat > /opt/infra/docker-compose.yml <<COMPOSE
     version: '3.8'
     services:
       redis:
@@ -134,7 +134,7 @@ resource "aws_instance" "infra_instance" {
           KAFKA_NODE_ID: 1
           KAFKA_PROCESS_ROLES: broker,controller
           KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://$(hostname -I | awk '{print $1}'):9092
           KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
           KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
           KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
