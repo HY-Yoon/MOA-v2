@@ -7,14 +7,14 @@ on:
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
-      - 'infra/packer/**'
+      - 'terraform/packer/**'
   pull_request:
     branches:
       - 'feature/user-update'
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
-      - 'infra/packer/**'
+      - 'terraform/packer/**'
 
 jobs:
   build:
