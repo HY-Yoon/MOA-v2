@@ -74,11 +74,11 @@ jobs:
         uses: hashicorp/setup-packer@main
 
       - name: Packer Init
-        working-directory: infra/packer
+        working-directory: terraform/packer
         run: packer init .
 
       - name: Build AMI with Packer
-        working-directory: infra/packer
+        working-directory: terraform/packer
         run: |
           packer build \
             -var "app_artifact_path=../../artifacts/app.jar" \
