@@ -41,7 +41,7 @@ public interface TicketingControllerDocs {
             "message": null
           }
           """))),
-      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "선점 실패", content = @Content(mediaType = "application/json", examples = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "선점 실패", content = @Content(mediaType = "application/json", examples = {
           @ExampleObject(name = "좌석 충돌 (SEAT_CONFLICT)", value = """
               {
                 "success": false,
