@@ -70,16 +70,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
       - name: Get Subnet ID from Terraform
         working-directory: terraform
         run: |
           terraform init
           echo "SUBNET_ID=$(terraform output -raw public_subnet_a_id)" >> $GITHUB_ENV
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
 
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
