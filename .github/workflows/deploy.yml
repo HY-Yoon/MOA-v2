@@ -7,7 +7,14 @@ on:
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
-      - 'packer/**'
+      - 'infra/packer/**'
+  pull_request:
+    branches:
+      - 'feature/user-update'
+    paths:
+      - '@backend/**'
+      - '.github/workflows/deploy.yml'
+      - 'infra/packer/**'
 
 jobs:
   build:
@@ -40,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-jar
-          path: @backend/build/libs/app.jar
+          path: ./@backend/build/libs/app.jar
 
   build-ami:
     needs: build
@@ -66,7 +73,14 @@ jobs:
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
+      - name: Packer Init
+        working-directory: infra/packer
+        run: packer init .
+
       - name: Build AMI with Packer
+        working-directory: infra/packer
         run: |
-          packer init packer
-          packer build -var "jar_path=artifacts/app.jar" packer
+          packer build \
+            -var "app_artifact_path=../../artifacts/app.jar" \
+            -var "subnet_id=${{ secrets.SUBNET_ID }}" \
+            .
