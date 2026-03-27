@@ -7,7 +7,7 @@ Type=simple
 User=moa
 Group=moa
 WorkingDirectory=/opt/moa/backend
-ExecStart=/usr/bin/java -jar /opt/moa/backend/app.jar
+ExecStart=/usr/bin/java -Xms256m -Xmx256m -jar /opt/moa/backend/app.jar
 Restart=always
 RestartSec=5
 Environment=SPRING_PROFILES_ACTIVE=prod

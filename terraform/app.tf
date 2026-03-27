@@ -60,12 +60,7 @@ resource "aws_launch_template" "app_lt" {
   # EC2가 켜질 때 실행될 스크립트 (요청하신 JVM 힙 설정 적용)
   user_data = base64encode(<<-EOF
     #!/bin/bash
-
-    # 1. 환경 변수 설정 (필요시 추가)
     export SPRING_PROFILES_ACTIVE=prod
-
-    # 2. Packer가 /tmp에 복사해둔 jar 파일을 지정된 JVM 옵션으로 백그라운드 실행
-    nohup java -Xms256m -Xmx256m -jar /tmp/app.jar > /tmp/app.log 2>&1 &
   EOF
   )
 }
