@@ -8,6 +8,7 @@ on:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
       - 'terraform/packer/**'
+      - 'terraform/**'
   pull_request:
     branches:
       - 'feature/user-update'
@@ -15,6 +16,7 @@ on:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
       - 'terraform/packer/**'
+      - 'terraform/**'
 
 jobs:
   build:
