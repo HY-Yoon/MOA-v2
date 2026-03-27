@@ -1,3 +1,12 @@
+terraform {
+  backend "s3" {
+    bucket         = "moa-v2-tfstate"
+    key            = "terraform.tfstate"
+    region         = "ap-northeast-2"
+    dynamodb_table = "moa-v2-terraform-lock"
+    encrypt        = true
+  }
+}
 # ==============================================================================
 # 1. AWS Provider 설정
 # 테라폼이 AWS 클라우드의 어느 지역(Region)에 인프라를 만들지 지정합니다.
