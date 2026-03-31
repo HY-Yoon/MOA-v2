@@ -1,3 +1,4 @@
+/*
 # ==============================================================================
 # 1. Infra EC2용 보안 그룹
 # 앱 서버(ASG)에서만 Redis(6379), Kafka(9092), Prometheus(9090), Grafana(3000) 접근 허용
@@ -81,6 +82,7 @@ resource "aws_iam_instance_profile" "infra_profile" {
 # Redis + Kafka + Prometheus + Grafana를 Docker로 실행
 # Swap 4GB 설정으로 1GB RAM 한계 극복
 # ==============================================================================
+# 로컬 인프라 EC2는 PaaS(Aiven 등) 사용을 위해 주석 처리됨
 resource "aws_instance" "infra_instance" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
@@ -166,3 +168,4 @@ resource "aws_instance" "infra_instance" {
 
   tags = { Name = "moa-v2-infra-instance" }
 }
+*/

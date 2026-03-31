@@ -54,7 +54,7 @@ resource "aws_db_instance" "moa_postgres" {
   identifier = "moa-v2-postgres"
 
   engine         = "postgres"
-  engine_version = "16.3"
+  engine_version = "16"
   instance_class = "db.t3.micro"
 
   allocated_storage     = 20
