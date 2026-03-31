@@ -19,6 +19,9 @@ on:
       - 'terraform/**'
 
 jobs:
+  # ============================================================
+  # Job 1: Spring Boot JAR 빌드
+  # ============================================================
   build:
     runs-on: ubuntu-latest
     defaults:
@@ -52,9 +55,37 @@ jobs:
           path: ./@backend/build/libs/app.jar
           if-no-files-found: error
 
-  build-ami:
+  # ============================================================
+  # Job 2: 인프라 프로비저닝 + AMI 빌드 + 앱 배포
+  # 3-Phase 전략으로 닭-달걀 문제를 근본적으로 해결합니다.
+  #   Phase 1: 기반 인프라 생성 (Network, RDS, IAM) — AMI 불필요
+  #   Phase 2: Packer AMI 빌드 — Phase 1에서 얻은 Subnet ID 사용
+  #   Phase 3: 전체 배포 (Launch Template, ASG) — 이제 AMI 존재
+  # ============================================================
+  deploy:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+      TF_VAR_redis_host: ${{ secrets.REDIS_HOST }}
+      TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
+      TF_VAR_redis_port: ${{ secrets.REDIS_PORT }}
+      TF_VAR_kafka_bootstrap_servers: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+      TF_VAR_kafka_ssl_truststore_cert: ${{ secrets.KAFKA_SSL_TRUSTSTORE_CERT }}
+      TF_VAR_kafka_ssl_keystore_cert: ${{ secrets.KAFKA_SSL_KEYSTORE_CERT }}
+      TF_VAR_kafka_ssl_keystore_key: ${{ secrets.KAFKA_SSL_KEYSTORE_KEY }}
+      TF_VAR_jwt_access_secret: ${{ secrets.JWT_ACCESS_SECRET }}
+      TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
+      TF_VAR_encryption_key: ${{ secrets.ENCRYPTION_KEY }}
+      TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      TF_VAR_kakao_client_id: ${{ secrets.KAKAO_CLIENT_ID }}
+      TF_VAR_kakao_client_secret: ${{ secrets.KAKAO_CLIENT_SECRET }}
+      TF_VAR_naver_client_id: ${{ secrets.NAVER_CLIENT_ID }}
+      TF_VAR_naver_client_secret: ${{ secrets.NAVER_CLIENT_SECRET }}
+      TF_VAR_mail_username: ${{ secrets.MAIL_USERNAME }}
+      TF_VAR_mail_password: ${{ secrets.MAIL_PASSWORD }}
+      TF_VAR_cors_allowed_origins: ${{ secrets.CORS_ALLOWED_ORIGINS }}
 
     steps:
       - name: Checkout Repository
@@ -78,34 +109,30 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Get Subnet ID from Terraform
+      - name: Terraform Init
         working-directory: terraform
-        env:
-          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-          TF_VAR_redis_host: ${{ secrets.REDIS_HOST }}
-          TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
-          TF_VAR_redis_port: ${{ secrets.REDIS_PORT }}
-          TF_VAR_kafka_bootstrap_servers: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-          TF_VAR_kafka_ssl_truststore_cert: ${{ secrets.KAFKA_SSL_TRUSTSTORE_CERT }}
-          TF_VAR_kafka_ssl_keystore_cert: ${{ secrets.KAFKA_SSL_KEYSTORE_CERT }}
-          TF_VAR_kafka_ssl_keystore_key: ${{ secrets.KAFKA_SSL_KEYSTORE_KEY }}
-          TF_VAR_jwt_access_secret: ${{ secrets.JWT_ACCESS_SECRET }}
-          TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
-          TF_VAR_encryption_key: ${{ secrets.ENCRYPTION_KEY }}
-          TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
-          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          TF_VAR_kakao_client_id: ${{ secrets.KAKAO_CLIENT_ID }}
-          TF_VAR_kakao_client_secret: ${{ secrets.KAKAO_CLIENT_SECRET }}
-          TF_VAR_naver_client_id: ${{ secrets.NAVER_CLIENT_ID }}
-          TF_VAR_naver_client_secret: ${{ secrets.NAVER_CLIENT_SECRET }}
-          TF_VAR_mail_username: ${{ secrets.MAIL_USERNAME }}
-          TF_VAR_mail_password: ${{ secrets.MAIL_PASSWORD }}
-          TF_VAR_cors_allowed_origins: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+        run: terraform init
+
+      # ──────────────────────────────────────────────────────────
+      # Phase 1: 기반 인프라만 생성 (AMI 의존성 없는 리소스만)
+      # -target을 사용해 app.tf의 AMI 의존 리소스를 제외합니다.
+      # ──────────────────────────────────────────────────────────
+      - name: "Phase 1: Apply Base Infrastructure"
+        working-directory: terraform
         run: |
-          terraform init
-          terraform apply -auto-approve
+          terraform apply -auto-approve \
+            -target=aws_db_instance.moa_postgres \
+            -target=aws_instance.nat_instance \
+            -target=aws_route_table_association.private_a_assoc \
+            -target=aws_route_table_association.private_c_assoc \
+            -target=aws_route_table_association.public_a_assoc \
+            -target=aws_route_table_association.public_c_assoc \
+            -target=aws_iam_instance_profile.infra_profile
           echo "SUBNET_ID=$(terraform output -raw public_subnet_a_id)" >> $GITHUB_ENV
 
+      # ──────────────────────────────────────────────────────────
+      # Phase 2: Packer로 AMI 빌드 (Phase 1에서 얻은 Subnet ID 사용)
+      # ──────────────────────────────────────────────────────────
       - name: Setup Packer
         uses: hashicorp/setup-packer@main
 
@@ -113,10 +140,17 @@ jobs:
         working-directory: terraform/packer
         run: packer init .
 
-      - name: Build AMI with Packer
+      - name: "Phase 2: Build AMI with Packer"
         working-directory: terraform/packer
         run: |
           packer build \
             -var "app_artifact_path=../../artifacts/app.jar" \
             -var "subnet_id=${{ env.SUBNET_ID }}" \
             .
+
+      # ──────────────────────────────────────────────────────────
+      # Phase 3: 전체 배포 (이제 AMI가 존재하므로 Launch Template + ASG 생성)
+      # ──────────────────────────────────────────────────────────
+      - name: "Phase 3: Deploy Application"
+        working-directory: terraform
+        run: terraform apply -auto-approve
