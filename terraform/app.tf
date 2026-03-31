@@ -75,6 +75,7 @@ resource "aws_launch_template" "app_lt" {
     Environment="SPRING_DATASOURCE_PASSWORD=${var.db_password}"
     
     # PaaS (Redis & Kafka) 변수
+    Environment="REDIS_URL=rediss://default:${var.redis_password}@${var.redis_host}:${var.redis_port}"
     Environment="REDIS_HOST=${var.redis_host}"
     Environment="REDIS_PORT=${var.redis_port}"
     Environment="REDIS_PASSWORD=${var.redis_password}"
