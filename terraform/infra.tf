@@ -49,6 +49,7 @@ resource "aws_security_group" "infra_sg" {
 
   tags = { Name = "moa-v2-infra-sg" }
 }
+*/
 
 # ==============================================================================
 # 2. SSM을 위한 IAM Role
@@ -77,6 +78,7 @@ resource "aws_iam_instance_profile" "infra_profile" {
   role = aws_iam_role.infra_ssm_role.name
 }
 
+/*
 # ==============================================================================
 # 3. Infra EC2 생성
 # Redis + Kafka + Prometheus + Grafana를 Docker로 실행
