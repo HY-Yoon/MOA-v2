@@ -67,7 +67,7 @@ resource "aws_launch_template" "app_lt" {
     # 2. DB 정보를 systemd Environment 로 주입 (Spring Boot가 이를 읽어 실행됨)
     cat <<EOF2 > /etc/systemd/system/moa-backend.service.d/override.conf
     [Service]
-    Environment="SPRING_PROFILES_ACTIVE=prod"
+    Environment="SPRING_PROFILES_ACTIVE=prod,v2"
     # RDS (PostgreSQL) 변수
     Environment="DB_HOST=${aws_db_instance.moa_postgres.address}"
     Environment="SPRING_DATASOURCE_URL=jdbc:postgresql://${aws_db_instance.moa_postgres.address}:5432/${aws_db_instance.moa_postgres.db_name}"
@@ -100,7 +100,7 @@ resource "aws_launch_template" "app_lt" {
     EOF2
 
     # /etc/environment 에도 시스템 확인용 참고 기록
-    echo "SPRING_PROFILES_ACTIVE=prod" >> /etc/environment
+    echo "SPRING_PROFILES_ACTIVE=prod,v2" >> /etc/environment
     echo "DB_HOST=${aws_db_instance.moa_postgres.address}" >> /etc/environment
     echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${aws_db_instance.moa_postgres.address}:5432/${aws_db_instance.moa_postgres.db_name}" >> /etc/environment
 
