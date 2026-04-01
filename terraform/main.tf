@@ -169,7 +169,7 @@ resource "aws_instance" "nat_instance" {
   source_dest_check = false
   user_data_replace_on_change = true
 
-  user_data = <<-EOF
+  user_data = replace(<<-EOF
                 #!/bin/bash
                 # 0. 타임존을 한국 시간(KST)으로 변경
                 timedatectl set-timezone Asia/Seoul
@@ -216,6 +216,7 @@ server {
 CONF_EOF
                 systemctl restart nginx
                 EOF
+  , "\r", "")
 
   tags = { Name = "moa-v2-nat-instance" }
 }
