@@ -175,6 +175,17 @@ resource "aws_instance" "nat_instance" {
 }
 
 # ==============================================================================
+# 7-1. 탄력적 IP (Elastic IP) 생성 및 연결
+# NAT 인스턴스가 고정된 퍼블릭 IP를 갖도록 설정합니다. (도메인 연결용)
+# ==============================================================================
+resource "aws_eip" "nat_eip" {
+  instance = aws_instance.nat_instance.id
+  domain   = "vpc"
+
+  tags = { Name = "moa-v2-nat-eip" }
+}
+
+# ==============================================================================
 # 7. Private Route Table (프라이빗 라우팅 테이블)
 # 프라이빗 서브넷의 이정표입니다. "인터넷으로 나갈 일(0.0.0.0/0)이 생기면 방금 만든 NAT EC2로 가라"고 지시합니다.
 # ==============================================================================
@@ -199,4 +210,31 @@ resource "aws_route_table_association" "private_c_assoc" {
 
 output "public_subnet_a_id" {
   value = aws_subnet.public_a.id
+}
+
+output "nat_public_ip" {
+  value       = aws_eip.nat_eip.public_ip
+  description = "NAT Instance Public IP for Domain A Record"
+}
+
+# ==============================================================================
+# 8. Route 53 (DNS 자동 연결)
+# NAT 인스턴스의 탄력적 IP(EIP)를 moa.hee-factory.com 도메인에 자동으로 매핑합니다.
+# ==============================================================================
+
+# AWS Route 53에 이미 존재하는 hee-factory.com 도메인의 정보를 찾아옵니다.
+data "aws_route53_zone" "main_domain" {
+  name         = "hee-factory.com"
+  private_zone = false
+}
+
+# moa.hee-factory.com의 A 레코드를 생성하고 EIP 주소를 자동으로 꽂아넣습니다.
+resource "aws_route53_record" "moa_a_record" {
+  zone_id = data.aws_route53_zone.main_domain.zone_id
+  name    = "moa.${data.aws_route53_zone.main_domain.name}" # moa.hee-factory.com
+  type    = "A"
+  ttl     = 300
+
+  # 값(Value): Terraform이 방금 발급받은 NAT 인스턴스의 EIP
+  records = [aws_eip.nat_eip.public_ip]
 }
