@@ -61,6 +61,9 @@ resource "aws_launch_template" "app_lt" {
   user_data = base64encode(<<-EOF
     #!/bin/bash
     
+    # 0. 타임존을 한국 시간(KST)으로 변경
+    timedatectl set-timezone Asia/Seoul
+
     # 1. Systemd 서비스 환경변수 주입을 위한 override 디렉토리 생성
     mkdir -p /etc/systemd/system/moa-backend.service.d
     

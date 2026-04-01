@@ -167,9 +167,13 @@ resource "aws_instance" "nat_instance" {
   iam_instance_profile   = aws_iam_instance_profile.infra_profile.name
 
   source_dest_check = false
+  user_data_replace_on_change = true
 
   user_data = <<-EOF
                 #!/bin/bash
+                # 0. 타임존을 한국 시간(KST)으로 변경
+                timedatectl set-timezone Asia/Seoul
+                
                 # 1. 기존 NAT 기능(iptables) 유지
                 dnf install -y iptables-services
                 systemctl enable iptables
