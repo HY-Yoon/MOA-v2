@@ -31,7 +31,7 @@ systemctl enable --now nginx
 cat > /etc/nginx/conf.d/app-proxy.conf << 'NGINX_CONF'
 server {
     listen 80;
-    server_name _;
+    server_name moa.hee-factory.com;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
