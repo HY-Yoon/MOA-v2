@@ -170,24 +170,47 @@ resource "aws_instance" "nat_instance" {
 
   user_data = <<-EOF
                 #!/bin/bash
-                # 1. iptables-services 먼저 설치 (NAT 구성)
+                # 1. 기존 NAT 기능(iptables) 유지
                 dnf install -y iptables-services
                 systemctl enable iptables
 
-                # 2. IP 포워딩 활성화
                 sysctl -w net.ipv4.ip_forward=1
                 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 
-                # 3. 네트워크 인터페이스 추출
                 ETH=$(ip route show default | awk '/default/ {print $5}')
 
-                # 4. iptables NAT 룰 설정
                 iptables -t nat -A POSTROUTING -o $ETH -j MASQUERADE
                 iptables-save > /etc/sysconfig/iptables
 
-                # 5. Nginx 설치 및 실행 (ALB 대체용 Reverse Proxy 구성)
+                # 2. EBS 활용 Swap 4GB 생성 및 활성화 (RAM 부족 방지용)
+                dd if=/dev/zero of=/swapfile bs=1M count=4096
+                chmod 600 /swapfile
+                mkswap /swapfile
+                swapon /swapfile
+                echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+
+                # 3. Nginx 설치 및 실행
                 dnf install -y nginx
                 systemctl enable --now nginx
+
+                # 4. Nginx 설정 파일 생성 (80포트 요청을 App 서버 사설 IP:8080포트로 전달)
+                cat > /etc/nginx/conf.d/app-proxy.conf << 'CONF_EOF'
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        # TODO: <APP_SERVER_PRIVATE_IP> 부분을 실제 App 서버의 사설 IP 주소로 대체하거나
+        # 내부 로드밸런서(Internal LB), Service Discovery 체계로 연결합니다.
+        proxy_pass http://<APP_SERVER_PRIVATE_IP>:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+CONF_EOF
+                systemctl restart nginx
                 EOF
 
   tags = { Name = "moa-v2-nat-instance" }

@@ -33,7 +33,7 @@ public class SpringDocConfig {
     }
 
 
-    @Value("${APP_URL:http://localhost:8081}")
+    @Value("${APP_URL:http://localhost:8080}")
     private String appUrl;
 
     @Bean

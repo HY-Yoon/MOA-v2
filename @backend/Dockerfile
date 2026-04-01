@@ -39,14 +39,14 @@ COPY --from=builder /build/build/libs/*.jar app.jar
 RUN mkdir -p /app/uploads
 
 # 포트 노출
-EXPOSE 8081
+EXPOSE 8080
 
 # Health check (curl 사용)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8081}/actuator/health || exit 1
+  CMD curl -f http://localhost:${PORT:-8080}/actuator/health || exit 1
 
 # 환경변수 기본값 설정
-ENV PORT=8081
+ENV PORT=8080
 
 # JVM 메모리 최적화
 ENTRYPOINT ["sh", "-c", "java \
