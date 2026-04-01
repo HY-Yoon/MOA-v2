@@ -25,6 +25,10 @@ echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 
 # 3. Nginx 설치 및 실행
 dnf install -y nginx
+
+# SELinux가 켜져있을 경우 Nginx가 프록시(네트워크) 연결을 할 수 있도록 허용
+setsebool -P httpd_can_network_connect 1 || true
+
 systemctl enable --now nginx
 
 # 앱 서버 IP를 동적으로 조회하기 위한 스크립트 (켜질 때까지 무한 대기)
