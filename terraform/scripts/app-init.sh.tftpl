@@ -11,6 +11,7 @@ mkdir -p /etc/systemd/system/moa-backend.service.d
 cat > /etc/systemd/system/moa-backend.service.d/override.conf << 'OVERRIDE_EOF'
 [Service]
 Environment="SPRING_PROFILES_ACTIVE=prod,v2"
+Environment="PORT=8080"
 Environment="DB_HOST=${db_host}"
 Environment="SPRING_DATASOURCE_URL=jdbc:postgresql://${db_host}:5432/${db_name}"
 Environment="SPRING_DATASOURCE_USERNAME=${db_username}"
