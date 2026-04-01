@@ -50,7 +50,12 @@ resource "aws_launch_template" "app_lt" {
   # 설계서 정책에 따라 App 서버는 t3.micro를 사용합니다[cite: 15].
   instance_type = "t3.micro"
 
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
+  # 추가: 고정 사설 IP 부여 (단일 서버 운영용)
+  network_interfaces {
+    associate_public_ip_address = false
+    private_ip_address          = "10.0.3.100"
+    security_groups             = [aws_security_group.app_sg.id]
+  }
 
   # infra.tf에서 만들어둔 SSM 접속 권한 프로필을 재사용합니다 (키페어 없이 접속 가능)
   iam_instance_profile {
@@ -92,11 +97,12 @@ resource "aws_autoscaling_group" "app_asg" {
   name                = "moa-v2-app-asg"
 
   # 앱 서버는 외부에서 직접 접근할 수 없는 프라이빗 서브넷에 안전하게 배치합니다[cite: 54].
-  vpc_zone_identifier = [aws_subnet.private_a.id, aws_subnet.private_c.id]
+  # 고정 IP(10.0.3.100)와 맞추기 위해 서브넷을 private_a 단일로 지정
+  vpc_zone_identifier = [aws_subnet.private_a.id]
 
   desired_capacity    = 1
   min_size            = 1
-  max_size            = 2
+  max_size            = 1 # 고정 IP는 1개만 존재할 수 있으므로 최대 크기를 1로 제한
 
   # 100% Spot Instance로만 띄워서 비용을 극한으로 최적화합니다[cite: 15].
   mixed_instances_policy {
