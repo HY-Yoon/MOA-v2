@@ -73,6 +73,21 @@ resource "aws_iam_role_policy_attachment" "infra_ssm_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# 추가: NAT 인스턴스가 앱 서버의 동적 IP를 조회하기 위해 필요한 IAM 정책 (AWS CLI 사용)
+resource "aws_iam_role_policy" "infra_describe_ec2" {
+  name = "moa-v2-infra-describe-ec2"
+  role = aws_iam_role.infra_ssm_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = ["ec2:DescribeInstances"]
+      Effect   = "Allow"
+      Resource = "*"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "infra_profile" {
   name = "moa-v2-infra-profile"
   role = aws_iam_role.infra_ssm_role.name

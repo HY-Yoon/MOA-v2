@@ -27,18 +27,37 @@ echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 dnf install -y nginx
 systemctl enable --now nginx
 
-# 4. Nginx 설정 파일 생성 (80포트 요청을 App 서버 사설 IP:8080포트로 전달)
-cat > /etc/nginx/conf.d/app-proxy.conf << 'NGINX_CONF'
+# 앱 서버 IP를 동적으로 조회하기 위한 스크립트 (켜질 때까지 무한 대기)
+echo "Waiting for backend app server to become available..."
+while true; do
+  APP_IP=$(aws ec2 describe-instances \
+    --region ap-northeast-2 \
+    --filters "Name=tag:Name,Values=moa-v2-app-instance" \
+              "Name=instance-state-name,Values=running" \
+    --query "Reservations[0].Instances[0].PrivateIpAddress" \
+    --output text)
+  
+  # APP_IP가 None이 아니고 비어있지 않은 경우 루프 탈출
+  if [ "$APP_IP" != "None" ] && [ -n "$APP_IP" ]; then
+    echo "Found Backend IP: $APP_IP"
+    break
+  fi
+  echo "Backend not found yet. Retrying in 5 seconds..."
+  sleep 5
+done
+
+# 찾아낸 앱 서버 IP($APP_IP)를 Nginx proxy_pass에 동적으로 주입
+cat > /etc/nginx/conf.d/app-proxy.conf << NGINX_CONF
 server {
     listen 80;
     server_name moa.hee-factory.com;
 
     location / {
-        proxy_pass http://10.0.3.100:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://${APP_IP}:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 NGINX_CONF
