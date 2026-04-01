@@ -204,9 +204,9 @@ server {
     server_name _;
 
     location / {
-        # TODO: <APP_SERVER_PRIVATE_IP> 부분을 실제 App 서버의 사설 IP 주소로 대체하거나
+        # TODO: 127.0.0.1 부분을 실제 App 서버의 사설 IP 주소로 대체하거나
         # 내부 로드밸런서(Internal LB), Service Discovery 체계로 연결합니다.
-        proxy_pass http://<APP_SERVER_PRIVATE_IP>:8080;
+        proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
