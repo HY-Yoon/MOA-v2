@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # 0. 타임존을 한국 시간(KST)으로 변경
 timedatectl set-timezone Asia/Seoul
@@ -35,10 +35,10 @@ while true; do
     --filters "Name=tag:Name,Values=moa-v2-app-instance" \
               "Name=instance-state-name,Values=running" \
     --query "Reservations[0].Instances[0].PrivateIpAddress" \
-    --output text)
+    --output text) || APP_IP=""
   
   # APP_IP가 None이 아니고 비어있지 않은 경우 루프 탈출
-  if [ "$APP_IP" != "None" ] && [ -n "$APP_IP" ]; then
+  if [ "${APP_IP:-}" != "None" ] && [ -n "${APP_IP:-}" ]; then
     echo "Found Backend IP: $APP_IP"
     break
   fi
