@@ -1,0 +1,6 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell scripts must always use LF line endings (Linux/EC2 compatibility)
+*.sh text eol=lf
+*.tftpl text eol=lf

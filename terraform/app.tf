@@ -58,60 +58,31 @@ resource "aws_launch_template" "app_lt" {
   }
 
   # EC2가 켜질 때 실행될 스크립트 (동적 DB 엔드포인트 자동 주입 및 시스템 시작 설정)
-  user_data = base64encode(<<-EOF
-    #!/bin/bash
-    
-    # 0. 타임존을 한국 시간(KST)으로 변경
-    timedatectl set-timezone Asia/Seoul
-
-    # 1. Systemd 서비스 환경변수 주입을 위한 override 디렉토리 생성
-    mkdir -p /etc/systemd/system/moa-backend.service.d
-    
-    # 2. DB 정보를 systemd Environment 로 주입 (Spring Boot가 이를 읽어 실행됨)
-    cat <<EOF2 > /etc/systemd/system/moa-backend.service.d/override.conf
-    [Service]
-    Environment="SPRING_PROFILES_ACTIVE=prod,v2"
-    # RDS (PostgreSQL) 변수
-    Environment="DB_HOST=${aws_db_instance.moa_postgres.address}"
-    Environment="SPRING_DATASOURCE_URL=jdbc:postgresql://${aws_db_instance.moa_postgres.address}:5432/${aws_db_instance.moa_postgres.db_name}"
-    Environment="SPRING_DATASOURCE_USERNAME=${aws_db_instance.moa_postgres.username}"
-    Environment="SPRING_DATASOURCE_PASSWORD=${var.db_password}"
-    
-    # PaaS (Redis & Kafka) 변수
-    Environment="REDIS_URL=rediss://default:${var.redis_password}@${var.redis_host}:${var.redis_port}"
-    Environment="REDIS_HOST=${var.redis_host}"
-    Environment="REDIS_PORT=${var.redis_port}"
-    Environment="REDIS_PASSWORD=${var.redis_password}"
-    Environment="KAFKA_BOOTSTRAP_SERVERS=${var.kafka_bootstrap_servers}"
-    Environment="KAFKA_SSL_TRUSTSTORE_CERT=${var.kafka_ssl_truststore_cert}"
-    Environment="KAFKA_SSL_KEYSTORE_CERT=${var.kafka_ssl_keystore_cert}"
-    Environment="KAFKA_SSL_KEYSTORE_KEY=${var.kafka_ssl_keystore_key}"
-
-    # Secret 변수
-    Environment="JWT_ACCESS_SECRET=${var.jwt_access_secret}"
-    Environment="JWT_REFRESH_SECRET=${var.jwt_refresh_secret}"
-    Environment="ENCRYPTION_KEY=${var.encryption_key}"
-    Environment="GOOGLE_CLIENT_ID=${var.google_client_id}"
-    Environment="GOOGLE_CLIENT_SECRET=${var.google_client_secret}"
-    Environment="KAKAO_CLIENT_ID=${var.kakao_client_id}"
-    Environment="KAKAO_CLIENT_SECRET=${var.kakao_client_secret}"
-    Environment="NAVER_CLIENT_ID=${var.naver_client_id}"
-    Environment="NAVER_CLIENT_SECRET=${var.naver_client_secret}"
-    Environment="MAIL_USERNAME=${var.mail_username}"
-    Environment="MAIL_PASSWORD=${var.mail_password}"
-    Environment="CORS_ALLOWED_ORIGINS=${var.cors_allowed_origins}"
-    EOF2
-
-    # /etc/environment 에도 시스템 확인용 참고 기록
-    echo "SPRING_PROFILES_ACTIVE=prod,v2" >> /etc/environment
-    echo "DB_HOST=${aws_db_instance.moa_postgres.address}" >> /etc/environment
-    echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${aws_db_instance.moa_postgres.address}:5432/${aws_db_instance.moa_postgres.db_name}" >> /etc/environment
-
-    # 3. systemd 설정 다시 읽고, Spring Boot 앱 서비스 재시작
-    systemctl daemon-reload
-    systemctl restart moa-backend.service
-  EOF
-  )
+  user_data = base64encode(templatefile("${path.module}/scripts/app-init.sh.tftpl", {
+    db_host                  = aws_db_instance.moa_postgres.address
+    db_name                  = aws_db_instance.moa_postgres.db_name
+    db_username              = aws_db_instance.moa_postgres.username
+    db_password              = var.db_password
+    redis_host               = var.redis_host
+    redis_port               = var.redis_port
+    redis_password           = var.redis_password
+    kafka_bootstrap_servers  = var.kafka_bootstrap_servers
+    kafka_ssl_truststore_cert = var.kafka_ssl_truststore_cert
+    kafka_ssl_keystore_cert  = var.kafka_ssl_keystore_cert
+    kafka_ssl_keystore_key   = var.kafka_ssl_keystore_key
+    jwt_access_secret        = var.jwt_access_secret
+    jwt_refresh_secret       = var.jwt_refresh_secret
+    encryption_key           = var.encryption_key
+    google_client_id         = var.google_client_id
+    google_client_secret     = var.google_client_secret
+    kakao_client_id          = var.kakao_client_id
+    kakao_client_secret      = var.kakao_client_secret
+    naver_client_id          = var.naver_client_id
+    naver_client_secret      = var.naver_client_secret
+    mail_username            = var.mail_username
+    mail_password            = var.mail_password
+    cors_allowed_origins     = var.cors_allowed_origins
+  }))
 }
 
 # ==============================================================================
