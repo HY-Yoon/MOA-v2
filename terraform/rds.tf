@@ -29,13 +29,20 @@ resource "aws_security_group" "rds_sg" {
   name   = "moa-v2-rds-sg"
   vpc_id = aws_vpc.main_vpc.id
 
-  # Temporary rule: allow PostgreSQL from private subnet CIDRs.
-  # Replace with security_groups = [aws_security_group.app_sg.id] after app SG is finalized.
+  # App ASG에서 오는 PostgreSQL 트래픽 허용
   ingress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["10.0.3.0/24", "10.0.4.0/24"]
+    security_groups = [aws_security_group.app_sg.id]
+  }
+
+  # SSM 포트포워딩 대상인 NAT 인스턴스에서 오는 PostgreSQL 트래픽 허용
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [aws_security_group.nat_sg.id]
   }
 
   egress {

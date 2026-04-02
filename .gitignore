@@ -53,3 +53,5 @@ docker-compose.yml
 crash.log
 crash.*.log
 
+global-bundle.pem
+
