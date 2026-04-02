@@ -68,3 +68,29 @@ NGINX_CONF
 
 # 5. Nginx 설정 테스트 후 재시작
 nginx -t && systemctl restart nginx
+
+# 6. 백엔드 IP 변경 감지 및 Nginx 자동 reload (30초마다)
+cat > /usr/local/bin/refresh-backend-ip.sh << 'SCRIPT_EOF'
+#!/bin/bash
+NEW_IP=$(aws ec2 describe-instances \
+  --region ap-northeast-2 \
+  --filters "Name=tag:Name,Values=moa-v2-app-instance" \
+            "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].PrivateIpAddress" \
+  --output text 2>/dev/null) || exit 0
+
+[ "${NEW_IP:-}" = "None" ] || [ -z "${NEW_IP:-}" ] && exit 0
+
+CURRENT_IP=$(grep -oP 'proxy_pass http://\K[^:]+' /etc/nginx/conf.d/app-proxy.conf 2>/dev/null) || exit 0
+
+if [ "$NEW_IP" != "$CURRENT_IP" ]; then
+  sed -i "s|proxy_pass http://${CURRENT_IP}:8080|proxy_pass http://${NEW_IP}:8080|g" /etc/nginx/conf.d/app-proxy.conf
+  nginx -t && systemctl reload nginx
+fi
+SCRIPT_EOF
+
+chmod +x /usr/local/bin/refresh-backend-ip.sh
+
+# cron: 30초마다 IP 변경 감지
+echo "* * * * * root /usr/local/bin/refresh-backend-ip.sh" >> /etc/cron.d/refresh-backend-ip
+echo "* * * * * root sleep 30 && /usr/local/bin/refresh-backend-ip.sh" >> /etc/cron.d/refresh-backend-ip
