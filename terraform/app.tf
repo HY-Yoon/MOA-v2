@@ -82,6 +82,8 @@ resource "aws_launch_template" "app_lt" {
     mail_username            = var.mail_username
     mail_password            = var.mail_password
     cors_allowed_origins     = var.cors_allowed_origins
+    s3_bucket_name           = aws_s3_bucket.moa_cdn_bucket.id
+    cloudfront_domain        = aws_cloudfront_distribution.moa_cdn.domain_name
   }))
 }
 

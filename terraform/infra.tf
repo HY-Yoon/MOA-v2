@@ -88,6 +88,24 @@ resource "aws_iam_role_policy" "infra_describe_ec2" {
   })
 }
 
+resource "aws_iam_role_policy" "infra_s3_upload" {
+  name = "moa-v2-infra-s3-upload"
+  role = aws_iam_role.infra_ssm_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ]
+      Effect   = "Allow"
+      Resource = "${aws_s3_bucket.moa_cdn_bucket.arn}/*"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "infra_profile" {
   name = "moa-v2-infra-profile"
   role = aws_iam_role.infra_ssm_role.name
