@@ -71,7 +71,7 @@ public class FileService {
         validateFile(file);
 
         LocalDate today = LocalDate.now();
-        String datePath = today.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String datePath = today.format(DateTimeFormatter.ofPattern("yyyy/MMdd"));
 
         String originalFilename = file.getOriginalFilename();
         String extension = "";
