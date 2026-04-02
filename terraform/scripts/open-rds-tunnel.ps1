@@ -1,11 +1,11 @@
-$ErrorActionPreference = "Stop"
-
 param(
   [string]$NatNameTag = "moa-v2-nat-instance",
   [string]$DbIdentifier = "moa-v2-postgres",
   [int]$RemotePort = 5432,
   [int]$LocalPort = 5432
 )
+
+$ErrorActionPreference = "Stop"
 
 function Require-Command {
   param([string]$Name)
@@ -16,7 +16,7 @@ function Require-Command {
 
 Require-Command -Name "aws"
 
-Write-Host "==> NAT 인스턴스 조회 중..."
+Write-Host "==> NAT 인스턴스 조회 중..."FG
 $natInstanceId = aws ec2 describe-instances `
   --filters "Name=tag:Name,Values=$NatNameTag" "Name=instance-state-name,Values=running" `
   --query "Reservations[].Instances[].InstanceId" `

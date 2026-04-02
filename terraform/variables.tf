@@ -4,6 +4,46 @@
 # ==============================================================================
 
 # ------------------------------
+# 0. 외부 PostgreSQL 연결 정보
+# ------------------------------
+variable "db_host" {
+  description = "External PostgreSQL Host Endpoint"
+  type        = string
+  default     = ""
+}
+
+variable "db_port" {
+  description = "External PostgreSQL Port"
+  type        = string
+  default     = "5432"
+}
+
+variable "db_sslmode" {
+  description = "External PostgreSQL sslmode (e.g. require, disable)"
+  type        = string
+  default     = "require"
+}
+
+variable "db_name" {
+  description = "External PostgreSQL database name"
+  type        = string
+  default     = "defaultdb"
+}
+
+variable "db_username" {
+  description = "External PostgreSQL username"
+  type        = string
+  default     = "avnadmin"
+}
+
+variable "db_password" {
+  description = "External PostgreSQL password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ------------------------------
 # 1. PaaS 연결 정보 (Aiven Redis, Kafka)
 # ------------------------------
 variable "redis_host" {

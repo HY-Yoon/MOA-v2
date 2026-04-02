@@ -47,8 +47,8 @@ resource "aws_launch_template" "app_lt" {
   name_prefix   = "moa-v2-app-"
   image_id      = data.aws_ami.latest_backend.id
 
-  # 설계서 정책에 따라 App 서버는 t3.micro를 사용합니다[cite: 15].
-  instance_type = "t3.micro"
+  # 프리티어 안정성을 위해 온디맨드 t2.micro로 고정합니다.
+  instance_type = "t2.micro"
 
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
@@ -59,9 +59,11 @@ resource "aws_launch_template" "app_lt" {
 
   # EC2가 켜질 때 실행될 스크립트 (동적 DB 엔드포인트 자동 주입 및 시스템 시작 설정)
   user_data = base64encode(templatefile("${path.module}/scripts/app-init.sh.tftpl", {
-    db_host                  = aws_db_instance.moa_postgres.address
-    db_name                  = aws_db_instance.moa_postgres.db_name
-    db_username              = aws_db_instance.moa_postgres.username
+    db_host                  = var.db_host
+    db_port                  = var.db_port
+    db_sslmode               = var.db_sslmode
+    db_name                  = var.db_name
+    db_username              = var.db_username
     db_password              = var.db_password
     redis_host               = var.redis_host
     redis_port               = var.redis_port
@@ -88,7 +90,7 @@ resource "aws_launch_template" "app_lt" {
 }
 
 # ==============================================================================
-# 4. Auto Scaling Group (ASG) - Spot Instance 구성
+# 4. Auto Scaling Group (ASG) - On-Demand 단일 인스턴스 구성
 # ==============================================================================
 resource "aws_autoscaling_group" "app_asg" {
   name                = "moa-v2-app-asg"
@@ -98,21 +100,11 @@ resource "aws_autoscaling_group" "app_asg" {
 
   desired_capacity    = 1
   min_size            = 1
-  max_size            = 2
+  max_size            = 1
 
-  # 100% Spot Instance로만 띄워서 비용을 극한으로 최적화합니다[cite: 15].
-  mixed_instances_policy {
-    launch_template {
-      launch_template_specification {
-        launch_template_id = aws_launch_template.app_lt.id
-        version            = "$Latest"
-      }
-    }
-    instances_distribution {
-      on_demand_base_capacity                  = 0
-      on_demand_percentage_above_base_capacity = 0
-      spot_allocation_strategy                 = "lowest-price"
-    }
+  launch_template {
+    id      = aws_launch_template.app_lt.id
+    version = "$Latest"
   }
 
   tag {
