@@ -154,3 +154,10 @@ jobs:
       - name: "Phase 3: Deploy Application"
         working-directory: terraform
         run: terraform apply -auto-approve
+
+      - name: "Phase 4: Trigger ASG Instance Refresh"
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name moa-v2-app-asg \
+            --preferences '{"MinHealthyPercentage": 0, "InstanceWarmup": 60}' \
+          || echo "Instance refresh skipped (possibly first deploy or already refreshing)"
