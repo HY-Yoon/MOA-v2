@@ -58,6 +58,9 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
+    
+    // AWS SDK (S3)
+    implementation("software.amazon.awssdk:s3:2.25.11")
 
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
