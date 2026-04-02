@@ -10,7 +10,7 @@ WorkingDirectory=/opt/moa/backend
 ExecStart=/usr/bin/java -Xms256m -Xmx256m -jar /opt/moa/backend/app.jar
 Restart=always
 RestartSec=5
-Environment=SPRING_PROFILES_ACTIVE=prod
+Environment=SPRING_PROFILES_ACTIVE=prod,v2
 
 [Install]
 WantedBy=multi-user.target
