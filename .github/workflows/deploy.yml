@@ -63,6 +63,7 @@ jobs:
   #   Phase 3: 전체 배포 (Launch Template, ASG) — 이제 AMI 존재
   # ============================================================
   deploy:
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     env:
@@ -112,6 +113,14 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
+
+      - name: Validate required secrets
+        run: |
+          test -n "${{ secrets.DB_HOST }}" || (echo "DB_HOST is missing" && exit 1)
+          test -n "${{ secrets.DB_PORT }}" || (echo "DB_PORT is missing" && exit 1)
+          test -n "${{ secrets.DB_NAME }}" || (echo "DB_NAME is missing" && exit 1)
+          test -n "${{ secrets.DB_USERNAME }}" || (echo "DB_USERNAME is missing" && exit 1)
+          test -n "${{ secrets.DB_PASSWORD }}" || (echo "DB_PASSWORD is missing" && exit 1)
 
       - name: Terraform Init
         working-directory: terraform
