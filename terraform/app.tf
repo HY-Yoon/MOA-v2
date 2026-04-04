@@ -59,33 +59,34 @@ resource "aws_launch_template" "app_lt" {
 
   # EC2가 켜질 때 실행될 스크립트 (동적 DB 엔드포인트 자동 주입 및 시스템 시작 설정)
   user_data = base64encode(templatefile("${path.module}/scripts/app-init.sh.tftpl", {
-    db_host                  = var.db_host
-    db_port                  = var.db_port
-    db_sslmode               = var.db_sslmode
-    db_name                  = var.db_name
-    db_username              = var.db_username
-    db_password              = var.db_password
-    redis_host               = var.redis_host
-    redis_port               = var.redis_port
-    redis_password           = var.redis_password
-    kafka_bootstrap_servers  = var.kafka_bootstrap_servers
+    db_host                   = var.db_host
+    db_port                   = var.db_port
+    db_sslmode                = var.db_sslmode
+    db_name                   = var.db_name
+    db_username               = var.db_username
+    db_password               = var.db_password
+    redis_host                = var.redis_host
+    redis_port                = var.redis_port
+    redis_password            = var.redis_password
+    redis_password_urlencoded = urlencode(var.redis_password)
+    kafka_bootstrap_servers   = var.kafka_bootstrap_servers
     kafka_ssl_truststore_cert = var.kafka_ssl_truststore_cert
-    kafka_ssl_keystore_cert  = var.kafka_ssl_keystore_cert
-    kafka_ssl_keystore_key   = var.kafka_ssl_keystore_key
-    jwt_access_secret        = var.jwt_access_secret
-    jwt_refresh_secret       = var.jwt_refresh_secret
-    encryption_key           = var.encryption_key
-    google_client_id         = var.google_client_id
-    google_client_secret     = var.google_client_secret
-    kakao_client_id          = var.kakao_client_id
-    kakao_client_secret      = var.kakao_client_secret
-    naver_client_id          = var.naver_client_id
-    naver_client_secret      = var.naver_client_secret
-    mail_username            = var.mail_username
-    mail_password            = var.mail_password
-    cors_allowed_origins     = var.cors_allowed_origins
-    s3_bucket_name           = aws_s3_bucket.moa_cdn_bucket.id
-    cloudfront_domain        = aws_cloudfront_distribution.moa_cdn.domain_name
+    kafka_ssl_keystore_cert   = var.kafka_ssl_keystore_cert
+    kafka_ssl_keystore_key    = var.kafka_ssl_keystore_key
+    jwt_access_secret         = var.jwt_access_secret
+    jwt_refresh_secret        = var.jwt_refresh_secret
+    encryption_key            = var.encryption_key
+    google_client_id          = var.google_client_id
+    google_client_secret      = var.google_client_secret
+    kakao_client_id           = var.kakao_client_id
+    kakao_client_secret       = var.kakao_client_secret
+    naver_client_id           = var.naver_client_id
+    naver_client_secret       = var.naver_client_secret
+    mail_username             = var.mail_username
+    mail_password             = var.mail_password
+    cors_allowed_origins      = var.cors_allowed_origins
+    s3_bucket_name            = aws_s3_bucket.moa_cdn_bucket.id
+    cloudfront_domain         = aws_cloudfront_distribution.moa_cdn.domain_name
   }))
 }
 

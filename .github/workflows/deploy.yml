@@ -114,13 +114,44 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Debug - Check secrets availability
+        run: |
+          echo "=== Secret availability check ==="
+          echo "DB_HOST:              ${{ secrets.DB_HOST != '' }}"
+          echo "DB_PORT:              ${{ secrets.DB_PORT != '' }}"
+          echo "DB_NAME:              ${{ secrets.DB_NAME != '' }}"
+          echo "DB_USERNAME:          ${{ secrets.DB_USERNAME != '' }}"
+          echo "DB_PASSWORD:          ${{ secrets.DB_PASSWORD != '' }}"
+          echo "REDIS_HOST:           ${{ secrets.REDIS_HOST != '' }}"
+          echo "REDIS_PORT:           ${{ secrets.REDIS_PORT != '' }}"
+          echo "REDIS_PASSWORD:       ${{ secrets.REDIS_PASSWORD != '' }}"
+          echo "JWT_ACCESS_SECRET:    ${{ secrets.JWT_ACCESS_SECRET != '' }}"
+          echo "JWT_REFRESH_SECRET:   ${{ secrets.JWT_REFRESH_SECRET != '' }}"
+          echo "ENCRYPTION_KEY:       ${{ secrets.ENCRYPTION_KEY != '' }}"
+          echo "CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS != '' }}"
+          echo "AWS_ACCESS_KEY_ID:    ${{ secrets.AWS_ACCESS_KEY_ID != '' }}"
+          echo "AWS_SECRET_ACCESS_KEY:${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}"
+
       - name: Validate required secrets
         run: |
-          test -n "${{ secrets.DB_HOST }}" || (echo "DB_HOST is missing" && exit 1)
-          test -n "${{ secrets.DB_PORT }}" || (echo "DB_PORT is missing" && exit 1)
-          test -n "${{ secrets.DB_NAME }}" || (echo "DB_NAME is missing" && exit 1)
-          test -n "${{ secrets.DB_USERNAME }}" || (echo "DB_USERNAME is missing" && exit 1)
-          test -n "${{ secrets.DB_PASSWORD }}" || (echo "DB_PASSWORD is missing" && exit 1)
+          MISSING=""
+          test -n "${{ secrets.DB_HOST }}" || MISSING="$MISSING DB_HOST"
+          test -n "${{ secrets.DB_PORT }}" || MISSING="$MISSING DB_PORT"
+          test -n "${{ secrets.DB_NAME }}" || MISSING="$MISSING DB_NAME"
+          test -n "${{ secrets.DB_USERNAME }}" || MISSING="$MISSING DB_USERNAME"
+          test -n "${{ secrets.DB_PASSWORD }}" || MISSING="$MISSING DB_PASSWORD"
+          test -n "${{ secrets.REDIS_HOST }}" || MISSING="$MISSING REDIS_HOST"
+          test -n "${{ secrets.REDIS_PASSWORD }}" || MISSING="$MISSING REDIS_PASSWORD"
+          test -n "${{ secrets.JWT_ACCESS_SECRET }}" || MISSING="$MISSING JWT_ACCESS_SECRET"
+          test -n "${{ secrets.JWT_REFRESH_SECRET }}" || MISSING="$MISSING JWT_REFRESH_SECRET"
+          test -n "${{ secrets.ENCRYPTION_KEY }}" || MISSING="$MISSING ENCRYPTION_KEY"
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing required secrets:$MISSING"
+            echo "Hint: GitHub repo Settings > Secrets and variables > Actions 에서 Repository secrets 로 등록했는지 확인하세요."
+            echo "Environment secrets 로 등록한 경우, deploy job 에 'environment: <name>' 을 추가해야 합니다."
+            exit 1
+          fi
+          echo "All required secrets are set."
 
       - name: Terraform Init
         working-directory: terraform

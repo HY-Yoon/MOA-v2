@@ -1,10 +1,9 @@
 #!/bin/bash
-set -uo pipefail
+set -euo pipefail
 
-# 0. 타임존을 한국 시간(KST)으로 변경
 timedatectl set-timezone Asia/Seoul
 
-# 1. 기존 NAT 기능(iptables) 유지
+# NAT (iptables masquerade)
 dnf install -y iptables-services
 systemctl enable iptables
 
@@ -12,46 +11,39 @@ sysctl -w net.ipv4.ip_forward=1
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 
 ETH=$(ip route show default | awk '/default/ {print $5}')
-
 iptables -t nat -A POSTROUTING -o "$ETH" -j MASQUERADE
 iptables-save > /etc/sysconfig/iptables
 
-# 2. EBS 활용 Swap 4GB 생성 및 활성화 (RAM 부족 방지용)
-dd if=/dev/zero of=/swapfile bs=1M count=4096
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+# Swap 2GB (fallocate는 dd보다 즉시 할당되어 부팅 시간 단축)
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+fi
 
-# 3. Nginx 설치 및 실행
+# Nginx
 dnf install -y nginx
-
-# SELinux가 켜져있을 경우 Nginx가 프록시(네트워크) 연결을 할 수 있도록 허용
 setsebool -P httpd_can_network_connect 1 || true
-
 systemctl enable --now nginx
 
-# 앱 서버 IP를 동적으로 조회하기 위한 스크립트 (켜질 때까지 무한 대기)
-echo "Waiting for backend app server to become available..."
-while true; do
-  APP_IP=$(aws ec2 describe-instances \
-    --region ap-northeast-2 \
-    --filters "Name=tag:Name,Values=moa-v2-app-instance" \
-              "Name=instance-state-name,Values=running" \
-    --query "Reservations[0].Instances[0].PrivateIpAddress" \
-    --output text) || APP_IP=""
-  
-  # APP_IP가 None이 아니고 비어있지 않은 경우 루프 탈출
-  if [ "${APP_IP:-}" != "None" ] && [ -n "${APP_IP:-}" ]; then
-    echo "Found Backend IP: $APP_IP"
-    break
-  fi
-  echo "Backend not found yet. Retrying in 5 seconds..."
-  sleep 5
-done
+# 앱 서버 IP 조회 → Nginx 프록시 설정 스크립트 (초기 + cron 공용)
+cat > /opt/refresh-nginx-upstream.sh << 'REFRESH_EOF'
+#!/bin/bash
+APP_IP=$(aws ec2 describe-instances \
+  --region ap-northeast-2 \
+  --filters "Name=tag:Name,Values=moa-v2-app-instance" \
+            "Name=instance-state-name,Values=running" \
+  --query "Reservations[0].Instances[0].PrivateIpAddress" \
+  --output text 2>/dev/null) || exit 0
 
-# 찾아낸 앱 서버 IP($APP_IP)를 Nginx proxy_pass에 동적으로 주입
-cat > /etc/nginx/conf.d/app-proxy.conf << NGINX_CONF
+[ -z "$APP_IP" ] || [ "$APP_IP" = "None" ] && exit 0
+
+CURRENT=$(grep -oP 'proxy_pass http://\K[0-9.]+' /etc/nginx/conf.d/app-proxy.conf 2>/dev/null) || CURRENT=""
+
+if [ "$APP_IP" != "$CURRENT" ]; then
+  cat > /etc/nginx/conf.d/app-proxy.conf << NGINX_CONF
 server {
     listen 80;
     server_name moa.hee-factory.com;
@@ -65,6 +57,24 @@ server {
     }
 }
 NGINX_CONF
+  nginx -t && systemctl reload nginx
+fi
+REFRESH_EOF
+chmod +x /opt/refresh-nginx-upstream.sh
 
-# 5. Nginx 설정 테스트 후 재시작
-nginx -t && systemctl restart nginx
+# 초기 부팅 시: 앱 서버가 올라올 때까지 대기 후 Nginx 설정
+echo "Waiting for backend app server to become available..."
+while true; do
+  /opt/refresh-nginx-upstream.sh && \
+    [ -f /etc/nginx/conf.d/app-proxy.conf ] && \
+    grep -q 'proxy_pass' /etc/nginx/conf.d/app-proxy.conf 2>/dev/null && break
+  echo "Backend not found yet. Retrying in 5 seconds..."
+  sleep 5
+done
+echo "Nginx upstream configured."
+
+# cron — 매분 앱 서버 IP 변경 감지 및 자동 갱신 (ASG 교체 대응)
+dnf install -y cronie
+systemctl enable --now crond
+echo "* * * * * root /opt/refresh-nginx-upstream.sh" > /etc/cron.d/refresh-nginx
+chmod 644 /etc/cron.d/refresh-nginx
