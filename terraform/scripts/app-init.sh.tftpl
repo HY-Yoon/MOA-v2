@@ -65,7 +65,7 @@ cat > /etc/moa/backend/moa-backend.env << 'ENVFILE_EOF'
 SPRING_PROFILES_ACTIVE="prod,v2"
 PORT="8080"
 DB_HOST="${db_host}"
-# application.properties 가 ${DB_URL}/${DB_USERNAME}/${DB_PASSWORD} 플레이스홀더를 쓰므로 동일 값을 명시 (누락 시 localhost DB로 붙다가 기동 실패)
+# application.properties 의 DB_URL·DB_USERNAME·DB_PASSWORD 플레이스홀더와 동일 값 (누락 시 localhost DB로 붙다가 기동 실패)
 DB_URL="jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}"
 DB_USERNAME="${db_username}"
 DB_PASSWORD="${db_password}"
