@@ -169,7 +169,13 @@ resource "aws_instance" "nat_instance" {
   source_dest_check = false
   user_data_replace_on_change = true
 
-  user_data = file("${path.module}/scripts/nat-init.sh")
+  user_data = templatefile("${path.module}/scripts/nat-init.sh.tftpl", {
+    aws_region       = var.nat_proxy_region
+    app_asg_name     = var.nat_proxy_app_asg_name
+    app_tag_name     = var.nat_proxy_app_name_tag
+    public_domain    = var.nat_proxy_public_domain
+    backend_app_port = var.nat_proxy_backend_port
+  })
 
   tags = { Name = "moa-v2-nat-instance" }
 }

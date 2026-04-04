@@ -81,7 +81,10 @@ resource "aws_iam_role_policy" "infra_describe_ec2" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action   = ["ec2:DescribeInstances"]
+      Action   = [
+        "ec2:DescribeInstances",
+        "autoscaling:DescribeAutoScalingGroups"
+      ]
       Effect   = "Allow"
       Resource = "*"
     }]

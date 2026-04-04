@@ -1,0 +1,146 @@
+#!/bin/bash
+set -euo pipefail
+
+timedatectl set-timezone Asia/Seoul
+
+AWS_REGION="${aws_region}"
+APP_ASG_NAME="${app_asg_name}"
+APP_TAG_NAME="${app_tag_name}"
+PUBLIC_DOMAIN="${public_domain}"
+BACKEND_APP_PORT="${backend_app_port}"
+
+# NAT (iptables masquerade)
+dnf install -y iptables-services awscli nginx cronie
+systemctl enable iptables
+
+sysctl -w net.ipv4.ip_forward=1
+grep -q '^net.ipv4.ip_forward=1$' /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+
+ETH=$(ip route show default | awk '/default/ {print $5}')
+iptables -t nat -C POSTROUTING -o "$ETH" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o "$ETH" -j MASQUERADE
+iptables-save > /etc/sysconfig/iptables
+
+# Swap 2GB
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+fi
+
+setsebool -P httpd_can_network_connect 1 || true
+systemctl enable --now nginx
+systemctl enable --now crond
+
+# ASG 우선 조회, 실패 시 Name 태그 기반 조회로 fallback
+cat > /opt/resolve-app-ip.sh << 'RESOLVE_IP_EOF'
+#!/bin/bash
+set -euo pipefail
+
+AWS_REGION="$1"
+APP_ASG_NAME="$2"
+APP_TAG_NAME="$3"
+
+INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+  --region "$AWS_REGION" \
+  --auto-scaling-group-names "$APP_ASG_NAME" \
+  --query "AutoScalingGroups[0].Instances[?LifecycleState==\`InService\`].InstanceId" \
+  --output text 2>/dev/null || true)
+
+APP_IP=""
+if [ -n "${INSTANCE_IDS// }" ] && [ "$INSTANCE_IDS" != "None" ]; then
+  APP_IP=$(aws ec2 describe-instances \
+    --region "$AWS_REGION" \
+    --instance-ids $INSTANCE_IDS \
+    --filters "Name=instance-state-name,Values=running" \
+    --query "Reservations[].Instances[].PrivateIpAddress" \
+    --output text 2>/dev/null | awk '{print $1}' || true)
+fi
+
+if [ -z "${APP_IP:-}" ] || [ "$APP_IP" = "None" ]; then
+  APP_IP=$(aws ec2 describe-instances \
+    --region "$AWS_REGION" \
+    --filters "Name=tag:Name,Values=$APP_TAG_NAME" "Name=instance-state-name,Values=running" \
+    --query "Reservations[].Instances[].PrivateIpAddress" \
+    --output text 2>/dev/null | awk '{print $1}' || true)
+fi
+
+if [ -n "${APP_IP:-}" ] && [ "$APP_IP" != "None" ]; then
+  echo "$APP_IP"
+fi
+RESOLVE_IP_EOF
+chmod +x /opt/resolve-app-ip.sh
+
+# 최신 앱 IP로 nginx.conf를 재생성
+cat > /opt/refresh-nginx-upstream.sh << 'REFRESH_EOF'
+#!/bin/bash
+set -euo pipefail
+
+AWS_REGION="$1"
+APP_ASG_NAME="$2"
+APP_TAG_NAME="$3"
+PUBLIC_DOMAIN="$4"
+BACKEND_APP_PORT="$5"
+
+APP_IP=$(/opt/resolve-app-ip.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" 2>/dev/null || true)
+[ -z "${APP_IP:-}" ] && exit 1
+
+CURRENT=$(awk '/proxy_pass http:\/\//{gsub(/.*http:\/\//,""); gsub(/:.*/,""); print; exit}' /etc/nginx/nginx.conf 2>/dev/null || true)
+
+if [ "$APP_IP" != "${CURRENT:-}" ]; then
+  cat > /etc/nginx/nginx.conf << NGINX_CONF
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log notice;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    log_format main '\$remote_addr - \$remote_user [\$time_local] "\$request" '
+                    '\$status \$body_bytes_sent "\$http_referer" '
+                    '"\$http_user_agent" "\$http_x_forwarded_for"';
+    access_log /var/log/nginx/access.log main;
+    sendfile on;
+    keepalive_timeout 65;
+
+    server {
+        listen 80;
+        server_name ${PUBLIC_DOMAIN};
+
+        location / {
+            proxy_pass http://${APP_IP}:${BACKEND_APP_PORT};
+            proxy_http_version 1.1;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 60s;
+        }
+    }
+}
+NGINX_CONF
+  nginx -t && systemctl reload nginx
+fi
+REFRESH_EOF
+chmod +x /opt/refresh-nginx-upstream.sh
+
+# 초기 부팅 시: ASG가 붙을 때까지 최대 10분 대기 후 진행 (이후 cron이 계속 갱신)
+ATTEMPTS=0
+MAX_ATTEMPTS=120
+until /opt/refresh-nginx-upstream.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$PUBLIC_DOMAIN" "$BACKEND_APP_PORT"; do
+  ATTEMPTS=$((ATTEMPTS + 1))
+  [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ] && break
+  sleep 5
+done
+
+cat > /etc/cron.d/refresh-nginx << CRON_EOF
+* * * * * root /opt/refresh-nginx-upstream.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$PUBLIC_DOMAIN" "$BACKEND_APP_PORT" >/var/log/refresh-nginx.log 2>&1
+CRON_EOF
+chmod 644 /etc/cron.d/refresh-nginx

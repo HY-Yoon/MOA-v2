@@ -177,3 +177,36 @@ variable "cors_allowed_origins" {
   type        = string
   default     = "http://localhost:3000,http://localhost:5173"
 }
+
+# ------------------------------
+# 5. NAT Nginx Reverse Proxy 설정
+# ------------------------------
+variable "nat_proxy_region" {
+  description = "AWS region used by NAT instance AWS CLI lookup"
+  type        = string
+  default     = "ap-northeast-2"
+}
+
+variable "nat_proxy_app_asg_name" {
+  description = "ASG name used by NAT to resolve backend private IP"
+  type        = string
+  default     = "moa-v2-app-asg"
+}
+
+variable "nat_proxy_app_name_tag" {
+  description = "Fallback Name tag used by NAT to resolve backend private IP"
+  type        = string
+  default     = "moa-v2-app-instance"
+}
+
+variable "nat_proxy_public_domain" {
+  description = "Public domain served by NAT nginx"
+  type        = string
+  default     = "moa.hee-factory.com"
+}
+
+variable "nat_proxy_backend_port" {
+  description = "Backend app port proxied by NAT nginx"
+  type        = number
+  default     = 8080
+}
