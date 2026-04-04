@@ -107,7 +107,8 @@ http {
                     '"\$http_user_agent" "\$http_x_forwarded_for"';
     access_log /var/log/nginx/access.log main;
     sendfile on;
-    keepalive_timeout 65;
+    # 짧은 keepalive로 구 upstream 커넥션 잔존 시간을 줄여 IP 전환 반영을 빠르게 함
+    keepalive_timeout 15;
 
     server {
         listen 80;
@@ -115,6 +116,7 @@ http {
 
         location / {
             proxy_pass http://$${APP_IP}:$${BACKEND_APP_PORT};
+            proxy_bind off;
             proxy_http_version 1.1;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
@@ -126,7 +128,32 @@ http {
     }
 }
 NGINX_CONF
-  nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload || systemctl reload nginx || nginx -s reload)
+  if nginx -t; then
+    RELOADED=0
+    MASTER_PID=""
+    [ -f /run/nginx.pid ] && MASTER_PID=$(cat /run/nginx.pid 2>/dev/null || true)
+
+    # 1순위: 마스터 프로세스에 HUP 직접 전달 (graceful, zero-downtime)
+    if [ -n "$MASTER_PID" ]; then
+      if kill -0 "$MASTER_PID" 2>/dev/null; then
+        if kill -HUP "$MASTER_PID" 2>/dev/null || sudo kill -HUP "$MASTER_PID" 2>/dev/null; then
+          RELOADED=1
+        fi
+      fi
+    fi
+
+    # 2순위: 서비스 reload 명령으로 폴백
+    if [ "$RELOADED" -ne 1 ]; then
+      if sudo systemctl reload nginx 2>/dev/null || systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || nginx -s reload 2>/dev/null; then
+        RELOADED=1
+      fi
+    fi
+
+    # 3순위(예외): reload 계열이 모두 실패한 경우에만 restart
+    if [ "$RELOADED" -ne 1 ]; then
+      sudo systemctl restart nginx || systemctl restart nginx
+    fi
+  fi
 fi
 REFRESH_EOF
 chmod +x /opt/refresh-nginx-upstream.sh
