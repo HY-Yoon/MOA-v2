@@ -197,3 +197,11 @@ jobs:
       - name: "Phase 3: Deploy Application"
         working-directory: terraform
         run: terraform apply -auto-approve
+
+      - name: "Phase 3.5: Force Instance Refresh"
+        run: |
+          echo "Triggering ASG instance refresh to apply new launch template..."
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name moa-v2-app-asg \
+            --preferences '{"MinHealthyPercentage":0,"InstanceWarmup":180}' \
+            --region ap-northeast-2 || echo "Instance refresh already in progress or triggered by Terraform."

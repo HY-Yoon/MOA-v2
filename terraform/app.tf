@@ -96,7 +96,6 @@ resource "aws_launch_template" "app_lt" {
 resource "aws_autoscaling_group" "app_asg" {
   name                = "moa-v2-app-asg"
 
-  # 앱 서버는 외부에서 직접 접근할 수 없는 프라이빗 서브넷에 안전하게 배치합니다[cite: 54].
   vpc_zone_identifier = [aws_subnet.private_a.id, aws_subnet.private_c.id]
 
   desired_capacity    = 1
@@ -106,6 +105,15 @@ resource "aws_autoscaling_group" "app_asg" {
   launch_template {
     id      = aws_launch_template.app_lt.id
     version = "$Latest"
+  }
+
+  # Launch Template 변경 시 자동으로 인스턴스 교체 (RDS→Aiven 등 환경변수 변경 반영)
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 0
+      instance_warmup        = 180
+    }
   }
 
   tag {
