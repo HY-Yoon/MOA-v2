@@ -59,49 +59,58 @@ START_SCRIPT_BOUNDARY
 chmod +x /opt/moa/backend/start.sh
 chown moa:moa /opt/moa/backend/start.sh
 
-# 앱 환경변수는 단일 파일로 기록 (cat /etc/moa/backend/moa-backend.env 로 확인 가능)
-mkdir -p /etc/moa/backend
-cat > /etc/moa/backend/moa-backend.env << 'ENVFILE_EOF'
-SPRING_PROFILES_ACTIVE="prod,v2"
-PORT="8080"
-DB_HOST="${db_host}"
-# application.properties 의 DB_URL·DB_USERNAME·DB_PASSWORD 플레이스홀더와 동일 값 (누락 시 localhost DB로 붙다가 기동 실패)
-DB_URL="jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}"
-DB_USERNAME="${db_username}"
-DB_PASSWORD="${db_password}"
-SPRING_DATASOURCE_URL="jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}"
-SPRING_DATASOURCE_USERNAME="${db_username}"
-SPRING_DATASOURCE_PASSWORD="${db_password}"
-REDIS_URL="rediss://default:${redis_password_urlencoded}@${redis_host}:${redis_port}"
-REDIS_HOST="${redis_host}"
-REDIS_PORT="${redis_port}"
-REDIS_PASSWORD="${redis_password}"
-KAFKA_BOOTSTRAP_SERVERS="${kafka_bootstrap_servers}"
-JWT_ACCESS_SECRET="${jwt_access_secret}"
-JWT_REFRESH_SECRET="${jwt_refresh_secret}"
-ENCRYPTION_KEY="${encryption_key}"
-GOOGLE_CLIENT_ID="${google_client_id}"
-GOOGLE_CLIENT_SECRET="${google_client_secret}"
-KAKAO_CLIENT_ID="${kakao_client_id}"
-KAKAO_CLIENT_SECRET="${kakao_client_secret}"
-NAVER_CLIENT_ID="${naver_client_id}"
-NAVER_CLIENT_SECRET="${naver_client_secret}"
-MAIL_USERNAME="${mail_username}"
-MAIL_PASSWORD="${mail_password}"
-CORS_ALLOWED_ORIGINS="${cors_allowed_origins}"
-S3_BUCKET_NAME="${s3_bucket_name}"
-CLOUDFRONT_DOMAIN="${cloudfront_domain}"
-ENVFILE_EOF
-chmod 600 /etc/moa/backend/moa-backend.env
-chown root:root /etc/moa/backend/moa-backend.env
+# Terraform 변수값을 systemd 유닛 본문에 직접 주입
+# - jsonencode: 공백/따옴표/백슬래시를 안전하게 escape
+# - replace(..., "%", "%%"): systemd specifier(%) 충돌 방지
+cat > /etc/systemd/system/moa-backend.service << 'SERVICE_EOF'
+[Unit]
+Description=MOA Backend Service
+After=network.target
 
-# ExecStart만 래퍼로 교체; 변수는 EnvironmentFile에서 로드
-cat > /etc/systemd/system/moa-backend.service.d/override.conf << 'OVERRIDE_EOF'
 [Service]
-EnvironmentFile=/etc/moa/backend/moa-backend.env
-ExecStart=
+Type=simple
+User=moa
+Group=moa
+WorkingDirectory=/opt/moa/backend
 ExecStart=/opt/moa/backend/start.sh
-OVERRIDE_EOF
+Restart=always
+RestartSec=5
+Environment=SPRING_PROFILES_ACTIVE="prod,v2"
+Environment=PORT="8080"
+Environment=DB_HOST=${jsonencode(replace(db_host, "%", "%%"))}
+Environment=DB_PORT=${jsonencode(replace(db_port, "%", "%%"))}
+Environment=DB_NAME=${jsonencode(replace(db_name, "%", "%%"))}
+Environment=DB_URL=${jsonencode(replace(format("jdbc:postgresql://%s:%s/%s?sslmode=%s", db_host, db_port, db_name, db_sslmode), "%", "%%"))}
+Environment=DB_USERNAME=${jsonencode(replace(db_username, "%", "%%"))}
+Environment=DB_PASSWORD=${jsonencode(replace(db_password, "%", "%%"))}
+Environment=SPRING_DATASOURCE_URL=${jsonencode(replace(format("jdbc:postgresql://%s:%s/%s?sslmode=%s", db_host, db_port, db_name, db_sslmode), "%", "%%"))}
+Environment=SPRING_DATASOURCE_USERNAME=${jsonencode(replace(db_username, "%", "%%"))}
+Environment=SPRING_DATASOURCE_PASSWORD=${jsonencode(replace(db_password, "%", "%%"))}
+Environment=REDIS_URL=${jsonencode(replace(format("rediss://default:%s@%s:%s", redis_password_urlencoded, redis_host, redis_port), "%", "%%"))}
+Environment=REDIS_HOST=${jsonencode(replace(redis_host, "%", "%%"))}
+Environment=REDIS_PORT=${jsonencode(replace(redis_port, "%", "%%"))}
+Environment=REDIS_PASSWORD=${jsonencode(replace(redis_password, "%", "%%"))}
+Environment=KAFKA_BOOTSTRAP_SERVERS=${jsonencode(replace(kafka_bootstrap_servers, "%", "%%"))}
+Environment=JWT_ACCESS_SECRET=${jsonencode(replace(jwt_access_secret, "%", "%%"))}
+Environment=JWT_REFRESH_SECRET=${jsonencode(replace(jwt_refresh_secret, "%", "%%"))}
+Environment=ENCRYPTION_KEY=${jsonencode(replace(encryption_key, "%", "%%"))}
+Environment=GOOGLE_CLIENT_ID=${jsonencode(replace(google_client_id, "%", "%%"))}
+Environment=GOOGLE_CLIENT_SECRET=${jsonencode(replace(google_client_secret, "%", "%%"))}
+Environment=KAKAO_CLIENT_ID=${jsonencode(replace(kakao_client_id, "%", "%%"))}
+Environment=KAKAO_CLIENT_SECRET=${jsonencode(replace(kakao_client_secret, "%", "%%"))}
+Environment=NAVER_CLIENT_ID=${jsonencode(replace(naver_client_id, "%", "%%"))}
+Environment=NAVER_CLIENT_SECRET=${jsonencode(replace(naver_client_secret, "%", "%%"))}
+Environment=MAIL_USERNAME=${jsonencode(replace(mail_username, "%", "%%"))}
+Environment=MAIL_PASSWORD=${jsonencode(replace(mail_password, "%", "%%"))}
+Environment=CORS_ALLOWED_ORIGINS=${jsonencode(replace(cors_allowed_origins, "%", "%%"))}
+Environment=S3_BUCKET_NAME=${jsonencode(replace(s3_bucket_name, "%", "%%"))}
+Environment=CLOUDFRONT_DOMAIN=${jsonencode(replace(cloudfront_domain, "%", "%%"))}
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+chmod 644 /etc/systemd/system/moa-backend.service
+chown root:root /etc/systemd/system/moa-backend.service
 
 systemctl daemon-reload
 systemctl restart moa-backend.service
