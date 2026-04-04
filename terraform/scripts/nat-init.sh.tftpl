@@ -49,7 +49,7 @@ INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
   --output text 2>/dev/null || true)
 
 APP_IP=""
-if [ -n "${INSTANCE_IDS// }" ] && [ "$INSTANCE_IDS" != "None" ]; then
+if [ -n "$${INSTANCE_IDS// }" ] && [ "$INSTANCE_IDS" != "None" ]; then
   APP_IP=$(aws ec2 describe-instances \
     --region "$AWS_REGION" \
     --instance-ids $INSTANCE_IDS \
@@ -58,7 +58,7 @@ if [ -n "${INSTANCE_IDS// }" ] && [ "$INSTANCE_IDS" != "None" ]; then
     --output text 2>/dev/null | awk '{print $1}' || true)
 fi
 
-if [ -z "${APP_IP:-}" ] || [ "$APP_IP" = "None" ]; then
+if [ -z "$${APP_IP:-}" ] || [ "$APP_IP" = "None" ]; then
   APP_IP=$(aws ec2 describe-instances \
     --region "$AWS_REGION" \
     --filters "Name=tag:Name,Values=$APP_TAG_NAME" "Name=instance-state-name,Values=running" \
@@ -66,7 +66,7 @@ if [ -z "${APP_IP:-}" ] || [ "$APP_IP" = "None" ]; then
     --output text 2>/dev/null | awk '{print $1}' || true)
 fi
 
-if [ -n "${APP_IP:-}" ] && [ "$APP_IP" != "None" ]; then
+if [ -n "$${APP_IP:-}" ] && [ "$APP_IP" != "None" ]; then
   echo "$APP_IP"
 fi
 RESOLVE_IP_EOF
@@ -84,11 +84,11 @@ PUBLIC_DOMAIN="$4"
 BACKEND_APP_PORT="$5"
 
 APP_IP=$(/opt/resolve-app-ip.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" 2>/dev/null || true)
-[ -z "${APP_IP:-}" ] && exit 1
+[ -z "$${APP_IP:-}" ] && exit 1
 
 CURRENT=$(awk '/proxy_pass http:\/\//{gsub(/.*http:\/\//,""); gsub(/:.*/,""); print; exit}' /etc/nginx/nginx.conf 2>/dev/null || true)
 
-if [ "$APP_IP" != "${CURRENT:-}" ]; then
+if [ "$APP_IP" != "$${CURRENT:-}" ]; then
   cat > /etc/nginx/nginx.conf << NGINX_CONF
 user nginx;
 worker_processes auto;
@@ -111,10 +111,10 @@ http {
 
     server {
         listen 80;
-        server_name ${PUBLIC_DOMAIN};
+        server_name $${PUBLIC_DOMAIN};
 
         location / {
-            proxy_pass http://${APP_IP}:${BACKEND_APP_PORT};
+            proxy_pass http://$${APP_IP}:$${BACKEND_APP_PORT};
             proxy_http_version 1.1;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
