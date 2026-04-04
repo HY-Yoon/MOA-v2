@@ -126,7 +126,7 @@ http {
     }
 }
 NGINX_CONF
-  nginx -t && systemctl reload nginx
+  nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload || systemctl reload nginx || nginx -s reload)
 fi
 REFRESH_EOF
 chmod +x /opt/refresh-nginx-upstream.sh
