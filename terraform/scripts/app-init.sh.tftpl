@@ -59,41 +59,45 @@ START_SCRIPT_BOUNDARY
 chmod +x /opt/moa/backend/start.sh
 chown moa:moa /opt/moa/backend/start.sh
 
-# systemd 환경변수 override + ExecStart를 래퍼 스크립트로 교체
+# 앱 환경변수는 단일 파일로 기록 (cat /etc/moa/backend/moa-backend.env 로 확인 가능)
+mkdir -p /etc/moa/backend
+cat > /etc/moa/backend/moa-backend.env << 'ENVFILE_EOF'
+SPRING_PROFILES_ACTIVE="prod,v2"
+PORT="8080"
+DB_HOST="${db_host}"
+SPRING_DATASOURCE_URL="jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}"
+SPRING_DATASOURCE_USERNAME="${db_username}"
+SPRING_DATASOURCE_PASSWORD="${db_password}"
+REDIS_URL="rediss://default:${redis_password_urlencoded}@${redis_host}:${redis_port}"
+REDIS_HOST="${redis_host}"
+REDIS_PORT="${redis_port}"
+REDIS_PASSWORD="${redis_password}"
+KAFKA_BOOTSTRAP_SERVERS="${kafka_bootstrap_servers}"
+JWT_ACCESS_SECRET="${jwt_access_secret}"
+JWT_REFRESH_SECRET="${jwt_refresh_secret}"
+ENCRYPTION_KEY="${encryption_key}"
+GOOGLE_CLIENT_ID="${google_client_id}"
+GOOGLE_CLIENT_SECRET="${google_client_secret}"
+KAKAO_CLIENT_ID="${kakao_client_id}"
+KAKAO_CLIENT_SECRET="${kakao_client_secret}"
+NAVER_CLIENT_ID="${naver_client_id}"
+NAVER_CLIENT_SECRET="${naver_client_secret}"
+MAIL_USERNAME="${mail_username}"
+MAIL_PASSWORD="${mail_password}"
+CORS_ALLOWED_ORIGINS="${cors_allowed_origins}"
+S3_BUCKET_NAME="${s3_bucket_name}"
+CLOUDFRONT_DOMAIN="${cloudfront_domain}"
+ENVFILE_EOF
+chmod 600 /etc/moa/backend/moa-backend.env
+chown root:root /etc/moa/backend/moa-backend.env
+
+# ExecStart만 래퍼로 교체; 변수는 EnvironmentFile에서 로드
 cat > /etc/systemd/system/moa-backend.service.d/override.conf << 'OVERRIDE_EOF'
 [Service]
-Environment="SPRING_PROFILES_ACTIVE=prod,v2"
-Environment="PORT=8080"
-Environment="DB_HOST=${db_host}"
-Environment="SPRING_DATASOURCE_URL=jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}"
-Environment="SPRING_DATASOURCE_USERNAME=${db_username}"
-Environment="SPRING_DATASOURCE_PASSWORD=${db_password}"
-Environment="REDIS_URL=rediss://default:${redis_password_urlencoded}@${redis_host}:${redis_port}"
-Environment="REDIS_HOST=${redis_host}"
-Environment="REDIS_PORT=${redis_port}"
-Environment="REDIS_PASSWORD=${redis_password}"
-Environment="KAFKA_BOOTSTRAP_SERVERS=${kafka_bootstrap_servers}"
-Environment="JWT_ACCESS_SECRET=${jwt_access_secret}"
-Environment="JWT_REFRESH_SECRET=${jwt_refresh_secret}"
-Environment="ENCRYPTION_KEY=${encryption_key}"
-Environment="GOOGLE_CLIENT_ID=${google_client_id}"
-Environment="GOOGLE_CLIENT_SECRET=${google_client_secret}"
-Environment="KAKAO_CLIENT_ID=${kakao_client_id}"
-Environment="KAKAO_CLIENT_SECRET=${kakao_client_secret}"
-Environment="NAVER_CLIENT_ID=${naver_client_id}"
-Environment="NAVER_CLIENT_SECRET=${naver_client_secret}"
-Environment="MAIL_USERNAME=${mail_username}"
-Environment="MAIL_PASSWORD=${mail_password}"
-Environment="CORS_ALLOWED_ORIGINS=${cors_allowed_origins}"
-Environment="S3_BUCKET_NAME=${s3_bucket_name}"
-Environment="CLOUDFRONT_DOMAIN=${cloudfront_domain}"
+EnvironmentFile=/etc/moa/backend/moa-backend.env
 ExecStart=
 ExecStart=/opt/moa/backend/start.sh
 OVERRIDE_EOF
-
-echo "SPRING_PROFILES_ACTIVE=prod,v2" >> /etc/environment
-echo "DB_HOST=${db_host}" >> /etc/environment
-echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${db_host}:${db_port}/${db_name}?sslmode=${db_sslmode}" >> /etc/environment
 
 systemctl daemon-reload
 systemctl restart moa-backend.service

@@ -2,6 +2,11 @@
 Description=MOA Backend Service
 After=network.target
 
+# TF apply → Launch Template user_data 가 아래 파일·drop-in 을 채웁니다.
+#   - 전체 키/값: /etc/moa/backend/moa-backend.env
+#   - ExecStart 래퍼: /etc/systemd/system/moa-backend.service.d/override.conf
+# 합쳐진 유닛: systemctl cat moa-backend.service
+
 [Service]
 Type=simple
 User=moa
