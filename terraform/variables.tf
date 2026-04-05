@@ -222,3 +222,42 @@ variable "nat_proxy_backend_dns_name" {
   type        = string
   default     = "app.internal.moa"
 }
+
+# ------------------------------
+# 6. 비용 절감용 운영 시간 스케줄링
+# ------------------------------
+variable "enable_business_hours_schedule" {
+  description = "Enable weekday business-hours auto start/stop scheduling"
+  type        = bool
+  default     = true
+}
+
+variable "business_hours_timezone" {
+  description = "Timezone used by scheduler resources"
+  type        = string
+  default     = "Asia/Seoul"
+}
+
+variable "app_start_cron" {
+  description = "Cron expression for starting app ASG on weekdays"
+  type        = string
+  default     = "0 9 * * 1-5"
+}
+
+variable "app_stop_cron" {
+  description = "Cron expression for stopping app ASG on weekdays"
+  type        = string
+  default     = "0 21 * * 1-5"
+}
+
+variable "nat_start_cron" {
+  description = "EventBridge cron expression for starting NAT instance on weekdays"
+  type        = string
+  default     = "cron(55 8 ? * MON-FRI *)"
+}
+
+variable "nat_stop_cron" {
+  description = "EventBridge cron expression for stopping NAT instance on weekdays"
+  type        = string
+  default     = "cron(5 21 ? * MON-FRI *)"
+}

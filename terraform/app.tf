@@ -122,3 +122,31 @@ resource "aws_autoscaling_group" "app_asg" {
     propagate_at_launch = true
   }
 }
+
+# 평일 업무 시간 시작: 앱 ASG ON (09:00 KST)
+resource "aws_autoscaling_schedule" "app_weekday_start" {
+  count = var.enable_business_hours_schedule ? 1 : 0
+
+  scheduled_action_name  = "moa-v2-app-weekday-start"
+  autoscaling_group_name = aws_autoscaling_group.app_asg.name
+  recurrence             = var.app_start_cron
+  time_zone              = var.business_hours_timezone
+
+  min_size         = 1
+  max_size         = 1
+  desired_capacity = 1
+}
+
+# 평일 업무 시간 종료: 앱 ASG OFF (21:00 KST)
+resource "aws_autoscaling_schedule" "app_weekday_stop" {
+  count = var.enable_business_hours_schedule ? 1 : 0
+
+  scheduled_action_name  = "moa-v2-app-weekday-stop"
+  autoscaling_group_name = aws_autoscaling_group.app_asg.name
+  recurrence             = var.app_stop_cron
+  time_zone              = var.business_hours_timezone
+
+  min_size         = 0
+  max_size         = 1
+  desired_capacity = 0
+}
