@@ -91,6 +91,23 @@ resource "aws_iam_role_policy" "infra_describe_ec2" {
   })
 }
 
+resource "aws_iam_role_policy" "infra_route53_backend_dns" {
+  name = "moa-v2-infra-route53-backend-dns"
+  role = aws_iam_role.infra_ssm_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets"
+      ]
+      Effect   = "Allow"
+      Resource = aws_route53_zone.private_backend_zone.arn
+    }]
+  })
+}
+
 resource "aws_iam_role_policy" "infra_s3_upload" {
   name = "moa-v2-infra-s3-upload"
   role = aws_iam_role.infra_ssm_role.name

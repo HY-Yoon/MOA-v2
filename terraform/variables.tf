@@ -210,3 +210,15 @@ variable "nat_proxy_backend_port" {
   type        = number
   default     = 8080
 }
+
+variable "nat_proxy_private_zone_name" {
+  description = "Private hosted zone name for backend service discovery"
+  type        = string
+  default     = "internal.moa"
+}
+
+variable "nat_proxy_backend_dns_name" {
+  description = "Backend DNS name resolved by NAT nginx"
+  type        = string
+  default     = "app.internal.moa"
+}

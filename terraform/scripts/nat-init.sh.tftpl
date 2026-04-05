@@ -8,6 +8,8 @@ APP_ASG_NAME="${app_asg_name}"
 APP_TAG_NAME="${app_tag_name}"
 PUBLIC_DOMAIN="${public_domain}"
 BACKEND_APP_PORT="${backend_app_port}"
+BACKEND_DNS_ZONE_ID="${backend_dns_zone_id}"
+BACKEND_DNS_NAME="${backend_dns_name}"
 
 # NAT (iptables masquerade)
 dnf install -y iptables-services awscli nginx cronie
@@ -72,24 +74,47 @@ fi
 RESOLVE_IP_EOF
 chmod +x /opt/resolve-app-ip.sh
 
-# 최신 앱 IP로 nginx.conf를 재생성
-cat > /opt/refresh-nginx-upstream.sh << 'REFRESH_EOF'
+# 최신 앱 IP를 Route53 Private DNS 레코드로 동기화
+cat > /opt/refresh-backend-dns.sh << 'REFRESH_EOF'
 #!/bin/bash
 set -euo pipefail
 
 AWS_REGION="$1"
 APP_ASG_NAME="$2"
 APP_TAG_NAME="$3"
-PUBLIC_DOMAIN="$4"
-BACKEND_APP_PORT="$5"
+BACKEND_DNS_ZONE_ID="$4"
+BACKEND_DNS_NAME="$5"
 
 APP_IP=$(/opt/resolve-app-ip.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" 2>/dev/null || true)
 [ -z "$${APP_IP:-}" ] && exit 1
 
-CURRENT=$(awk '/proxy_pass http:\/\//{gsub(/.*http:\/\//,""); gsub(/:.*/,""); print; exit}' /etc/nginx/nginx.conf 2>/dev/null || true)
+CURRENT_DNS_IP=$(aws route53 list-resource-record-sets \
+  --hosted-zone-id "$BACKEND_DNS_ZONE_ID" \
+  --query "ResourceRecordSets[?Name == '$BACKEND_DNS_NAME.'] | [?Type == 'A'] | [0].ResourceRecords[0].Value" \
+  --output text 2>/dev/null || true)
 
-if [ "$APP_IP" != "$${CURRENT:-}" ]; then
-  cat > /etc/nginx/nginx.conf << NGINX_CONF
+if [ "$APP_IP" != "$${CURRENT_DNS_IP:-}" ]; then
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id "$BACKEND_DNS_ZONE_ID" \
+    --change-batch "{
+      \"Comment\": \"Sync backend private IP from NAT\",
+      \"Changes\": [{
+        \"Action\": \"UPSERT\",
+        \"ResourceRecordSet\": {
+          \"Name\": \"$BACKEND_DNS_NAME\",
+          \"Type\": \"A\",
+          \"TTL\": 10,
+          \"ResourceRecords\": [{\"Value\": \"$APP_IP\"}]
+        }
+      }]
+    }" >/dev/null
+fi
+REFRESH_EOF
+chmod +x /opt/refresh-backend-dns.sh
+
+# Nginx 설정은 DNS 기반으로 1회 생성.
+# backend DNS가 바뀌어도 reload/restart 없이 resolver(valid=10s)로 자동 반영.
+cat > /etc/nginx/nginx.conf << NGINX_CONF
 user nginx;
 worker_processes auto;
 error_log /var/log/nginx/error.log notice;
@@ -107,67 +132,42 @@ http {
                     '"\$http_user_agent" "\$http_x_forwarded_for"';
     access_log /var/log/nginx/access.log main;
     sendfile on;
-    # 짧은 keepalive로 구 upstream 커넥션 잔존 시간을 줄여 IP 전환 반영을 빠르게 함
     keepalive_timeout 15;
+    resolver 169.254.169.253 valid=10s ipv6=off;
+    resolver_timeout 2s;
 
     server {
         listen 80;
         server_name $${PUBLIC_DOMAIN};
 
         location / {
-            proxy_pass http://$${APP_IP}:$${BACKEND_APP_PORT};
-            proxy_bind off;
+            set \$backend_host $${BACKEND_DNS_NAME};
+            proxy_pass http://\$backend_host:$${BACKEND_APP_PORT};
             proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
             proxy_connect_timeout 5s;
             proxy_read_timeout 60s;
+            proxy_next_upstream error timeout invalid_header http_502 http_503 http_504;
         }
     }
 }
 NGINX_CONF
-  if nginx -t; then
-    RELOADED=0
-    MASTER_PID=""
-    [ -f /run/nginx.pid ] && MASTER_PID=$(cat /run/nginx.pid 2>/dev/null || true)
-
-    # 1순위: 마스터 프로세스에 HUP 직접 전달 (graceful, zero-downtime)
-    if [ -n "$MASTER_PID" ]; then
-      if kill -0 "$MASTER_PID" 2>/dev/null; then
-        if kill -HUP "$MASTER_PID" 2>/dev/null || sudo kill -HUP "$MASTER_PID" 2>/dev/null; then
-          RELOADED=1
-        fi
-      fi
-    fi
-
-    # 2순위: 서비스 reload 명령으로 폴백
-    if [ "$RELOADED" -ne 1 ]; then
-      if sudo systemctl reload nginx 2>/dev/null || systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || nginx -s reload 2>/dev/null; then
-        RELOADED=1
-      fi
-    fi
-
-    # 3순위(예외): reload 계열이 모두 실패한 경우에만 restart
-    if [ "$RELOADED" -ne 1 ]; then
-      sudo systemctl restart nginx || systemctl restart nginx
-    fi
-  fi
-fi
-REFRESH_EOF
-chmod +x /opt/refresh-nginx-upstream.sh
+nginx -t && (sudo systemctl reload nginx || systemctl reload nginx || sudo nginx -s reload || nginx -s reload)
 
 # 초기 부팅 시: ASG가 붙을 때까지 최대 10분 대기 후 진행 (이후 cron이 계속 갱신)
 ATTEMPTS=0
 MAX_ATTEMPTS=120
-until /opt/refresh-nginx-upstream.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$PUBLIC_DOMAIN" "$BACKEND_APP_PORT"; do
+until /opt/refresh-backend-dns.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$BACKEND_DNS_ZONE_ID" "$BACKEND_DNS_NAME"; do
   ATTEMPTS=$((ATTEMPTS + 1))
   [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ] && break
   sleep 5
 done
 
-cat > /etc/cron.d/refresh-nginx << CRON_EOF
-* * * * * root /opt/refresh-nginx-upstream.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$PUBLIC_DOMAIN" "$BACKEND_APP_PORT" >/var/log/refresh-nginx.log 2>&1
+cat > /etc/cron.d/refresh-backend-dns << CRON_EOF
+* * * * * root /opt/refresh-backend-dns.sh "$AWS_REGION" "$APP_ASG_NAME" "$APP_TAG_NAME" "$BACKEND_DNS_ZONE_ID" "$BACKEND_DNS_NAME" >/var/log/refresh-backend-dns.log 2>&1
 CRON_EOF
-chmod 644 /etc/cron.d/refresh-nginx
+chmod 644 /etc/cron.d/refresh-backend-dns

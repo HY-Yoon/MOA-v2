@@ -170,11 +170,13 @@ resource "aws_instance" "nat_instance" {
   user_data_replace_on_change = true
 
   user_data = templatefile("${path.module}/scripts/nat-init.sh.tftpl", {
-    aws_region       = var.nat_proxy_region
-    app_asg_name     = var.nat_proxy_app_asg_name
-    app_tag_name     = var.nat_proxy_app_name_tag
-    public_domain    = var.nat_proxy_public_domain
-    backend_app_port = var.nat_proxy_backend_port
+    aws_region          = var.nat_proxy_region
+    app_asg_name        = var.nat_proxy_app_asg_name
+    app_tag_name        = var.nat_proxy_app_name_tag
+    public_domain       = var.nat_proxy_public_domain
+    backend_app_port    = var.nat_proxy_backend_port
+    backend_dns_zone_id = aws_route53_zone.private_backend_zone.zone_id
+    backend_dns_name    = trimsuffix(aws_route53_record.private_backend_record.fqdn, ".")
   })
 
   tags = { Name = "moa-v2-nat-instance" }
@@ -243,4 +245,24 @@ resource "aws_route53_record" "moa_a_record" {
 
   # 값(Value): Terraform이 방금 발급받은 NAT 인스턴스의 EIP
   records = [aws_eip.nat_eip.public_ip]
+}
+
+# 앱 서버 동적 탐색용 Private Hosted Zone
+resource "aws_route53_zone" "private_backend_zone" {
+  name = var.nat_proxy_private_zone_name
+
+  vpc {
+    vpc_id = aws_vpc.main_vpc.id
+  }
+
+  tags = { Name = "moa-v2-private-backend-zone" }
+}
+
+# NAT nginx가 참조할 백엔드 DNS 레코드 (실제 값은 NAT 스크립트가 주기적으로 UPSERT)
+resource "aws_route53_record" "private_backend_record" {
+  zone_id = aws_route53_zone.private_backend_zone.zone_id
+  name    = var.nat_proxy_backend_dns_name
+  type    = "A"
+  ttl     = 10
+  records = ["127.0.0.1"]
 }
