@@ -3,6 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 
 type Props = { params: Promise<{ path: string[] }> };
 
+/** API Set-Cookie 모두 전달 (로그아웃 등)
+ *  getSetCookie 없으면 단일 헤더만 */
+function appendSetCookieFromBackend(source: Headers, target: Headers) {
+  const withGetter = source as Headers & { getSetCookie?: () => string[] };
+  if (typeof withGetter.getSetCookie === 'function') {
+    for (const c of withGetter.getSetCookie()) {
+      target.append('set-cookie', c);
+    }
+    return;
+  }
+  const single = source.get('set-cookie');
+  if (single) {
+    target.append('set-cookie', single);
+  }
+}
+
 async function proxyRequest(request: NextRequest, { params }: Props) {
   try {
     const { path } = await params;
@@ -44,15 +60,14 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
     const backendUrl = `${BE_URL}/api/${pathString}${url.search}`;
     const response = await fetch(backendUrl, fetchOptions);
     const data = await response.text();
+
     const responseHeaders = new Headers();
     const responseContentType = response.headers.get('Content-Type');
     if (responseContentType) {
       responseHeaders.set('Content-Type', responseContentType);
     }
-    const setCookie = response.headers.get('set-cookie');
-    if (setCookie) {
-      responseHeaders.set('set-cookie', setCookie);
-    }
+
+    appendSetCookieFromBackend(response.headers, responseHeaders);
 
     return new NextResponse(data, {
       status: response.status,
