@@ -13,7 +13,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="border-border relative h-64 overflow-hidden rounded-sm border sm:h-80 lg:h-96">
             <Image
-              src="https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2602/260224093155_26001991.gif"
+              src="https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2603/260312093256_26003451.gif"
               alt="메인 배너"
               fill
               priority
