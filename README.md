@@ -1,60 +1,103 @@
-# Moa Place v2
+# 🎭 Moa Place v2 🎭
 
----
+공연 정보 관리와 예매, 결제 기능을 사용자/관리자 메뉴로 제공하는 웹 서비스입니다.  
+[모아 플레이스 v1](https://github.com/psmin77/MOAPLACE-page)의 주요 기능을 기반으로 기술 스택을 업그레이드하여 재구성했습니다.
 
-## 프로젝트 소개
-- 공연 정보 및 좌석 등록/관리하고, 사용자 예매 기능을 제공하는 웹 인터페이스입니다.
-- [모아 플레이스 v1](https://github.com/psmin77/MOAPLACE-page)의 주요 기능을 위주로 Next.js와 React, Java, Redis 등 기술 스택을 업그레이드하여 구현합니다.  
+## 🎯 프로젝트 개요
 
-### 프로젝트 메뉴
-- **관리자**
-    - 공연 조회 및 관리
-    - 좌석도 조회 및 관리
-    - 회원 목록 조회 및 관리
-- **사용자**
-    - 로그인 및 회원가입
-    - 공연 정보 조회
-    - 공연 예매 및 결제
-    - 회원 정보 및 예매내역 조회 관리 등
+### 사용자 기능
+- 로그인/회원가입
+- 공연 목록 및 상세 조회
+- 좌석 선택, 예매, 결제
+- 마이페이지 예매 내역 조회/관리
 
+### 관리자 기능
+- 공연 등록/수정/조회/삭제
+- 좌석도 등록/수정/조회/삭제
+- 회원 목록 조회/관리
 
-## 주요 기능
-- Shadcn 디자인 시스템 컴포넌트를 사용한 공통 컴포넌트 UI/UX 구현
-- Canvas 활용한 공연장 좌석도 및 예매 좌석 구현
-- Redis를 통해 실시간 좌석 선점 및 예매 시스템 관리
-- 소셜 API를 통한 로그인 및 회원가입, 본인 인증 등
+## ✅ 주요 기능
+- Shadcn 기반 공통 UI 컴포넌트 설계 및 재사용
+- Canvas 기반 좌석도 렌더링/선택 인터랙션
+- Redis 기반 실시간 좌석 선점 및 예매 동시성 제어
+- 소셜 로그인 및 인증 흐름 지원
 
-## 기술 스택
-### **공통**
-- Monorepo
+## 🗂️ 모노레포 구조
 
-### **Frontend** 
-- Next.js 16.1.1, React 19.2.3
-- TypeScript 5
-- Tailwind, Shadcn
-- Tanstack Query React 5
+```text
+MOA-v2/
+├── @frontend/   # Next.js 프론트엔드
+├── @backend/    # Spring Boot 백엔드
+├── @shared/     # 공통 타입 파일
+└── README.md    # 메인
+```
+
+## 🛠️ 기술 스택
+
+### Frontend
+- Next.js 16.1.1, React 19.2.3, TypeScript 5
+- Tailwind CSS, Shadcn/ui
+- TanStack Query v5, React Hook Form, Zod
 - Pnpm
 
-### **Backend**
-- Java 17
-- Redis
+### Backend
+- Java 17, Spring Boot 3
+- Spring Data JPA, Spring Security, OAuth2 Client
+- Redis, PostgreSQL, Kafka
+- Gradle (Kotlin DSL)
 
-## 개발 가이드 라인
+## ⚙️ 프로젝트 설정
+
+### 1) 사전 요구사항
+- Node.js 20+
+- pnpm 8+
+- Java 17
+- PostgreSQL, Redis
+
+### 2) 백엔드 실행
+- `@backend/src/main/resources/application.properties.example`를 기준으로 로컬 설정 파일을 구성합니다.
+- DB, Redis, OAuth, JWT 관련 환경변수를 주입해 실행합니다.
+- 기본 포트: `8081`
+
+```bash
+cd @backend
+cp src/main/resources/application.properties.example src/main/resources/application-local.properties
+./gradlew bootRun
+```
+
+
+### 3) 프론트엔드 실행
+- 환경 설정: `@frontend/.env.local`
+```env
+NEXT_PUBLIC_BACKEND_URL=http://moa.hee-factory.com
+```
+
+- 기본 포트: `3000`
+
+```bash
+cd @frontend
+pnpm install
+pnpm dev
+```
+
+## 👉 개발 가이드라인
+
 ### 코드 컨벤션
-- **명명 규칙**:
-    - 파일/컴포넌트명: PascalCase
-    - 유틸리티/훅: camelCase
-    - 함수/변수: camelCase
-    - 상수: UPPER_SNAKE_CASE
+- 파일/컴포넌트: `PascalCase`
+- 유틸리티/훅: `camelCase`
+- 함수/변수: `camelCase`
+- 상수: `UPPER_SNAKE_CASE`
 
 ### Git 워크플로우
-- **브랜치 구조**
-  - `main`: 최종 메인 브랜치
-  - `develop`: 개발 메인 브랜치 (단위 테스트 완료 후 머지)
-  - `feature/*`: 신규 기능 개발
+- 브랜치
+  - `main`: 최종 배포
+  - `develop`: 통합 개발
+  - `feature/*`: 기능 개발
   - `fix/*`: 버그 수정
-- **커밋 컨벤션**
-  - 일반적인 커밋 컨벤션 준수
-  - `[ALL]`, `[FE]`, `[BE]`: 공통, 프론트엔드, 백엔드 태그 추가
-  - `feat`, `fix`, `refactor`, `chore`, `docs`, `style` 등
+- 커밋
+  - Conventional Commits 권장 (`feat`, `fix`, `refactor`, `chore`, `docs`, `style`)
+  - 범위 태그 사용: `[ALL]`, `[FE]`, `[BE]`
+
+## 📚 기타
+- 프론트엔드 상세 안내: `@frontend/README.md`
 
