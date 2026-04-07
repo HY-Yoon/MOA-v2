@@ -707,7 +707,7 @@ export default function ShowUpsertForm(props: Props) {
                 label="메인 포스터"
                 htmlFor="poster"
                 required={true}
-                maxSize={10}
+                maxSize={5}
                 onFileChange={handlePosterChange}
                 error={errors.root?.poster?.message}
                 previewImages={data?.posterUrl || undefined}
@@ -720,7 +720,7 @@ export default function ShowUpsertForm(props: Props) {
                 htmlFor="detail-images"
                 required={true}
                 multiple={true}
-                maxSize={10}
+                maxSize={5}
                 onFileChange={handleDetailImagesChange}
                 error={errors.root?.details?.message}
                 previewImages={data?.detailImages || []}

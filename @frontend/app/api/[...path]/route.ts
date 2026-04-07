@@ -41,19 +41,28 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
       headers,
     };
 
-    let bodySizeBytes = 0;
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
-      const body = await request.text();
-      if (body) {
-        // 이미지 등록 파일 용량 체크
-        bodySizeBytes = Buffer.byteLength(body, 'utf8');
-        if (bodySizeBytes > 0) {
+      // multipart는 문자열로 읽으면 이미지 바이너리 손상되므로 raw bytes로 전달
+      const isMultipartFormData = contentType.includes('multipart/form-data');
+      if (isMultipartFormData) {
+        const bodyBuffer = await request.arrayBuffer();
+        if (bodyBuffer.byteLength > 0) {
+          const mb = (bodyBuffer.byteLength / 1024 / 1024).toFixed(2);
+          console.log(
+            `[Proxy] ${request.method} /api/${pathString} size: ${bodyBuffer.byteLength.toLocaleString()} bytes (${mb} MB) / type: multipart/form-data`,
+          );
+          fetchOptions.body = bodyBuffer;
+        }
+      } else {
+        const body = await request.text();
+        if (body) {
+          const bodySizeBytes = Buffer.byteLength(body, 'utf8');
           const mb = (bodySizeBytes / 1024 / 1024).toFixed(2);
           console.log(
             `[Proxy] ${request.method} /api/${pathString} size: ${bodySizeBytes.toLocaleString()} bytes (${mb} MB) / type: ${contentType.slice(0, 30)} ...`,
           );
+          fetchOptions.body = body;
         }
-        fetchOptions.body = body;
       }
     }
 
