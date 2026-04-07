@@ -32,7 +32,7 @@ public class FileService {
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
 
-    @Value("${file.max-size:52428800}") // 50MB 기본값
+    @Value("${file.max-size:1073741824}") // 1GB 기본값
     private long maxFileSize;
 
     @Value("${aws.s3.bucket:}")

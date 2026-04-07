@@ -140,6 +140,8 @@ http {
         listen 80;
         server_name $${PUBLIC_DOMAIN};
 
+        client_max_body_size 500M;
+
         location / {
             set \$backend_host $${BACKEND_DNS_NAME};
             proxy_pass http://\$backend_host:$${BACKEND_APP_PORT};

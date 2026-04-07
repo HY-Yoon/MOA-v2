@@ -105,7 +105,7 @@ public interface AdminShowControllerDocs {
     @Operation(summary = "공연 등록", description = DESC_CREATE_SHOW)
     ResponseEntity<ApiResponse<ShowDto.CreateResponse>> createShow(
             @Parameter(description = "공연 정보 (JSON)", required = true, schema = @Schema(implementation = ShowDto.CreateRequest.class)) @RequestPart("data") String dataJson,
-            @Parameter(description = "포스터 이미지 파일 (jpg, jpeg, png, gif, webp, 최대 10MB)", required = true) @RequestPart("poster") MultipartFile poster,
+            @Parameter(description = "포스터 이미지 파일 (jpg, jpeg, png, gif, webp, 최대 1GB)", required = true) @RequestPart("poster") MultipartFile poster,
             @Parameter(description = "상세 이미지 파일 목록 (선택, 여러 개 가능)") @RequestPart(value = "detailImages", required = false) List<MultipartFile> detailImages);
 
     @Operation(summary = "공연 수정", description = DESC_UPDATE_SHOW_JSON)
