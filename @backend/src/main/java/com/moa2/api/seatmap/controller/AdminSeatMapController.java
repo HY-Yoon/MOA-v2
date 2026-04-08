@@ -4,12 +4,11 @@ import com.moa2.api.seatmap.dto.*;
 import com.moa2.api.seatmap.service.AdminSeatMapService;
 import com.moa2.global.dto.ApiResponse;
 import com.moa2.global.dto.PageResponse;
-import com.moa2.global.model.Region;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "좌석배치도 관리 API", description = "관리자용 좌석배치도 관리 API")
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/admin/seat-maps")
 @RequiredArgsConstructor
@@ -32,6 +32,13 @@ public class AdminSeatMapController {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<SeatmapDto.ListResponse>>> getSeatMapList(
             @ParameterObject @ModelAttribute SeatmapDto.ListRequest request) {
+        log.info(
+                "[AdminSeatMapController#getSeatMapList] region={}, venueName={}, hallName={}, page={}, size={}",
+                request.region(),
+                request.venueName(),
+                request.hallName(),
+                request.page(),
+                request.size());
 
         Pageable pageable = PageRequest.of(
                 request.page(),
@@ -49,6 +56,8 @@ public class AdminSeatMapController {
     @GetMapping("/duplicate")
     public ResponseEntity<ApiResponse<SeatmapDto.DuplicateCheckResponse>> checkDuplicate(
             @ParameterObject @ModelAttribute @Valid SeatmapDto.DuplicateCheckRequest request) {
+        log.info("[AdminSeatMapController#checkDuplicate] region={}, venueName={}, hallName={}",
+                request.region(), request.venueName(), request.hallName());
 
         SeatmapDto.DuplicateCheckResponse result = adminSeatMapService.checkDuplicate(request);
         return ResponseEntity.ok(ApiResponse.success(result));

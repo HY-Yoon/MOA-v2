@@ -9,7 +9,6 @@ import com.moa2.global.dto.PageResponse;
 import com.moa2.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -35,11 +34,22 @@ public class UserReservationController implements UserReservationControllerDocs 
   public ResponseEntity<ApiResponse<PageResponse<ReservationDto.ListResponse>>> getMyReservations(
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @ModelAttribute ReservationSearchCondition condition) {
+    String userEmail = userPrincipal != null ? userPrincipal.getEmail() : null;
+    log.info(
+        "[UserReservationController#getMyReservations] userEmail={}, status={}, paymentStatus={}, dateType={}, startDate={}, endDate={}, page={}, size={}",
+        userEmail != null ? userEmail : "anonymous",
+        condition.status(),
+        condition.paymentStatus(),
+        condition.dateType(),
+        condition.startDate(),
+        condition.endDate(),
+        condition.page(),
+        condition.size());
 
     // 최신순 정렬
     Pageable pageable = PageRequest.of(condition.page(), condition.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
 
-    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userPrincipal.getEmail(),
+    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userEmail,
         condition, pageable);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
