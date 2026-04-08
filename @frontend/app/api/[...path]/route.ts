@@ -3,6 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 
 type Props = { params: Promise<{ path: string[] }> };
 
+/** API Set-Cookie 모두 전달 (로그아웃 등)
+ *  getSetCookie 없으면 단일 헤더만 */
+function appendSetCookieFromBackend(source: Headers, target: Headers) {
+  const withGetter = source as Headers & { getSetCookie?: () => string[] };
+  if (typeof withGetter.getSetCookie === 'function') {
+    for (const c of withGetter.getSetCookie()) {
+      target.append('set-cookie', c);
+    }
+    return;
+  }
+  const single = source.get('set-cookie');
+  if (single) {
+    target.append('set-cookie', single);
+  }
+}
+
 async function proxyRequest(request: NextRequest, { params }: Props) {
   try {
     const { path } = await params;
@@ -25,34 +41,42 @@ async function proxyRequest(request: NextRequest, { params }: Props) {
       headers,
     };
 
-    let bodySizeBytes = 0;
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
-      const body = await request.text();
-      if (body) {
-        // 이미지 등록 파일 용량 체크
-        bodySizeBytes = Buffer.byteLength(body, 'utf8');
-        if (bodySizeBytes > 0) {
+      // multipart는 문자열로 읽으면 이미지 바이너리 손상되므로 raw bytes로 전달
+      const isMultipartFormData = contentType.includes('multipart/form-data');
+      if (isMultipartFormData) {
+        const bodyBuffer = await request.arrayBuffer();
+        if (bodyBuffer.byteLength > 0) {
+          const mb = (bodyBuffer.byteLength / 1024 / 1024).toFixed(2);
+          console.log(
+            `[Proxy] ${request.method} /api/${pathString} size: ${bodyBuffer.byteLength.toLocaleString()} bytes (${mb} MB) / type: multipart/form-data`,
+          );
+          fetchOptions.body = bodyBuffer;
+        }
+      } else {
+        const body = await request.text();
+        if (body) {
+          const bodySizeBytes = Buffer.byteLength(body, 'utf8');
           const mb = (bodySizeBytes / 1024 / 1024).toFixed(2);
           console.log(
             `[Proxy] ${request.method} /api/${pathString} size: ${bodySizeBytes.toLocaleString()} bytes (${mb} MB) / type: ${contentType.slice(0, 30)} ...`,
           );
+          fetchOptions.body = body;
         }
-        fetchOptions.body = body;
       }
     }
 
     const backendUrl = `${BE_URL}/api/${pathString}${url.search}`;
     const response = await fetch(backendUrl, fetchOptions);
     const data = await response.text();
+
     const responseHeaders = new Headers();
     const responseContentType = response.headers.get('Content-Type');
     if (responseContentType) {
       responseHeaders.set('Content-Type', responseContentType);
     }
-    const setCookie = response.headers.get('set-cookie');
-    if (setCookie) {
-      responseHeaders.set('set-cookie', setCookie);
-    }
+
+    appendSetCookieFromBackend(response.headers, responseHeaders);
 
     return new NextResponse(data, {
       status: response.status,

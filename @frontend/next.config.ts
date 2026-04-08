@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // multipart 대용량 본문 (API 요청당 합계 50MB)
+  experimental: {
+    proxyClientMaxBodySize: '50mb',
+  },
   images: {
     remotePatterns: [
       // 로컬 개발 환경
@@ -13,6 +17,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'ticketimage.interpark.com',
+      },
+      // 외부 이미지 CDN (CloudFront)
+      {
+        protocol: 'https',
+        hostname: 'd23ve22iivj7kg.cloudfront.net',
       },
       // 백엔드 서버 도메인 (환경 변수가 설정된 경우만)
       ...(process.env.NEXT_PUBLIC_BACKEND_URL

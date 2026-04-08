@@ -15,6 +15,7 @@ import { MY_PAGE_ROUTES } from '@/constants/route/userRoutes';
 import ReservationBasicInfo from './ReservationBasicInfo';
 import ReservationPaymentInfo from './ReservationPaymentInfo';
 import ReservationNotice from './ReservationNotice';
+import { ADMIN_ROUTES } from '@/constants/route/adminRoutes';
 
 /** useQuery에 넘길 상세 조회 옵션 (문서용) */
 export type ReservationDetailQueryOptions = {
@@ -38,15 +39,14 @@ export interface ReservationDetailProps {
 export default function ReservationDetail({ id, variant = 'user' }: ReservationDetailProps) {
   const router = useRouter();
   const reservationId = Number(id) || -1;
+  const isAdmin = variant === 'admin';
 
   const { confirm } = useAlert();
 
   const detailQuery = useMemo(
     () =>
-      variant === 'admin'
-        ? fetchShowReservationDetail(reservationId)
-        : fetchReservationDetail(reservationId),
-    [variant, reservationId],
+      isAdmin ? fetchShowReservationDetail(reservationId) : fetchReservationDetail(reservationId),
+    [isAdmin, reservationId],
   );
 
   const { data, isFetching } = useQuery(detailQuery);
@@ -75,10 +75,13 @@ export default function ReservationDetail({ id, variant = 'user' }: ReservationD
     });
     if (!confirmed) return;
 
-    // TODO: 예매 취소 api 테스트
-    // await onCancelReservation(reservationId);
-    // await queryClient.invalidateQueries({ queryKey: ['user', 'reservations', 'list'] });
-    // router.push(MY_PAGE_ROUTES.RESERVATIONS);
+    await onCancelReservation(reservationId);
+    await queryClient.invalidateQueries({ queryKey: ['reservations', 'list'] });
+
+    // '예매 취소' 상태 반영을 위해 딜레이 적용
+    setTimeout(() => {
+      router.push(isAdmin ? ADMIN_ROUTES.SHOW : MY_PAGE_ROUTES.RESERVATIONS);
+    }, 300);
   };
 
   if (!reservationId) return;

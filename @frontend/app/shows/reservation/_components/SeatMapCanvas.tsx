@@ -21,6 +21,7 @@ export interface SelectedSeatInfo {
 
 interface SeatMapCanvasProps {
   scheduleId: number;
+  seatsRefetchKey?: number;
   disabled?: boolean;
   selectedSeatIds?: number[];
   onSelectedSeatIdsChange?: (scheduleSeatIds: number[]) => void;
@@ -89,6 +90,7 @@ function resolveSeatPositions(
 
 export default function SeatMapCanvas({
   scheduleId,
+  seatsRefetchKey = 0,
   disabled = false,
   selectedSeatIds,
   onSelectedSeatIdsChange,
@@ -111,7 +113,7 @@ export default function SeatMapCanvas({
   }, [isControlled, onSelectedSeatIdsChange]);
 
   const { data: seatMapData, isLoading, isError } = useQuery(getScheduleSeatMap(scheduleId));
-  const { data: seatStatusData } = useQuery(getScheduleSeats(scheduleId));
+  const { data: seatStatusData } = useQuery(getScheduleSeats(scheduleId, seatsRefetchKey));
 
   const seats = useMemo(() => {
     if (!seatMapData) return [];

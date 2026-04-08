@@ -152,6 +152,7 @@ export default function ReservationPaymentScreen({
                 const params = new URLSearchParams({
                   showId: String(showId),
                   scheduleId: String(scheduleId),
+                  seatsRefetchKey: String(Date.now()),
                 });
                 router.push(`/shows/reservation?${params.toString()}`);
               }}

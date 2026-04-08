@@ -53,6 +53,7 @@ export default function QueueWaitingScreen({
   const { data: showDetail } = useQuery(getShowDetail(showId));
   const [queueToken, setQueueToken] = useState<string | null>(null);
   const [position, setPosition] = useState<number | null>(null);
+  const [totalWaitingCount, setTotalWaitingCount] = useState<number | null>(null);
   const [estimatedWaitTimeSeconds, setEstimatedWaitTimeSeconds] = useState<number | null>(null);
   const [phase, setPhase] = useState<'IDLE' | 'ENTERING' | 'WAITING' | 'READY' | 'EXPIRED' | 'ERROR'>(
     'IDLE',
@@ -84,6 +85,7 @@ export default function QueueWaitingScreen({
 
         setQueueMessage(queueData.message);
         setPosition(queueData.position);
+        setTotalWaitingCount(queueData.position);
         setEstimatedWaitTimeSeconds(queueData.estimatedWaitTimeSeconds);
         setRetryAfterSeconds(1);
 
@@ -126,6 +128,11 @@ export default function QueueWaitingScreen({
 
         if (status.status === 'WAITING') {
           setPosition(status.position);
+          setTotalWaitingCount((prev) => {
+            if (status.position === null || Number.isNaN(status.position)) return prev;
+            if (prev === null || Number.isNaN(prev)) return status.position;
+            return Math.max(prev, status.position);
+          });
           setEstimatedWaitTimeSeconds(status.estimatedWaitTimeSeconds);
           setRetryAfterSeconds(status.retryAfterSeconds);
           timeoutId = window.setTimeout(
@@ -139,6 +146,11 @@ export default function QueueWaitingScreen({
 
         if (status.status === 'READY') {
           setPosition(status.position);
+          setTotalWaitingCount((prev) => {
+            if (status.position === null || Number.isNaN(status.position)) return prev;
+            if (prev === null || Number.isNaN(prev)) return status.position;
+            return Math.max(prev, status.position);
+          });
           setEstimatedWaitTimeSeconds(status.estimatedWaitTimeSeconds);
           setQueueToken(status.token);
           setPhase('READY');
@@ -180,36 +192,49 @@ export default function QueueWaitingScreen({
   }
 
   if (phase === 'WAITING') {
+    const normalizedPosition = typeof position === 'number' ? Math.max(1, position) : null;
+    const normalizedTotal =
+      typeof totalWaitingCount === 'number' ? Math.max(normalizedPosition ?? 1, totalWaitingCount) : null;
+    const progressPercent =
+      normalizedPosition && normalizedTotal
+        ? Math.min(100, Math.max(0, ((normalizedTotal - normalizedPosition + 1) / normalizedTotal) * 100))
+        : 4;
+
     return (
-      <section className="m-auto flex min-h-screen w-full max-w-3xl flex-col justify-center p-8">
-        <div className="space-y-2">
-          <p className="text-2xl font-bold text-black">접속 인원이 많아 대기 중입니다.</p>
-          <p className="text-2xl font-bold text-violet-600">조금만 기다려주세요.</p>
-          <p className="pt-2 text-slate-700">
-            {displayTitle}
-            {showDate ? ` · ${showDate}` : ''}
-          </p>
-        </div>
-
-        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-center font-semibold text-black">나의 대기순서</p>
-          <p className="mt-4 text-center text-2xl font-black tracking-tight text-black">
-            {formatNumber(position)}
-          </p>
-
-          <div className="mt-6 h-4 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full w-10 rounded-full bg-violet-500" />
+      <section className="flex min-h-screen w-full items-center justify-center p-8">
+        <div className="w-full max-w-3xl m-auto">
+          <div className="space-y-2">
+            <p className="text-2xl font-bold text-black">접속 인원이 많아 대기 중입니다.</p>
+            <p className="text-2xl font-bold text-violet-600">조금만 기다려주세요.</p>
+            <p className="pt-2 text-slate-700">
+              {displayTitle}
+              {showDate ? ` · ${showDate}` : ''}
+            </p>
           </div>
 
-          <div className="mt-7 border-t border-slate-200 pt-5">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-700">현재 대기인원</span>
-              <span className="font-bold text-black">{formatNumber(position)}명</span>
-            </div>
-            <p className="mt-3 text-right text-sm text-slate-500">
-              예상 대기 시간 {formatDurationFromSeconds(estimatedWaitTimeSeconds)} · {retryAfterSeconds}초
-              간격 갱신
+          <div className="mt-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+            <p className="text-center font-semibold text-black">나의 대기순서</p>
+            <p className="mt-4 text-center text-2xl font-black tracking-tight text-black">
+              {formatNumber(position)}
             </p>
+
+            <div className="mt-6 h-4 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div className="mt-7 border-t border-slate-200 pt-5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-700">현재 대기인원</span>
+                <span className="font-bold text-black">{formatNumber(position)}명</span>
+              </div>
+              <p className="mt-3 text-right text-sm text-slate-500">
+                예상 대기 시간 {formatDurationFromSeconds(estimatedWaitTimeSeconds)} · {retryAfterSeconds}초
+                간격 갱신
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -218,7 +243,7 @@ export default function QueueWaitingScreen({
 
   if (phase === 'READY') {
     return (
-      <section className="mx-auto max-w-3xl space-y-4 p-8">
+      <section className="m-auto max-w-3xl space-y-4 p-8">
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <p className="text-lg font-semibold text-black">입장 가능합니다.</p>
           <p className="mt-2 text-sm text-slate-600">
@@ -277,7 +302,7 @@ export default function QueueWaitingScreen({
 
   if (phase === 'ERROR') {
     return (
-      <section className="mx-auto max-w-3xl space-y-4 p-8">
+      <section className="m-auto max-w-3xl space-y-4 p-8">
         <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <p className="text-lg font-semibold text-red-600">문제가 발생했습니다.</p>
           <p className="mt-2 text-sm text-slate-600">
