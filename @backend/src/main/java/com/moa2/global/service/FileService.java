@@ -1,9 +1,15 @@
 package com.moa2.global.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,18 +26,42 @@ import java.util.UUID;
 @Service
 public class FileService {
 
+    @Value("${file.upload.provider:local}")
+    private String provider;
+
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
 
-    @Value("${file.max-size:10485760}") // 10MB 기본값
+    @Value("${file.max-size:1073741824}") // 1GB 기본값
     private long maxFileSize;
 
+    @Value("${aws.s3.bucket:}")
+    private String bucketName;
+
+    @Value("${aws.cloudfront.domain:}")
+    private String cloudfrontDomain;
+
+    @Value("${aws.region:ap-northeast-2}")
+    private String region;
+
+    private S3Client s3Client;
+
+    @PostConstruct
+    public void init() {
+        if ("s3".equalsIgnoreCase(provider)) {
+            try {
+                this.s3Client = S3Client.builder()
+                        .region(Region.of(region))
+                        .build();
+                log.info("S3Client initialized successfully for bucket: {}", bucketName);
+            } catch (Exception e) {
+                log.error("Failed to initialize S3Client: {}", e.getMessage(), e);
+            }
+        }
+    }
+
     /**
-     * 단일 파일 업로드 (포스터 이미지)
-     * 
-     * @param file         업로드할 파일
-     * @param subDirectory 서브 디렉토리 (예: "posters", "details")
-     * @return 상대 경로 (예: "/uploads/posters/2026/01/15/uuid-filename.jpg")
+     * 단일 파일 업로드
      */
     public String uploadFile(MultipartFile file, String subDirectory) {
         if (file == null || file.isEmpty()) {
@@ -40,48 +70,65 @@ public class FileService {
 
         validateFile(file);
 
+        LocalDate today = LocalDate.now();
+        String datePath = today.format(DateTimeFormatter.ofPattern("yyyy/MMdd"));
+
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String fileName = UUID.randomUUID().toString() + extension;
+        
+        String key = subDirectory + "/" + datePath + "/" + fileName;
+
+        if ("s3".equalsIgnoreCase(provider) && s3Client != null) {
+            return uploadToS3(file, key);
+        } else {
+            return uploadToLocal(file, subDirectory, datePath, fileName);
+        }
+    }
+
+    private String uploadToS3(MultipartFile file, String key) {
         try {
-            // 날짜별 디렉토리 생성 (예: 2026/01/15)
-            LocalDate today = LocalDate.now();
-            String datePath = today.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key)
+                    .contentType(file.getContentType())
+                    .build();
 
-            // 전체 경로: uploads/{subDirectory}/{yyyy}/{MM}/{dd}/
+            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            
+            String cloudfrontUrl = "https://" + cloudfrontDomain + "/" + key;
+            log.info("S3 파일 업로드 성공: {}", cloudfrontUrl);
+            return cloudfrontUrl;
+        } catch (IOException e) {
+            log.error("S3 파일 업로드 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("S3 파일 업로드에 실패했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    private String uploadToLocal(MultipartFile file, String subDirectory, String datePath, String fileName) {
+        try {
             Path uploadPath = Paths.get(uploadDir, subDirectory, datePath);
-
-            // 디렉토리가 없으면 생성
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            // UUID를 사용하여 파일명 중복 방지
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            String fileName = UUID.randomUUID().toString() + extension;
-
-            // 파일 저장
             Path filePath = uploadPath.resolve(fileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            // 상대 경로 반환 (예: /uploads/posters/2026/01/15/uuid-filename.jpg)
             String relativePath = "/" + uploadDir + "/" + subDirectory + "/" + datePath + "/" + fileName;
-            log.info("파일 업로드 성공: {}", relativePath);
-
+            log.info("로컬 파일 업로드 성공: {}", relativePath);
             return relativePath;
         } catch (IOException e) {
-            log.error("파일 업로드 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("파일 업로드에 실패했습니다: " + e.getMessage(), e);
+            log.error("로컬 파일 업로드 실패: {}", e.getMessage(), e);
+            throw new RuntimeException("로컬 파일 업로드에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 여러 파일 업로드 (상세 이미지)
-     * 
-     * @param files        업로드할 파일 리스트
-     * @param subDirectory 서브 디렉토리
-     * @return 상대 경로 배열
+     * 여러 파일 업로드
      */
     public String[] uploadFiles(List<MultipartFile> files, String subDirectory) {
         if (files == null || files.isEmpty()) {
@@ -100,61 +147,61 @@ public class FileService {
 
     /**
      * 파일 삭제
-     * 
-     * @param relativePath 상대 경로 (예: /uploads/posters/2026/01/15/uuid-filename.jpg)
      */
-    public void deleteFile(String relativePath) {
-        if (relativePath == null || relativePath.isEmpty()) {
+    public void deleteFile(String path) {
+        if (path == null || path.isEmpty()) {
             return;
         }
 
-        try {
-            // 상대 경로에서 첫 번째 "/" 제거 후 전체 경로 구성
-            String pathWithoutLeadingSlash = relativePath.startsWith("/")
-                    ? relativePath.substring(1)
-                    : relativePath;
-            Path filePath = Paths.get(pathWithoutLeadingSlash);
-
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("파일 삭제 성공: {}", relativePath);
-            } else {
-                log.warn("삭제할 파일이 존재하지 않습니다: {}", relativePath);
+        if ("s3".equalsIgnoreCase(provider) && s3Client != null && path.startsWith("https://" + cloudfrontDomain)) {
+            try {
+                String key = path.substring(("https://" + cloudfrontDomain + "/").length());
+                DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .build();
+                s3Client.deleteObject(deleteObjectRequest);
+                log.info("S3 파일 삭제 성공: {}", key);
+            } catch (Exception e) {
+                log.error("S3 파일 삭제 실패: {}", e.getMessage(), e);
             }
-        } catch (IOException e) {
-            log.error("파일 삭제 실패: {}", e.getMessage(), e);
-            // 삭제 실패해도 예외를 던지지 않음 (이미 삭제된 경우 등)
+        } else {
+            try {
+                String pathWithoutLeadingSlash = path.startsWith("/") ? path.substring(1) : path;
+                Path filePath = Paths.get(pathWithoutLeadingSlash);
+                if (Files.exists(filePath)) {
+                    Files.delete(filePath);
+                    log.info("로컬 파일 삭제 성공: {}", path);
+                } else {
+                    log.warn("삭제할 파일이 존재하지 않습니다: {}", path);
+                }
+            } catch (IOException e) {
+                log.error("로컬 파일 삭제 실패: {}", e.getMessage(), e);
+            }
         }
     }
 
     /**
      * 여러 파일 삭제
-     * 
-     * @param relativePaths 상대 경로 배열
      */
-    public void deleteFiles(String[] relativePaths) {
-        if (relativePaths == null) {
+    public void deleteFiles(String[] paths) {
+        if (paths == null) {
             return;
         }
 
-        for (String path : relativePaths) {
+        for (String path : paths) {
             deleteFile(path);
         }
     }
 
     /**
      * 파일 유효성 검증
-     * 
-     * @param file 검증할 파일
      */
     private void validateFile(MultipartFile file) {
-        // 파일 크기 검증
         if (file.getSize() > maxFileSize) {
-            throw new IllegalArgumentException(
-                    String.format("파일 크기가 너무 큽니다. 최대 크기: %d bytes", maxFileSize));
+            throw new IllegalArgumentException(String.format("파일 크기가 너무 큽니다. 최대 크기: %d bytes", maxFileSize));
         }
 
-        // 파일 확장자 검증 (이미지 파일만 허용)
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
             throw new IllegalArgumentException("파일명이 없습니다");
@@ -167,7 +214,6 @@ public class FileService {
             throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다 (jpg, jpeg, png, gif, webp)");
         }
 
-        // Content-Type 검증
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다");

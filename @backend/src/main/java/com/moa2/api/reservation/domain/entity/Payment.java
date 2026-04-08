@@ -44,6 +44,8 @@ public class Payment {
     private LocalDateTime requestedAt;
     private LocalDateTime approvedAt;
 
+    private Boolean isEmailSent = false;
+
     @Builder
     public Payment(Reservation reservation, String orderId, Integer amount) {
         this.reservation = reservation;
@@ -80,5 +82,10 @@ public class Payment {
     public void cancel(String reason) {
         this.status = PaymentStatus.CANCELLED;
         this.failureReason = reason; // 취소 사유 저장 용도
+    }
+
+    // 이메일 발송 완료 처리
+    public void markEmailAsSent() {
+        this.isEmailSent = true;
     }
 }

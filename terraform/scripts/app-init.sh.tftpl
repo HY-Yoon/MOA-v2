@@ -1,0 +1,116 @@
+#!/bin/bash
+set -euo pipefail
+
+timedatectl set-timezone Asia/Seoul
+
+# Swap 2GB — t2.micro(1GB RAM)에서 Spring Boot OOM 방지
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+fi
+
+mkdir -p /etc/systemd/system/moa-backend.service.d
+
+# Kafka PEM 인증서를 파일로 저장 (systemd Environment= 는 multi-line 값 불가)
+%{ if kafka_ssl_truststore_cert != "" ~}
+mkdir -p /opt/moa/backend/certs
+cat > /opt/moa/backend/certs/kafka-ca.pem << 'KAFKA_CA_CERT_BOUNDARY'
+${kafka_ssl_truststore_cert}
+KAFKA_CA_CERT_BOUNDARY
+chmod 600 /opt/moa/backend/certs/kafka-ca.pem
+chown moa:moa /opt/moa/backend/certs/kafka-ca.pem
+%{ endif ~}
+
+%{ if kafka_ssl_keystore_cert != "" ~}
+mkdir -p /opt/moa/backend/certs
+cat > /opt/moa/backend/certs/kafka-service.cert << 'KAFKA_SVC_CERT_BOUNDARY'
+${kafka_ssl_keystore_cert}
+KAFKA_SVC_CERT_BOUNDARY
+chmod 600 /opt/moa/backend/certs/kafka-service.cert
+chown moa:moa /opt/moa/backend/certs/kafka-service.cert
+%{ endif ~}
+
+%{ if kafka_ssl_keystore_key != "" ~}
+mkdir -p /opt/moa/backend/certs
+cat > /opt/moa/backend/certs/kafka-service.key << 'KAFKA_SVC_KEY_BOUNDARY'
+${kafka_ssl_keystore_key}
+KAFKA_SVC_KEY_BOUNDARY
+chmod 600 /opt/moa/backend/certs/kafka-service.key
+chown moa:moa /opt/moa/backend/certs/kafka-service.key
+%{ endif ~}
+
+# JVM 래퍼 — PEM 인증서를 파일에서 읽어 환경변수로 주입 후 JVM 실행
+cat > /opt/moa/backend/start.sh << 'START_SCRIPT_BOUNDARY'
+#!/bin/bash
+if [ -f /opt/moa/backend/certs/kafka-ca.pem ]; then
+  export KAFKA_SSL_TRUSTSTORE_CERT="$(cat /opt/moa/backend/certs/kafka-ca.pem)"
+fi
+if [ -f /opt/moa/backend/certs/kafka-service.cert ]; then
+  export KAFKA_SSL_KEYSTORE_CERT="$(cat /opt/moa/backend/certs/kafka-service.cert)"
+fi
+if [ -f /opt/moa/backend/certs/kafka-service.key ]; then
+  export KAFKA_SSL_KEYSTORE_KEY="$(cat /opt/moa/backend/certs/kafka-service.key)"
+fi
+exec /usr/bin/java -Xms256m -Xmx256m -jar /opt/moa/backend/app.jar
+START_SCRIPT_BOUNDARY
+chmod +x /opt/moa/backend/start.sh
+chown moa:moa /opt/moa/backend/start.sh
+
+# Terraform 변수값을 systemd 유닛 본문에 직접 주입
+# - jsonencode: 공백/따옴표/백슬래시를 안전하게 escape
+# - replace(..., "%", "%%"): systemd specifier(%) 충돌 방지
+cat > /etc/systemd/system/moa-backend.service << 'SERVICE_EOF'
+[Unit]
+Description=MOA Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=moa
+Group=moa
+WorkingDirectory=/opt/moa/backend
+ExecStart=/opt/moa/backend/start.sh
+Restart=always
+RestartSec=5
+Environment=SPRING_PROFILES_ACTIVE="prod,v2"
+Environment=PORT="8080"
+Environment=DB_HOST=${jsonencode(replace(db_host, "%", "%%"))}
+Environment=DB_PORT=${jsonencode(replace(db_port, "%", "%%"))}
+Environment=DB_NAME=${jsonencode(replace(db_name, "%", "%%"))}
+Environment=DB_URL=${jsonencode(replace(format("jdbc:postgresql://%s:%s/%s?sslmode=%s", db_host, db_port, db_name, db_sslmode), "%", "%%"))}
+Environment=DB_USERNAME=${jsonencode(replace(db_username, "%", "%%"))}
+Environment=DB_PASSWORD=${jsonencode(replace(db_password, "%", "%%"))}
+Environment=SPRING_DATASOURCE_URL=${jsonencode(replace(format("jdbc:postgresql://%s:%s/%s?sslmode=%s", db_host, db_port, db_name, db_sslmode), "%", "%%"))}
+Environment=SPRING_DATASOURCE_USERNAME=${jsonencode(replace(db_username, "%", "%%"))}
+Environment=SPRING_DATASOURCE_PASSWORD=${jsonencode(replace(db_password, "%", "%%"))}
+Environment=REDIS_URL=${jsonencode(replace(format("rediss://default:%s@%s:%s", redis_password_urlencoded, redis_host, redis_port), "%", "%%"))}
+Environment=REDIS_HOST=${jsonencode(replace(redis_host, "%", "%%"))}
+Environment=REDIS_PORT=${jsonencode(replace(redis_port, "%", "%%"))}
+Environment=REDIS_PASSWORD=${jsonencode(replace(redis_password, "%", "%%"))}
+Environment=KAFKA_BOOTSTRAP_SERVERS=${jsonencode(replace(kafka_bootstrap_servers, "%", "%%"))}
+Environment=JWT_ACCESS_SECRET=${jsonencode(replace(jwt_access_secret, "%", "%%"))}
+Environment=JWT_REFRESH_SECRET=${jsonencode(replace(jwt_refresh_secret, "%", "%%"))}
+Environment=ENCRYPTION_KEY=${jsonencode(replace(encryption_key, "%", "%%"))}
+Environment=GOOGLE_CLIENT_ID=${jsonencode(replace(google_client_id, "%", "%%"))}
+Environment=GOOGLE_CLIENT_SECRET=${jsonencode(replace(google_client_secret, "%", "%%"))}
+Environment=KAKAO_CLIENT_ID=${jsonencode(replace(kakao_client_id, "%", "%%"))}
+Environment=KAKAO_CLIENT_SECRET=${jsonencode(replace(kakao_client_secret, "%", "%%"))}
+Environment=NAVER_CLIENT_ID=${jsonencode(replace(naver_client_id, "%", "%%"))}
+Environment=NAVER_CLIENT_SECRET=${jsonencode(replace(naver_client_secret, "%", "%%"))}
+Environment=MAIL_USERNAME=${jsonencode(replace(mail_username, "%", "%%"))}
+Environment=MAIL_PASSWORD=${jsonencode(replace(mail_password, "%", "%%"))}
+Environment=CORS_ALLOWED_ORIGINS=${jsonencode(replace(cors_allowed_origins, "%", "%%"))}
+Environment=S3_BUCKET_NAME=${jsonencode(replace(s3_bucket_name, "%", "%%"))}
+Environment=CLOUDFRONT_DOMAIN=${jsonencode(replace(cloudfront_domain, "%", "%%"))}
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+chmod 644 /etc/systemd/system/moa-backend.service
+chown root:root /etc/systemd/system/moa-backend.service
+
+systemctl daemon-reload
+systemctl restart moa-backend.service

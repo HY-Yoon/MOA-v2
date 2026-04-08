@@ -1,0 +1,207 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - 'feature/user-update'
+    paths:
+      - '@backend/**'
+      - '.github/workflows/deploy.yml'
+      - 'terraform/packer/**'
+      - 'terraform/**'
+  pull_request:
+    branches:
+      - 'feature/user-update'
+    paths:
+      - '@backend/**'
+      - '.github/workflows/deploy.yml'
+      - 'terraform/packer/**'
+      - 'terraform/**'
+
+jobs:
+  # ============================================================
+  # Job 1: Spring Boot JAR 빌드
+  # ============================================================
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./@backend
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test
+
+      - name: Rename JAR file
+        run: mv build/libs/*-SNAPSHOT.jar build/libs/app.jar
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: ./@backend/build/libs/app.jar
+          if-no-files-found: error
+
+  # ============================================================
+  # Job 2: 인프라 프로비저닝 + AMI 빌드 + 앱 배포
+  # 3-Phase 전략으로 닭-달걀 문제를 근본적으로 해결합니다.
+  #   Phase 1: 기반 인프라 생성 (Network, RDS, IAM) — AMI 불필요
+  #   Phase 2: Packer AMI 빌드 — Phase 1에서 얻은 Subnet ID 사용
+  #   Phase 3: 전체 배포 (Launch Template, ASG) — 이제 AMI 존재
+  # ============================================================
+  deploy:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_db_host: ${{ secrets.DB_HOST }}
+      TF_VAR_db_port: ${{ secrets.DB_PORT }}
+      TF_VAR_db_name: ${{ secrets.DB_NAME }}
+      TF_VAR_db_username: ${{ secrets.DB_USERNAME }}
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_redis_host: ${{ secrets.REDIS_HOST }}
+      TF_VAR_redis_password: ${{ secrets.REDIS_PASSWORD }}
+      TF_VAR_redis_port: ${{ secrets.REDIS_PORT }}
+      TF_VAR_kafka_bootstrap_servers: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+      TF_VAR_kafka_ssl_truststore_cert: ${{ secrets.KAFKA_SSL_TRUSTSTORE_CERT }}
+      TF_VAR_kafka_ssl_keystore_cert: ${{ secrets.KAFKA_SSL_KEYSTORE_CERT }}
+      TF_VAR_kafka_ssl_keystore_key: ${{ secrets.KAFKA_SSL_KEYSTORE_KEY }}
+      TF_VAR_jwt_access_secret: ${{ secrets.JWT_ACCESS_SECRET }}
+      TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
+      TF_VAR_encryption_key: ${{ secrets.ENCRYPTION_KEY }}
+      TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      TF_VAR_kakao_client_id: ${{ secrets.KAKAO_CLIENT_ID }}
+      TF_VAR_kakao_client_secret: ${{ secrets.KAKAO_CLIENT_SECRET }}
+      TF_VAR_naver_client_id: ${{ secrets.NAVER_CLIENT_ID }}
+      TF_VAR_naver_client_secret: ${{ secrets.NAVER_CLIENT_SECRET }}
+      TF_VAR_mail_username: ${{ secrets.MAIL_USERNAME }}
+      TF_VAR_mail_password: ${{ secrets.MAIL_PASSWORD }}
+      TF_VAR_cors_allowed_origins: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download jar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: artifacts
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Debug - Check secrets availability
+        run: |
+          echo "=== Secret availability check ==="
+          echo "DB_HOST:              ${{ secrets.DB_HOST != '' }}"
+          echo "DB_PORT:              ${{ secrets.DB_PORT != '' }}"
+          echo "DB_NAME:              ${{ secrets.DB_NAME != '' }}"
+          echo "DB_USERNAME:          ${{ secrets.DB_USERNAME != '' }}"
+          echo "DB_PASSWORD:          ${{ secrets.DB_PASSWORD != '' }}"
+          echo "REDIS_HOST:           ${{ secrets.REDIS_HOST != '' }}"
+          echo "REDIS_PORT:           ${{ secrets.REDIS_PORT != '' }}"
+          echo "REDIS_PASSWORD:       ${{ secrets.REDIS_PASSWORD != '' }}"
+          echo "JWT_ACCESS_SECRET:    ${{ secrets.JWT_ACCESS_SECRET != '' }}"
+          echo "JWT_REFRESH_SECRET:   ${{ secrets.JWT_REFRESH_SECRET != '' }}"
+          echo "ENCRYPTION_KEY:       ${{ secrets.ENCRYPTION_KEY != '' }}"
+          echo "CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS != '' }}"
+          echo "AWS_ACCESS_KEY_ID:    ${{ secrets.AWS_ACCESS_KEY_ID != '' }}"
+          echo "AWS_SECRET_ACCESS_KEY:${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}"
+
+      - name: Validate required secrets
+        run: |
+          MISSING=""
+          test -n "${{ secrets.DB_HOST }}" || MISSING="$MISSING DB_HOST"
+          test -n "${{ secrets.DB_PORT }}" || MISSING="$MISSING DB_PORT"
+          test -n "${{ secrets.DB_NAME }}" || MISSING="$MISSING DB_NAME"
+          test -n "${{ secrets.DB_USERNAME }}" || MISSING="$MISSING DB_USERNAME"
+          test -n "${{ secrets.DB_PASSWORD }}" || MISSING="$MISSING DB_PASSWORD"
+          test -n "${{ secrets.REDIS_HOST }}" || MISSING="$MISSING REDIS_HOST"
+          test -n "${{ secrets.REDIS_PASSWORD }}" || MISSING="$MISSING REDIS_PASSWORD"
+          test -n "${{ secrets.JWT_ACCESS_SECRET }}" || MISSING="$MISSING JWT_ACCESS_SECRET"
+          test -n "${{ secrets.JWT_REFRESH_SECRET }}" || MISSING="$MISSING JWT_REFRESH_SECRET"
+          test -n "${{ secrets.ENCRYPTION_KEY }}" || MISSING="$MISSING ENCRYPTION_KEY"
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing required secrets:$MISSING"
+            echo "Hint: GitHub repo Settings > Secrets and variables > Actions 에서 Repository secrets 로 등록했는지 확인하세요."
+            echo "Environment secrets 로 등록한 경우, deploy job 에 'environment: <name>' 을 추가해야 합니다."
+            exit 1
+          fi
+          echo "All required secrets are set."
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      # ──────────────────────────────────────────────────────────
+      # Phase 1: 기반 인프라만 생성 (AMI 의존성 없는 리소스만)
+      # -target을 사용해 app.tf의 AMI 의존 리소스를 제외합니다.
+      # ──────────────────────────────────────────────────────────
+      - name: "Phase 1: Apply Base Infrastructure"
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -target=aws_instance.nat_instance \
+            -target=aws_route_table_association.private_a_assoc \
+            -target=aws_route_table_association.private_c_assoc \
+            -target=aws_route_table_association.public_a_assoc \
+            -target=aws_route_table_association.public_c_assoc \
+            -target=aws_iam_instance_profile.infra_profile
+          echo "SUBNET_ID=$(terraform output -raw public_subnet_a_id)" >> $GITHUB_ENV
+
+      # ──────────────────────────────────────────────────────────
+      # Phase 2: Packer로 AMI 빌드 (Phase 1에서 얻은 Subnet ID 사용)
+      # ──────────────────────────────────────────────────────────
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+
+      - name: Packer Init
+        working-directory: terraform/packer
+        run: packer init .
+
+      - name: "Phase 2: Build AMI with Packer"
+        working-directory: terraform/packer
+        run: |
+          packer build \
+            -var "app_artifact_path=../../artifacts/app.jar" \
+            -var "subnet_id=${{ env.SUBNET_ID }}" \
+            .
+
+      # ──────────────────────────────────────────────────────────
+      # Phase 3: 전체 배포 (이제 AMI가 존재하므로 Launch Template + ASG 생성)
+      # ──────────────────────────────────────────────────────────
+      - name: "Phase 3: Deploy Application"
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      - name: "Phase 3.5: Force Instance Refresh"
+        run: |
+          echo "Triggering ASG instance refresh to apply new launch template..."
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name moa-v2-app-asg \
+            --preferences '{"MinHealthyPercentage":0,"InstanceWarmup":180}' \
+            --region ap-northeast-2 || echo "Instance refresh already in progress or triggered by Terraform."

@@ -12,14 +12,12 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import org.springdoc.core.utils.SpringDocUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.TimeZone;
 
 @Configuration
@@ -32,10 +30,6 @@ public class SpringDocConfig {
         SpringDocUtils.getConfig().replaceWithSchema(LocalDateTime.class, schema);
     }
 
-
-    @Value("${APP_URL:http://localhost:8081}")
-    private String appUrl;
-
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
@@ -46,10 +40,11 @@ public class SpringDocConfig {
                         .contact(new Contact()
                                 .name("MOA Team")
                                 .email("support@moa.com")))
-                .servers(List.of(
+                // Swagger "Try it out"이 현재 접속한 도메인으로 호출되도록 상대 경로 사용
+                .servers(java.util.List.of(
                         new Server()
-                                .url(appUrl)
-                                .description("API 서버")))
+                                .url("/")
+                                .description("Current host")))
                 .components(new Components()
                         .addSecuritySchemes("Bearer Authentication", new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)

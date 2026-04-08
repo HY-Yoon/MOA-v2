@@ -14,7 +14,7 @@ yarn-error.log*
 lerna-debug.log*
 
 # dotenv environment variable files
-.env
+@backend/.env
 .env.development
 .env.test
 .env.production
@@ -40,9 +40,18 @@ uploads/
 
 package-lock.json
 
-.env
+@backend/.env
 k6/
 .vercel
 
 docker-compose.yml
+
+# Terraform (여기에 추가!)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+global-bundle.pem
 

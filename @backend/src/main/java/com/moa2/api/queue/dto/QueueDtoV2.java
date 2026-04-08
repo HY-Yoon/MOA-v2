@@ -151,13 +151,27 @@ public class QueueDtoV2 {
             Long scheduleId,
 
             @Schema(description = "내 앞에 둘 가짜 대기 인원 수", example = "3", defaultValue = "3")
-            Long usersAhead
+            Long usersAhead,
+
+            @Schema(description = "기존 대기열을 지우고 요청값 기준으로 다시 구성할지 여부", example = "true", defaultValue = "true")
+            Boolean clearExistingQueue,
+
+            @Schema(description = "대기열 구성 후 스케줄러 토큰 발급 루프를 활성화할지 여부", example = "false", defaultValue = "false")
+            Boolean activateScheduler
     ) {
         public long normalizedUsersAhead() {
             if (usersAhead == null || usersAhead < 1) {
                 return 3L;
             }
             return usersAhead;
+        }
+
+        public boolean shouldClearExistingQueue() {
+            return clearExistingQueue == null || clearExistingQueue;
+        }
+
+        public boolean shouldActivateScheduler() {
+            return activateScheduler != null && activateScheduler;
         }
     }
 

@@ -11,12 +11,15 @@ import com.moa2.global.token.TokenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * V2 대기열 상태 테스트용 디버그 컨트롤러
@@ -50,28 +53,43 @@ public class QueueDebugControllerV2 {
         String currentUserIdStr = userId.toString();
 
         clearUserToken(userId, scheduleId);
-        redisTemplate.opsForZSet().remove(queueKey, currentUserIdStr);
+        if (request.shouldClearExistingQueue()) {
+            redisTemplate.delete(queueKey);
+        } else {
+            redisTemplate.opsForZSet().remove(queueKey, currentUserIdStr);
+        }
 
         long usersAhead = request.normalizedUsersAhead();
         long baseScore = System.currentTimeMillis() - 100_000L;
+        Set<ZSetOperations.TypedTuple<String>> waitingEntries = new HashSet<>();
         for (long i = 1; i <= usersAhead; i++) {
             // 스케줄러에서 Long.parseLong 처리하므로 숫자형 사용자 ID 형태로 주입
             String fakeUserId = String.valueOf(9_000_000_000L + i);
-            redisTemplate.opsForZSet().add(queueKey, fakeUserId, baseScore + i);
+            waitingEntries.add(ZSetOperations.TypedTuple.of(fakeUserId, (double) (baseScore + i)));
         }
-        redisTemplate.opsForZSet().add(queueKey, currentUserIdStr, System.currentTimeMillis());
-        redisTemplate.opsForSet().add(activeSchedulesKey, String.valueOf(scheduleId));
+        waitingEntries.add(ZSetOperations.TypedTuple.of(currentUserIdStr, (double) System.currentTimeMillis()));
+        redisTemplate.opsForZSet().add(queueKey, waitingEntries);
+        if (request.shouldActivateScheduler()) {
+            redisTemplate.opsForSet().add(activeSchedulesKey, String.valueOf(scheduleId));
+        } else if (request.shouldClearExistingQueue()) {
+            // 테스트용 WAITING 고정 상태를 원할 때는 스케줄러 처리 대상에서 제외
+            redisTemplate.opsForSet().remove(activeSchedulesKey, String.valueOf(scheduleId));
+        }
 
         Long rank = redisTemplate.opsForZSet().rank(queueKey, currentUserIdStr);
         long position = (rank != null) ? rank + 1 : usersAhead + 1;
         long totalWaiting = usersAhead + 1;
 
-        log.info("Debug WAITING 시나리오 구성 완료 - userId={}, scheduleId={}, usersAhead={}, position={}",
-                userId, scheduleId, usersAhead, position);
+        log.info("Debug WAITING 시나리오 구성 완료 - userId={}, scheduleId={}, usersAhead={}, position={}, clearExistingQueue={}, activateScheduler={}",
+                userId, scheduleId, usersAhead, position, request.shouldClearExistingQueue(), request.shouldActivateScheduler());
+
+        String resultMessage = request.shouldActivateScheduler()
+                ? "WAITING 시나리오 구성 완료 (스케줄러 활성)"
+                : "WAITING 시나리오 구성 완료 (스케줄러 비활성)";
 
         return ResponseEntity.ok(ApiResponse.success(
                 QueueDtoV2.DebugScenarioResponse.of(
-                        "WAITING 시나리오 구성 완료",
+                        resultMessage,
                         scheduleId,
                         userId,
                         position,
@@ -111,8 +129,8 @@ public class QueueDebugControllerV2 {
     /**
      * 로그인 사용자 기준 대기열/토큰 초기화
      */
-    @PostMapping("/reset")
-    public ResponseEntity<ApiResponse<QueueDtoV2.DebugScenarioResponse>> resetScenario(
+    @PostMapping("/reset/me")
+    public ResponseEntity<ApiResponse<QueueDtoV2.DebugScenarioResponse>> resetMyScenario(
             @Valid @RequestBody QueueDtoV2.DebugResetScenarioRequest request) {
         Long userId = getAuthenticatedUserId();
         Long scheduleId = request.scheduleId();
@@ -121,17 +139,57 @@ public class QueueDebugControllerV2 {
         redisTemplate.opsForZSet().remove(queueKey, userId.toString());
         clearUserToken(userId, scheduleId);
 
-        log.info("Debug 시나리오 초기화 완료 - userId={}, scheduleId={}", userId, scheduleId);
+        log.info("Debug 내 시나리오 초기화 완료 - userId={}, scheduleId={}", userId, scheduleId);
 
         return ResponseEntity.ok(ApiResponse.success(
                 QueueDtoV2.DebugScenarioResponse.of(
-                        "시나리오 초기화 완료",
+                        "내 시나리오 초기화 완료",
                         scheduleId,
                         userId,
                         null,
                         null
                 )
         ));
+    }
+
+    /**
+     * 해당 스케줄의 전체 대기열 초기화
+     */
+    @PostMapping("/reset/all")
+    public ResponseEntity<ApiResponse<QueueDtoV2.DebugScenarioResponse>> resetAllScenario(
+            @Valid @RequestBody QueueDtoV2.DebugResetScenarioRequest request) {
+        Long userId = getAuthenticatedUserId();
+        Long scheduleId = request.scheduleId();
+
+        String queueKey = queueServiceV2.getQueueKey(scheduleId);
+        String activeSchedulesKey = queueServiceV2.getActiveSchedulesKey();
+        Long totalWaiting = redisTemplate.opsForZSet().zCard(queueKey);
+
+        redisTemplate.delete(queueKey);
+        redisTemplate.opsForSet().remove(activeSchedulesKey, String.valueOf(scheduleId));
+        clearUserToken(userId, scheduleId);
+
+        log.info("Debug 전체 시나리오 초기화 완료 - userId={}, scheduleId={}, removedCount={}",
+                userId, scheduleId, totalWaiting);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                QueueDtoV2.DebugScenarioResponse.of(
+                        "전체 시나리오 초기화 완료",
+                        scheduleId,
+                        userId,
+                        null,
+                        totalWaiting
+                )
+        ));
+    }
+
+    /**
+     * 하위호환: 기존 reset 엔드포인트는 reset/me 와 동일하게 동작
+     */
+    @PostMapping("/reset")
+    public ResponseEntity<ApiResponse<QueueDtoV2.DebugScenarioResponse>> resetScenario(
+            @Valid @RequestBody QueueDtoV2.DebugResetScenarioRequest request) {
+        return resetMyScenario(request);
     }
 
     private void clearUserToken(Long userId, Long scheduleId) {

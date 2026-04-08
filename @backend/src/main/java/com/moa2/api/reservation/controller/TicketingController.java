@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -80,7 +81,7 @@ public class TicketingController {
 
         } catch (SeatConflictException e) {
             log.warn("V2 좌석 선점 실패 (좌석 충돌): {}", e.getConflictSeatIds());
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(com.moa2.global.dto.ApiResponse.error(
                             e.getMessage(),
                             ErrorResponse.ofConflict(e.getConflictSeatIds())));
