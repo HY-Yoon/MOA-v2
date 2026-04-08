@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -28,6 +30,7 @@ public class ScheduleSeatService {
         private final SeatMapRepository seatMapRepository;
         private final SeatRepository seatRepository;
         private final ShowSeatGradeRepository showSeatGradeRepository;
+        private final ScheduleSeatInitService scheduleSeatInitService;
 
         private static final int MAX_SELECTABLE_SEATS = 6;
 
@@ -44,11 +47,8 @@ public class ScheduleSeatService {
 
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findSeatMapByScheduleId(scheduleId);
 
-                // 데이터가 없으면 자동 생성 (Lazy Init)
-                if (scheduleSeats.isEmpty()) {
-                        log.info("ScheduleSeat 자동 생성 시작: scheduleId={}", scheduleId);
-                        scheduleSeats = initializeScheduleSeats(schedule);
-                }
+                // 일부/전체 데이터 유실, 동시 초기화 경쟁 상황을 모두 안전하게 보정
+                scheduleSeats = ensureScheduleSeats(schedule, scheduleSeats);
 
                 // DTO 변환
                 List<ScheduleDto.SeatInfo> seats = scheduleSeats.stream()
@@ -89,7 +89,7 @@ public class ScheduleSeatService {
 
         // --- Private Methods (Logic & Mapping) ---
 
-        private List<ScheduleSeat> initializeScheduleSeats(ShowSchedule schedule) {
+        private List<ScheduleSeat> ensureScheduleSeats(ShowSchedule schedule, List<ScheduleSeat> existingScheduleSeats) {
                 Show show = schedule.getShow();
                 if (show.getVenue() == null) {
                         throw new IllegalArgumentException("공연에 연결된 공연장 정보가 없습니다.");
@@ -100,7 +100,7 @@ public class ScheduleSeatService {
 
                 if (seats.isEmpty() || seatGrades.isEmpty()) {
                         log.warn("초기화 실패: 좌석({}) 또는 등급({}) 정보 부족 - showId={}", seats.size(), seatGrades.size(), show.getId());
-                        return new ArrayList<>();
+                        return existingScheduleSeats;
                 }
 
                 Map<Long, ShowSeatGrade> gradeMap = seatGrades.stream()
@@ -110,8 +110,16 @@ public class ScheduleSeatService {
                                 (existing, replacement) -> existing
                         ));
 
+                Set<Long> existingSeatIds = new HashSet<>();
+                for (ScheduleSeat existingSeat : existingScheduleSeats) {
+                        existingSeatIds.add(existingSeat.getSeat().getId());
+                }
+
                 List<ScheduleSeat> scheduleSeatsToSave = new ArrayList<>();
                 for (Seat seat : seats) {
+                        if (existingSeatIds.contains(seat.getId())) {
+                                continue;
+                        }
                         ShowSeatGrade grade = gradeMap.get(seat.getSection().getId());
                         if (grade != null) {
                                 scheduleSeatsToSave.add(ScheduleSeat.builder()
@@ -122,10 +130,17 @@ public class ScheduleSeatService {
                         }
                 }
 
-                scheduleSeatRepository.saveAll(scheduleSeatsToSave);
-                log.info("ScheduleSeat 초기화 완료: scheduleId={}, count={}", schedule.getId(), scheduleSeatsToSave.size());
+                // 넣을 것이 없으면 기존 목록 그대로 반환 (DB 접근 없음)
+                if (scheduleSeatsToSave.isEmpty()) {
+                        return existingScheduleSeats;
+                }
 
-                // 영속성 컨텍스트 갱신을 위해 다시 조회
+                // REQUIRES_NEW 트랜잭션으로 INSERT 시도
+                // - 성공: 독립 커밋 → 아래 재조회로 최신 상태 반환
+                // - 중복 충돌(동시 요청): 독립 롤백 → 외부 트랜잭션은 살아있으므로 아래 재조회 정상 동작
+                scheduleSeatInitService.insertMissingSeats(scheduleSeatsToSave, schedule.getId());
+
+                // 영속성 컨텍스트 갱신을 위해 항상 재조회
                 return scheduleSeatRepository.findSeatMapByScheduleId(schedule.getId());
         }
 

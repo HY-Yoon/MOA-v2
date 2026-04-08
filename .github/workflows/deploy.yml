@@ -3,7 +3,7 @@ name: Backend CI/CD Pipeline
 on:
   push:
     branches:
-      - 'feature/user-update'
+      - 'feature/backend-infra-update'
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
@@ -11,7 +11,7 @@ on:
       - 'terraform/**'
   pull_request:
     branches:
-      - 'feature/user-update'
+      - 'feature/backend-infra-update'
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
