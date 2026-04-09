@@ -444,7 +444,6 @@ public class AdminShowService {
                     .status(ScheduleStatus.BEFORE_OPEN)
                     .build();
             showScheduleRepository.save(schedule);
-            scheduleSeatInitService.rebuildScheduleSeats(schedule);
         }
     }
 
