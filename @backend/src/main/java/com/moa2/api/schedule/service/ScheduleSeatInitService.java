@@ -36,17 +36,31 @@ public class ScheduleSeatInitService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean insertMissingSeats(List<ScheduleSeat> scheduleSeatsToSave, Long scheduleId) {
+        long startNs = System.nanoTime();
         if (scheduleSeatsToSave.isEmpty()) {
             return false;
         }
         try {
             scheduleSeatRepository.saveAll(scheduleSeatsToSave);
-            log.info("ScheduleSeat 보정 완료: scheduleId={}, inserted={}", scheduleId, scheduleSeatsToSave.size());
+            log.info(
+                    "ScheduleSeat 보정 완료: scheduleId={}, inserted={}, saveAllMs={}",
+                    scheduleId,
+                    scheduleSeatsToSave.size(),
+                    toMs(System.nanoTime() - startNs)
+            );
         } catch (DataIntegrityViolationException e) {
             // 동시 요청으로 다른 트랜잭션이 먼저 INSERT한 경우
             // 이 REQUIRES_NEW 트랜잭션만 롤백 → 외부 트랜잭션은 정상 유지
-            log.warn("ScheduleSeat 중복 감지(동시 요청) - 재조회로 처리: scheduleId={}", scheduleId);
+            log.warn(
+                    "ScheduleSeat 중복 감지(동시 요청) - 재조회로 처리: scheduleId={}, saveAllMs={}",
+                    scheduleId,
+                    toMs(System.nanoTime() - startNs)
+            );
         }
         return true;
+    }
+
+    private long toMs(long nanos) {
+        return nanos / 1_000_000;
     }
 }

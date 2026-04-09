@@ -40,20 +40,39 @@ public class ScheduleSeatService {
          */
         @Transactional
         public ScheduleDto.SeatsResponse getScheduleSeats(Long scheduleId) {
+                long startNs = System.nanoTime();
                 log.debug("좌석 상태 조회 시작: scheduleId={}", scheduleId);
 
                 ShowSchedule schedule = showScheduleRepository.findById(scheduleId)
                         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
+                long afterScheduleLookupNs = System.nanoTime();
 
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findSeatMapByScheduleId(scheduleId);
+                long afterInitialSeatQueryNs = System.nanoTime();
+                int initialSeatCount = scheduleSeats.size();
 
                 // 일부/전체 데이터 유실, 동시 초기화 경쟁 상황을 모두 안전하게 보정
                 scheduleSeats = ensureScheduleSeats(schedule, scheduleSeats);
+                long afterEnsureNs = System.nanoTime();
+                int finalSeatCount = scheduleSeats.size();
 
                 // DTO 변환
                 List<ScheduleDto.SeatInfo> seats = scheduleSeats.stream()
                         .map(this::mapToSeatInfo)
                         .collect(Collectors.toList());
+                long afterDtoMappingNs = System.nanoTime();
+
+                log.info(
+                        "좌석 조회 타이밍: scheduleId={}, scheduleLookupMs={}, initialSeatQueryMs={}, ensureMs={}, dtoMapMs={}, totalMs={}, initialSeatCount={}, finalSeatCount={}",
+                        scheduleId,
+                        toMs(afterScheduleLookupNs - startNs),
+                        toMs(afterInitialSeatQueryNs - afterScheduleLookupNs),
+                        toMs(afterEnsureNs - afterInitialSeatQueryNs),
+                        toMs(afterDtoMappingNs - afterEnsureNs),
+                        toMs(afterDtoMappingNs - startNs),
+                        initialSeatCount,
+                        finalSeatCount
+                );
 
                 return ScheduleDto.SeatsResponse.builder()
                         .maxSelectable(MAX_SELECTABLE_SEATS)
@@ -132,8 +151,24 @@ public class ScheduleSeatService {
 
                 // 넣을 것이 없으면 기존 목록 그대로 반환 (DB 접근 없음)
                 if (scheduleSeatsToSave.isEmpty()) {
+                        log.debug(
+                                "ScheduleSeat 보정 불필요: scheduleId={}, existingCount={}, venueSeatCount={}, gradeCount={}",
+                                schedule.getId(),
+                                existingScheduleSeats.size(),
+                                seats.size(),
+                                seatGrades.size()
+                        );
                         return existingScheduleSeats;
                 }
+
+                log.info(
+                        "ScheduleSeat 보정 시작: scheduleId={}, existingCount={}, venueSeatCount={}, missingCount={}, gradeCount={}",
+                        schedule.getId(),
+                        existingScheduleSeats.size(),
+                        seats.size(),
+                        scheduleSeatsToSave.size(),
+                        seatGrades.size()
+                );
 
                 // REQUIRES_NEW 트랜잭션으로 INSERT 시도
                 // - 성공: 독립 커밋 → 아래 재조회로 최신 상태 반환
@@ -142,6 +177,10 @@ public class ScheduleSeatService {
 
                 // 영속성 컨텍스트 갱신을 위해 항상 재조회
                 return scheduleSeatRepository.findSeatMapByScheduleId(schedule.getId());
+        }
+
+        private long toMs(long nanos) {
+                return nanos / 1_000_000;
         }
 
         private ScheduleDto.SeatInfo mapToSeatInfo(ScheduleSeat ss) {
