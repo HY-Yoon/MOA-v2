@@ -80,6 +80,15 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
        Long countByScheduleId(Long scheduleId);
 
        /**
+        * 특정 좌석 ID 목록을 등급/스케줄 포함 일괄 조회 (선점 시 N+1 방지)
+        */
+       @Query("SELECT ss FROM ScheduleSeat ss " +
+                     "JOIN FETCH ss.grade g " +
+                     "JOIN FETCH ss.schedule sch " +
+                     "WHERE ss.id IN :ids")
+       List<ScheduleSeat> findAllByIdsWithGradeAndSchedule(@Param("ids") List<Long> ids);
+
+       /**
         * 회차별 좌석 등급 통계 (구역ID, 구역명, 가격, 잔여석, 전체석)
         */
        @Query("SELECT " +

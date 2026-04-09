@@ -37,7 +37,6 @@ public class AdminShowService {
     private final VenueSeatSectionRepository venueSeatSectionRepository;
     private final VenueRepository venueRepository;
     private final ReservationRepository reservationRepository;
-    private final SeatRepository seatRepository;
     private final DetailImageRepository detailImageRepository;
     private final FileService fileService;
     private final ScheduleSeatInitService scheduleSeatInitService;
@@ -89,23 +88,26 @@ public class AdminShowService {
         List<ShowSchedule> schedules = showScheduleRepository.findByShowIdOrderByDateAndTime(id);
         List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(id);
 
-        // 전체 좌석 수 조회 (Venue 기준)
-        Long totalSeats = show.getVenue() != null
-                ? seatRepository.countByVenueId(show.getVenue().getId())
-                : 0L;
-
-        // 예약 수 배치를 조회
         List<Long> scheduleIds = schedules.stream()
                 .map(ShowSchedule::getId)
                 .collect(Collectors.toList());
 
+        // schedule_seat 상태 기준 집계 (정확한 잔여석 반영)
+        List<Object[]> seatStats = scheduleSeatRepository.countTotalAndRemainingSeatsByScheduleIds(scheduleIds);
+        Map<Long, int[]> seatStatsMap = seatStats.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> new int[]{ ((Number) row[1]).intValue(),
+                                row[2] == null ? 0 : ((Number) row[2]).intValue() }));
+
+        // 예약 건수 (표시용)
         List<Object[]> reservationStats = reservationRepository.countReservationsByScheduleIds(scheduleIds);
         Map<Long, Long> reservationCounts = reservationStats.stream()
                 .collect(Collectors.toMap(
                         row -> (Long) row[0],
                         row -> (Long) row[1]));
 
-        return ShowDto.ofAdminDetail(show, schedules, seatGrades, totalSeats, reservationCounts);
+        return ShowDto.ofAdminDetail(show, schedules, seatGrades, seatStatsMap, reservationCounts);
     }
 
     @Transactional
