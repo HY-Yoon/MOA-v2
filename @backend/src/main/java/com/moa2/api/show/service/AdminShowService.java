@@ -79,6 +79,7 @@ public class AdminShowService {
         return new PageImpl<>(content, pageable, shows.getTotalElements());
     }
 
+    @Transactional
     public ShowDto.AdminDetailResponse getShowDetail(Long id) {
         Show show = showRepository.findByIdAndNotDeleted(id);
         if (show == null) {
@@ -94,11 +95,30 @@ public class AdminShowService {
 
         // schedule_seat 상태 기준 집계 (정확한 잔여석 반영)
         List<Object[]> seatStats = scheduleSeatRepository.countTotalAndRemainingSeatsByScheduleIds(scheduleIds);
-        Map<Long, int[]> seatStatsMap = seatStats.stream()
+        Map<Long, int[]> seatStatsMap = new java.util.HashMap<>(seatStats.stream()
                 .collect(Collectors.toMap(
                         row -> (Long) row[0],
                         row -> new int[]{ ((Number) row[1]).intValue(),
-                                row[2] == null ? 0 : ((Number) row[2]).intValue() }));
+                                row[2] == null ? 0 : ((Number) row[2]).intValue() })));
+
+        // schedule_seat 미초기화 회차 자동 보정 (기존 등록 공연 대응)
+        boolean needsRefresh = false;
+        for (ShowSchedule schedule : schedules) {
+            if (!seatStatsMap.containsKey(schedule.getId())) {
+                log.info("schedule_seat 미초기화 회차 보정: scheduleId={}", schedule.getId());
+                scheduleSeatInitService.rebuildScheduleSeats(schedule);
+                needsRefresh = true;
+            }
+        }
+
+        if (needsRefresh) {
+            List<Object[]> refreshed = scheduleSeatRepository.countTotalAndRemainingSeatsByScheduleIds(scheduleIds);
+            seatStatsMap = refreshed.stream()
+                    .collect(Collectors.toMap(
+                            row -> (Long) row[0],
+                            row -> new int[]{ ((Number) row[1]).intValue(),
+                                    row[2] == null ? 0 : ((Number) row[2]).intValue() }));
+        }
 
         // 예약 건수 (표시용)
         List<Object[]> reservationStats = reservationRepository.countReservationsByScheduleIds(scheduleIds);
@@ -446,6 +466,7 @@ public class AdminShowService {
                     .status(ScheduleStatus.BEFORE_OPEN)
                     .build();
             showScheduleRepository.save(schedule);
+            scheduleSeatInitService.rebuildScheduleSeats(schedule);
         }
     }
 
