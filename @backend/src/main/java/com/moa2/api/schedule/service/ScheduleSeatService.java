@@ -11,10 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -28,22 +26,19 @@ public class ScheduleSeatService {
         private final ShowScheduleRepository showScheduleRepository;
         private final ScheduleSeatRepository scheduleSeatRepository;
         private final SeatMapRepository seatMapRepository;
-        private final SeatRepository seatRepository;
-        private final ShowSeatGradeRepository showSeatGradeRepository;
-        private final ScheduleSeatInitService scheduleSeatInitService;
 
         private static final int MAX_SELECTABLE_SEATS = 6;
 
         /**
          * 회차 좌석 상태 조회 (상세 좌석 선택 화면용)
-         * - Lazy Initialization 적용: 데이터가 없으면 자동 생성
+         * - 조회 전용: 데이터 생성/보정은 등록 시점에서 선처리
          */
         @Transactional
         public ScheduleDto.SeatsResponse getScheduleSeats(Long scheduleId) {
                 long startNs = System.nanoTime();
                 log.debug("좌석 상태 조회 시작: scheduleId={}", scheduleId);
 
-                ShowSchedule schedule = showScheduleRepository.findById(scheduleId)
+                showScheduleRepository.findById(scheduleId)
                         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
                 long afterScheduleLookupNs = System.nanoTime();
 
@@ -51,9 +46,11 @@ public class ScheduleSeatService {
                 long afterInitialSeatQueryNs = System.nanoTime();
                 int initialSeatCount = scheduleSeats.size();
 
-                // 일부/전체 데이터 유실, 동시 초기화 경쟁 상황을 모두 안전하게 보정
-                scheduleSeats = ensureScheduleSeats(schedule, scheduleSeats);
-                long afterEnsureNs = System.nanoTime();
+                if (scheduleSeats.isEmpty()) {
+                        log.error("회차 좌석 데이터 누락: scheduleId={}", scheduleId);
+                        throw new IllegalStateException("회차 좌석 데이터가 준비되지 않았습니다. 관리자에게 문의하세요.");
+                }
+                long afterValidationNs = System.nanoTime();
                 int finalSeatCount = scheduleSeats.size();
 
                 // DTO 변환
@@ -63,12 +60,12 @@ public class ScheduleSeatService {
                 long afterDtoMappingNs = System.nanoTime();
 
                 log.info(
-                        "좌석 조회 타이밍: scheduleId={}, scheduleLookupMs={}, initialSeatQueryMs={}, ensureMs={}, dtoMapMs={}, totalMs={}, initialSeatCount={}, finalSeatCount={}",
+                        "좌석 조회 타이밍: scheduleId={}, scheduleLookupMs={}, initialSeatQueryMs={}, validationMs={}, dtoMapMs={}, totalMs={}, initialSeatCount={}, finalSeatCount={}",
                         scheduleId,
                         toMs(afterScheduleLookupNs - startNs),
                         toMs(afterInitialSeatQueryNs - afterScheduleLookupNs),
-                        toMs(afterEnsureNs - afterInitialSeatQueryNs),
-                        toMs(afterDtoMappingNs - afterEnsureNs),
+                        toMs(afterValidationNs - afterInitialSeatQueryNs),
+                        toMs(afterDtoMappingNs - afterValidationNs),
                         toMs(afterDtoMappingNs - startNs),
                         initialSeatCount,
                         finalSeatCount
@@ -104,79 +101,6 @@ public class ScheduleSeatService {
                         .canvas(mapToCanvasInfo(seatMap.getCanvas()))
                         .sections(mapToSectionInfos(seatMap.getSections()))
                         .build();
-        }
-
-        // --- Private Methods (Logic & Mapping) ---
-
-        private List<ScheduleSeat> ensureScheduleSeats(ShowSchedule schedule, List<ScheduleSeat> existingScheduleSeats) {
-                Show show = schedule.getShow();
-                if (show.getVenue() == null) {
-                        throw new IllegalArgumentException("공연에 연결된 공연장 정보가 없습니다.");
-                }
-
-                List<Seat> seats = seatRepository.findByVenueId(show.getVenue().getId());
-                List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(show.getId());
-
-                if (seats.isEmpty() || seatGrades.isEmpty()) {
-                        log.warn("초기화 실패: 좌석({}) 또는 등급({}) 정보 부족 - showId={}", seats.size(), seatGrades.size(), show.getId());
-                        return existingScheduleSeats;
-                }
-
-                Map<Long, ShowSeatGrade> gradeMap = seatGrades.stream()
-                        .collect(Collectors.toMap(
-                                g -> g.getSection().getId(),
-                                g -> g,
-                                (existing, replacement) -> existing
-                        ));
-
-                Set<Long> existingSeatIds = new HashSet<>();
-                for (ScheduleSeat existingSeat : existingScheduleSeats) {
-                        existingSeatIds.add(existingSeat.getSeat().getId());
-                }
-
-                List<ScheduleSeat> scheduleSeatsToSave = new ArrayList<>();
-                for (Seat seat : seats) {
-                        if (existingSeatIds.contains(seat.getId())) {
-                                continue;
-                        }
-                        ShowSeatGrade grade = gradeMap.get(seat.getSection().getId());
-                        if (grade != null) {
-                                scheduleSeatsToSave.add(ScheduleSeat.builder()
-                                        .schedule(schedule)
-                                        .seat(seat)
-                                        .grade(grade)
-                                        .build());
-                        }
-                }
-
-                // 넣을 것이 없으면 기존 목록 그대로 반환 (DB 접근 없음)
-                if (scheduleSeatsToSave.isEmpty()) {
-                        log.debug(
-                                "ScheduleSeat 보정 불필요: scheduleId={}, existingCount={}, venueSeatCount={}, gradeCount={}",
-                                schedule.getId(),
-                                existingScheduleSeats.size(),
-                                seats.size(),
-                                seatGrades.size()
-                        );
-                        return existingScheduleSeats;
-                }
-
-                log.info(
-                        "ScheduleSeat 보정 시작: scheduleId={}, existingCount={}, venueSeatCount={}, missingCount={}, gradeCount={}",
-                        schedule.getId(),
-                        existingScheduleSeats.size(),
-                        seats.size(),
-                        scheduleSeatsToSave.size(),
-                        seatGrades.size()
-                );
-
-                // REQUIRES_NEW 트랜잭션으로 INSERT 시도
-                // - 성공: 독립 커밋 → 아래 재조회로 최신 상태 반환
-                // - 중복 충돌(동시 요청): 독립 롤백 → 외부 트랜잭션은 살아있으므로 아래 재조회 정상 동작
-                scheduleSeatInitService.insertMissingSeats(scheduleSeatsToSave, schedule.getId());
-
-                // 영속성 컨텍스트 갱신을 위해 항상 재조회
-                return scheduleSeatRepository.findSeatMapByScheduleId(schedule.getId());
         }
 
         private long toMs(long nanos) {

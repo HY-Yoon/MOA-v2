@@ -29,10 +29,5 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     Optional<User> findBySocialProviderAndProviderId(SocialProvider socialProvider, String providerId);
 
-    /**
-     * 이메일로 사용자 조회 (JWT 토큰 검증용)
-     */
-    Optional<User> findByEmail(String email);
-
     Optional<User> findByEmailAndSocialProvider(String email, SocialProvider socialProvider);
 }

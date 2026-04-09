@@ -35,9 +35,11 @@ public class UserReservationController implements UserReservationControllerDocs 
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @ModelAttribute ReservationSearchCondition condition) {
     String userEmail = userPrincipal != null ? userPrincipal.getEmail() : null;
+    String userProvider = userPrincipal != null ? userPrincipal.getProvider() : null;
     log.info(
-        "[UserReservationController#getMyReservations] userEmail={}, status={}, paymentStatus={}, dateType={}, startDate={}, endDate={}, page={}, size={}",
+        "[UserReservationController#getMyReservations] userEmail={}, provider={}, status={}, paymentStatus={}, dateType={}, startDate={}, endDate={}, page={}, size={}",
         userEmail != null ? userEmail : "anonymous",
+        userProvider != null ? userProvider : "unknown",
         condition.status(),
         condition.paymentStatus(),
         condition.dateType(),
@@ -49,7 +51,7 @@ public class UserReservationController implements UserReservationControllerDocs 
     // 최신순 정렬
     Pageable pageable = PageRequest.of(condition.page(), condition.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
 
-    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userEmail,
+    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userEmail, userProvider,
         condition, pageable);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
@@ -60,7 +62,9 @@ public class UserReservationController implements UserReservationControllerDocs 
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @PathVariable Long reservationId) {
 
-    ReservationDto.DetailResponse response = reservationService.getReservationDetail(userPrincipal.getEmail(),
+    ReservationDto.DetailResponse response = reservationService.getReservationDetail(
+        userPrincipal.getEmail(),
+        userPrincipal.getProvider(),
         reservationId);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
@@ -71,7 +75,9 @@ public class UserReservationController implements UserReservationControllerDocs 
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @PathVariable Long reservationId) {
 
-    ReservationDto.CancelResponse response = reservationService.cancelReservation(userPrincipal.getEmail(),
+    ReservationDto.CancelResponse response = reservationService.cancelReservation(
+        userPrincipal.getEmail(),
+        userPrincipal.getProvider(),
         reservationId);
     return ResponseEntity.ok(ApiResponse.success(response, response.message()));
   }

@@ -1,7 +1,13 @@
 package com.moa2.api.schedule.service;
 
 import com.moa2.api.show.domain.entity.ScheduleSeat;
+import com.moa2.api.show.domain.entity.Seat;
+import com.moa2.api.show.domain.entity.Show;
+import com.moa2.api.show.domain.entity.ShowSchedule;
+import com.moa2.api.show.domain.entity.ShowSeatGrade;
+import com.moa2.api.show.domain.repository.SeatRepository;
 import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
+import com.moa2.api.show.domain.repository.ShowSeatGradeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -9,7 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * ScheduleSeat 초기 INSERT 전용 서비스
@@ -25,6 +34,8 @@ import java.util.List;
 public class ScheduleSeatInitService {
 
     private final ScheduleSeatRepository scheduleSeatRepository;
+    private final SeatRepository seatRepository;
+    private final ShowSeatGradeRepository showSeatGradeRepository;
 
     /**
      * 누락된 ScheduleSeat만 INSERT (멱등, REQUIRES_NEW)
@@ -42,6 +53,8 @@ public class ScheduleSeatInitService {
         }
         try {
             scheduleSeatRepository.saveAll(scheduleSeatsToSave);
+            // unique constraint 충돌을 commit 시점이 아닌 현재 try 블록에서 감지하도록 강제 flush
+            scheduleSeatRepository.flush();
             log.info(
                     "ScheduleSeat 보정 완료: scheduleId={}, inserted={}, saveAllMs={}",
                     scheduleId,
@@ -58,6 +71,47 @@ public class ScheduleSeatInitService {
             );
         }
         return true;
+    }
+
+    /**
+     * 특정 회차의 schedule_seats를 전체 재생성한다.
+     * - 조회 API에서 lazy 생성하지 않고, 등록/수정 시점에 선생성하기 위한 메서드
+     */
+    @Transactional
+    public int rebuildScheduleSeats(ShowSchedule schedule) {
+        Show show = schedule.getShow();
+        if (show.getVenue() == null) {
+            throw new IllegalArgumentException("공연에 연결된 공연장 정보가 없습니다.");
+        }
+
+        List<Seat> seats = seatRepository.findByVenueId(show.getVenue().getId());
+        List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(show.getId());
+        if (seats.isEmpty() || seatGrades.isEmpty()) {
+            throw new IllegalStateException("회차 좌석 초기화 실패: 좌석 또는 등급 정보가 비어있습니다.");
+        }
+
+        Map<Long, ShowSeatGrade> gradeMap = seatGrades.stream()
+                .collect(Collectors.toMap(g -> g.getSection().getId(), g -> g, (existing, replacement) -> existing));
+
+        List<ScheduleSeat> toInsert = new ArrayList<>();
+        for (Seat seat : seats) {
+            ShowSeatGrade grade = gradeMap.get(seat.getSection().getId());
+            if (grade == null) {
+                continue;
+            }
+            toInsert.add(ScheduleSeat.builder()
+                    .schedule(schedule)
+                    .seat(seat)
+                    .grade(grade)
+                    .build());
+        }
+
+        scheduleSeatRepository.deleteByScheduleId(schedule.getId());
+        scheduleSeatRepository.saveAll(toInsert);
+        scheduleSeatRepository.flush();
+
+        log.info("ScheduleSeat 선생성 완료: scheduleId={}, inserted={}", schedule.getId(), toInsert.size());
+        return toInsert.size();
     }
 
     private long toMs(long nanos) {

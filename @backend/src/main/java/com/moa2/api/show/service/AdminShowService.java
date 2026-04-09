@@ -1,5 +1,6 @@
 package com.moa2.api.show.service;
 
+import com.moa2.api.schedule.service.ScheduleSeatInitService;
 import com.moa2.api.show.dto.*;
 import com.moa2.api.show.domain.entity.*;
 import com.moa2.api.show.domain.repository.*;
@@ -31,6 +32,7 @@ public class AdminShowService {
 
     private final ShowRepository showRepository;
     private final ShowScheduleRepository showScheduleRepository;
+    private final ScheduleSeatRepository scheduleSeatRepository;
     private final ShowSeatGradeRepository showSeatGradeRepository;
     private final VenueSeatSectionRepository venueSeatSectionRepository;
     private final VenueRepository venueRepository;
@@ -38,6 +40,7 @@ public class AdminShowService {
     private final SeatRepository seatRepository;
     private final DetailImageRepository detailImageRepository;
     private final FileService fileService;
+    private final ScheduleSeatInitService scheduleSeatInitService;
 
     public Page<ShowDto.AdminListResponse> getShowList(ShowDto.AdminListRequest request, Pageable pageable) {
         // keyword가 있으면 검색 패턴 생성 (null이거나 빈 문자열이면 null)
@@ -143,11 +146,11 @@ public class AdminShowService {
         // 상세 이미지 업로드 및 저장
         uploadAndSaveDetailImages(detailImages, show);
 
-        // 스케줄 생성 및 저장
-        createAndSaveSchedules(scheduleRequests, show);
-
         // 좌석 구역별 가격 정보 저장
         createAndSaveSeatGrades(show, venue);
+
+        // 스케줄 생성 및 저장 (schedule_seats 선생성을 위해 seatGrade 생성 이후 실행)
+        createAndSaveSchedules(scheduleRequests, show);
 
         return new ShowDto.CreateResponse(show.getId(), "공연이 등록되었습니다");
     }
@@ -208,6 +211,7 @@ public class AdminShowService {
             if (request.location() != null) { // 장소가 바뀌면 좌석도 바뀔 수 있으므로
                 showSeatGradeRepository.deleteAll(show.getShowSeatGrades());
                 createAndSaveSeatGrades(show, show.getVenue());
+                rebuildScheduleSeatsForShow(show);
             }
         }
 
@@ -278,6 +282,7 @@ public class AdminShowService {
 
         // 예매가 없으면 물리 삭제 진행
         if (!schedules.isEmpty()) {
+            scheduleSeatRepository.deleteByScheduleIdIn(schedules.stream().map(ShowSchedule::getId).toList());
             showScheduleRepository.deleteAll(schedules);
         }
 
@@ -439,6 +444,7 @@ public class AdminShowService {
                     .status(ScheduleStatus.BEFORE_OPEN)
                     .build();
             showScheduleRepository.save(schedule);
+            scheduleSeatInitService.rebuildScheduleSeats(schedule);
         }
     }
 
@@ -466,6 +472,13 @@ public class AdminShowService {
         }
     }
 
+    private void rebuildScheduleSeatsForShow(Show show) {
+        List<ShowSchedule> schedules = showScheduleRepository.findByShowIdOrderByDateAndTime(show.getId());
+        for (ShowSchedule schedule : schedules) {
+            scheduleSeatInitService.rebuildScheduleSeats(schedule);
+        }
+    }
+
     private void updateSchedules(Show show, List<ShowDto.UpdateRequest.ScheduleUpdateRequest> scheduleRequests) {
         if (scheduleRequests == null || scheduleRequests.isEmpty())
             return;
@@ -486,6 +499,7 @@ public class AdminShowService {
                 if (reservationCount > 0) {
                     throw new RuntimeException("예매가 있는 스케줄은 삭제할 수 없습니다 id: " + existing.getId());
                 }
+                scheduleSeatRepository.deleteByScheduleId(existing.getId());
                 showScheduleRepository.delete(existing);
             }
         }
@@ -502,6 +516,7 @@ public class AdminShowService {
                         .status(ScheduleStatus.BEFORE_OPEN)
                         .build();
                 showScheduleRepository.save(newSchedule);
+                scheduleSeatInitService.rebuildScheduleSeats(newSchedule);
             } else { // 수정
                 ShowSchedule existing = existingSchedules.stream().filter(s -> s.getId().equals(req.scheduleId()))
                         .findFirst().orElseThrow();
@@ -517,6 +532,7 @@ public class AdminShowService {
                 existing.setShowTime(showTime);
                 existing.setTicketOpenTime(req.ticketOpenTime());
                 showScheduleRepository.save(existing);
+                scheduleSeatInitService.rebuildScheduleSeats(existing);
             }
         }
 

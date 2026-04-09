@@ -30,6 +30,14 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
                      "WHERE ss.schedule.id = :scheduleId")
        List<ScheduleSeat> findSeatMapByScheduleId(@Param("scheduleId") Long scheduleId);
 
+       @Modifying
+       @Query("DELETE FROM ScheduleSeat ss WHERE ss.schedule.id = :scheduleId")
+       int deleteByScheduleId(@Param("scheduleId") Long scheduleId);
+
+       @Modifying
+       @Query("DELETE FROM ScheduleSeat ss WHERE ss.schedule.id IN :scheduleIds")
+       int deleteByScheduleIdIn(@Param("scheduleIds") List<Long> scheduleIds);
+
 
 
        /**
