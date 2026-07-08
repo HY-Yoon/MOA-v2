@@ -3,7 +3,8 @@ name: Backend CI/CD Pipeline
 on:
   push:
     branches:
-      - 'feature/user-update'
+      - 'develop'
+      - 'feature/**'
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
@@ -11,7 +12,7 @@ on:
       - 'terraform/**'
   pull_request:
     branches:
-      - 'feature/user-update'
+      - 'develop'
     paths:
       - '@backend/**'
       - '.github/workflows/deploy.yml'
@@ -66,7 +67,7 @@ jobs:
   #   Phase 3: 전체 배포 (Launch Template, ASG) — 이제 AMI 존재
   # ============================================================
   deploy:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: build
     runs-on: ubuntu-latest
     env:
