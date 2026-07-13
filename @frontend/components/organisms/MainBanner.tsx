@@ -6,29 +6,29 @@ import Image from 'next/image';
 
 const banners = [
   {
-    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2603/260312093256_26003451.gif',
-    alt: 'verdy',
-    bgColor: '#E7E8E7',
-  },
-  {
-    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2603/260303083142_26002980.gif',
-    alt: '마리 로랑생',
-    bgColor: '#98A0A2',
-  },
-  {
-    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2601/260129081837_26001001.gif',
-    alt: '빌리 엘리어트',
-    bgColor: '#F7F7F7',
-  },
-  {
-    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2604/260407082558_26002992.gif',
-    alt: '엔하이픈',
-    bgColor: '#214552',
-  },
-  {
-    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2604/260402012900_P0004610.gif',
-    alt: '디즈니',
+    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2607/260713090055_26009919.gif',
+    alt: 'khalid',
     bgColor: '#000000',
+  },
+  {
+    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2607/260713090709_22000354.gif',
+    alt: 'nol',
+    bgColor: '#E15E3B',
+  },
+  {
+    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2606/260630093733_26009314.gif',
+    alt: 'elisabeth',
+    bgColor: '#4D4266',
+  },
+  {
+    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2606/260615085250_26007895.gif',
+    alt: 'busan',
+    bgColor: '#6CC4EF',
+  },
+  {
+    src: 'https://ticketimage.interpark.com/TCMS3.0/NMain/BbannerPC/2605/260527093711_26007442.gif',
+    alt: 'dear',
+    bgColor: '#2E2B30',
   },
 ];
 
