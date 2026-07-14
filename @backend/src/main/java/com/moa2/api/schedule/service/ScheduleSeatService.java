@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -25,35 +27,62 @@ public class ScheduleSeatService {
 
         private final ShowScheduleRepository showScheduleRepository;
         private final ScheduleSeatRepository scheduleSeatRepository;
-        private final SeatMapRepository seatMapRepository;
         private final SeatRepository seatRepository;
         private final ShowSeatGradeRepository showSeatGradeRepository;
+        private final SeatMapRepository seatMapRepository;
+        private final ScheduleSeatInitService scheduleSeatInitService;
 
         private static final int MAX_SELECTABLE_SEATS = 6;
 
         /**
          * 회차 좌석 상태 조회 (상세 좌석 선택 화면용)
-         * - Lazy Initialization 적용: 데이터가 없으면 자동 생성
+         * - 조회 전용: 데이터 생성/보정은 등록 시점에서 선처리
          */
         @Transactional
         public ScheduleDto.SeatsResponse getScheduleSeats(Long scheduleId) {
+                long startNs = System.nanoTime();
                 log.debug("좌석 상태 조회 시작: scheduleId={}", scheduleId);
 
                 ShowSchedule schedule = showScheduleRepository.findById(scheduleId)
                         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스케줄입니다."));
+                long afterScheduleLookupNs = System.nanoTime();
 
                 List<ScheduleSeat> scheduleSeats = scheduleSeatRepository.findSeatMapByScheduleId(scheduleId);
+                long afterInitialSeatQueryNs = System.nanoTime();
+                int initialSeatCount = scheduleSeats.size();
 
-                // 데이터가 없으면 자동 생성 (Lazy Init)
-                if (scheduleSeats.isEmpty()) {
-                        log.info("ScheduleSeat 자동 생성 시작: scheduleId={}", scheduleId);
-                        scheduleSeats = initializeScheduleSeats(schedule);
+                // 등록 시 선생성을 생략하므로, 조회 시 누락 좌석을 멱등 보정한다.
+                if (scheduleSeats.isEmpty() || hasMissingScheduleSeats(schedule, scheduleSeats)) {
+                        int insertedCount = backfillScheduleSeats(schedule, scheduleSeats);
+                        if (insertedCount > 0) {
+                                scheduleSeats = scheduleSeatRepository.findSeatMapByScheduleId(scheduleId);
+                        }
                 }
+
+                if (scheduleSeats.isEmpty()) {
+                        log.error("회차 좌석 데이터 보정 실패: scheduleId={}", scheduleId);
+                        throw new IllegalStateException("회차 좌석 데이터가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                }
+                long afterValidationNs = System.nanoTime();
+                int finalSeatCount = scheduleSeats.size();
 
                 // DTO 변환
                 List<ScheduleDto.SeatInfo> seats = scheduleSeats.stream()
                         .map(this::mapToSeatInfo)
                         .collect(Collectors.toList());
+                long afterDtoMappingNs = System.nanoTime();
+
+                log.info(
+                        "좌석 조회 타이밍: scheduleId={}, scheduleLookupMs={}, initialSeatQueryMs={}, validationMs={}, dtoMapMs={}, totalMs={}, initialSeatCount={}, finalSeatCount={}",
+                        scheduleId,
+                        toMs(afterScheduleLookupNs - startNs),
+                        toMs(afterInitialSeatQueryNs - afterScheduleLookupNs),
+                        toMs(afterValidationNs - afterInitialSeatQueryNs),
+                        toMs(afterDtoMappingNs - afterValidationNs),
+                        toMs(afterDtoMappingNs - startNs),
+                        initialSeatCount,
+                        finalSeatCount
+                );
 
                 return ScheduleDto.SeatsResponse.builder()
                         .maxSelectable(MAX_SELECTABLE_SEATS)
@@ -87,9 +116,19 @@ public class ScheduleSeatService {
                         .build();
         }
 
-        // --- Private Methods (Logic & Mapping) ---
+        private long toMs(long nanos) {
+                return nanos / 1_000_000;
+        }
 
-        private List<ScheduleSeat> initializeScheduleSeats(ShowSchedule schedule) {
+        private boolean hasMissingScheduleSeats(ShowSchedule schedule, List<ScheduleSeat> currentScheduleSeats) {
+                if (schedule.getShow().getVenue() == null) {
+                        return false;
+                }
+                int totalVenueSeats = seatRepository.findByVenueId(schedule.getShow().getVenue().getId()).size();
+                return currentScheduleSeats.size() < totalVenueSeats;
+        }
+
+        private int backfillScheduleSeats(ShowSchedule schedule, List<ScheduleSeat> currentScheduleSeats) {
                 Show show = schedule.getShow();
                 if (show.getVenue() == null) {
                         throw new IllegalArgumentException("공연에 연결된 공연장 정보가 없습니다.");
@@ -97,36 +136,39 @@ public class ScheduleSeatService {
 
                 List<Seat> seats = seatRepository.findByVenueId(show.getVenue().getId());
                 List<ShowSeatGrade> seatGrades = showSeatGradeRepository.findByShowId(show.getId());
-
                 if (seats.isEmpty() || seatGrades.isEmpty()) {
-                        log.warn("초기화 실패: 좌석({}) 또는 등급({}) 정보 부족 - showId={}", seats.size(), seatGrades.size(), show.getId());
-                        return new ArrayList<>();
+                        throw new IllegalStateException("회차 좌석 초기화 실패: 좌석 또는 등급 정보가 비어있습니다.");
                 }
 
                 Map<Long, ShowSeatGrade> gradeMap = seatGrades.stream()
-                        .collect(Collectors.toMap(
-                                g -> g.getSection().getId(),
-                                g -> g,
-                                (existing, replacement) -> existing
-                        ));
+                        .collect(Collectors.toMap(g -> g.getSection().getId(), g -> g, (existing, replacement) -> existing));
+                Set<Long> existingSeatIds = currentScheduleSeats.stream()
+                        .map(ss -> ss.getSeat().getId())
+                        .collect(Collectors.toCollection(HashSet::new));
 
-                List<ScheduleSeat> scheduleSeatsToSave = new ArrayList<>();
+                List<ScheduleSeat> toInsert = new ArrayList<>();
                 for (Seat seat : seats) {
-                        ShowSeatGrade grade = gradeMap.get(seat.getSection().getId());
-                        if (grade != null) {
-                                scheduleSeatsToSave.add(ScheduleSeat.builder()
-                                        .schedule(schedule)
-                                        .seat(seat)
-                                        .grade(grade)
-                                        .build());
+                        if (existingSeatIds.contains(seat.getId())) {
+                                continue;
                         }
+                        ShowSeatGrade grade = gradeMap.get(seat.getSection().getId());
+                        if (grade == null) {
+                                continue;
+                        }
+                        toInsert.add(ScheduleSeat.builder()
+                                .schedule(schedule)
+                                .seat(seat)
+                                .grade(grade)
+                                .build());
                 }
 
-                scheduleSeatRepository.saveAll(scheduleSeatsToSave);
-                log.info("ScheduleSeat 초기화 완료: scheduleId={}, count={}", schedule.getId(), scheduleSeatsToSave.size());
+                if (toInsert.isEmpty()) {
+                        return 0;
+                }
 
-                // 영속성 컨텍스트 갱신을 위해 다시 조회
-                return scheduleSeatRepository.findSeatMapByScheduleId(schedule.getId());
+                scheduleSeatInitService.insertMissingSeats(toInsert, schedule.getId());
+                log.info("회차 좌석 누락 보정 수행: scheduleId={}, inserted={}", schedule.getId(), toInsert.size());
+                return toInsert.size();
         }
 
         private ScheduleDto.SeatInfo mapToSeatInfo(ScheduleSeat ss) {

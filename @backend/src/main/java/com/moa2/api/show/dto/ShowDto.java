@@ -157,25 +157,27 @@ public class ShowDto {
                                 .build();
         }
 
-        public static AdminDetailResponse ofAdminDetail(Show show, List<ShowSchedule> schedules,
-                        List<ShowSeatGrade> seatGrades, Long totalSeats, Map<Long, Long> reservationCounts) {
-                // 스케줄 정보 구성
-                List<AdminDetailResponse.AdminScheduleInfo> scheduleInfos = schedules.stream()
-                                .map(schedule -> {
-                                        Long reservationCount = reservationCounts.getOrDefault(schedule.getId(), 0L);
-                                        Long remainingSeats = totalSeats - reservationCount;
+	public static AdminDetailResponse ofAdminDetail(Show show, List<ShowSchedule> schedules,
+			List<ShowSeatGrade> seatGrades, Map<Long, int[]> seatStatsMap, Map<Long, Long> reservationCounts) {
+		// 스케줄 정보 구성
+		List<AdminDetailResponse.AdminScheduleInfo> scheduleInfos = schedules.stream()
+				.map(schedule -> {
+					int[] seatCounts = seatStatsMap.getOrDefault(schedule.getId(), new int[]{ 0, 0 });
+					int totalSeats = seatCounts[0];
+					int remainingSeats = seatCounts[1];
+					Long reservationCount = reservationCounts.getOrDefault(schedule.getId(), 0L);
 
-                                        return AdminDetailResponse.AdminScheduleInfo.builder()
-                                                        .scheduleId(schedule.getId())
-                                                        .showDate(schedule.getShowDate())
-                                                        .showTime(schedule.getShowTime())
-                                                        .ticketOpenTime(schedule.getTicketOpenTime())
-                                                        .remainingSeats(remainingSeats.intValue())
-                                                        .totalSeats(totalSeats.intValue())
-                                                        .reservationCount(reservationCount.intValue())
-                                                        .build();
-                                })
-                                .collect(Collectors.toList());
+					return AdminDetailResponse.AdminScheduleInfo.builder()
+							.scheduleId(schedule.getId())
+							.showDate(schedule.getShowDate())
+							.showTime(schedule.getShowTime())
+							.ticketOpenTime(schedule.getTicketOpenTime())
+							.remainingSeats(remainingSeats)
+							.totalSeats(totalSeats)
+							.reservationCount(reservationCount.intValue())
+							.build();
+				})
+				.collect(Collectors.toList());
 
                 // 좌석 가격 정보 구성
                 List<AdminDetailResponse.SeatPriceInfo> seatPriceInfos = seatGrades.stream()

@@ -13,6 +13,7 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "예매 관리 API", description = "관리자 예매 관리 API")
 public interface AdminReservationControllerDocs {
@@ -64,7 +65,9 @@ public interface AdminReservationControllerDocs {
                         schema = @Schema(type = "integer", defaultValue = "10")),
         })
         ResponseEntity<ApiResponse<PageResponse<AdminReservationDto.ListResponse>>> getReservations(
-                        @ParameterObject @ModelAttribute AdminReservationDto.SearchCondition condition);
+                        @ParameterObject @ModelAttribute AdminReservationDto.SearchCondition condition,
+                        @Parameter(hidden = true) @RequestParam(value = "dateType", required = false) String dateType,
+                        @Parameter(hidden = true) @RequestParam(value = "dateSearchType", required = false) String dateSearchType);
 
         @Operation(
                 summary = "예매 상세 조회",

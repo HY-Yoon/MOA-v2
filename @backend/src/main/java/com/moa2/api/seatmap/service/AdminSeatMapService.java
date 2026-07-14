@@ -82,6 +82,8 @@ public class AdminSeatMapService {
                                 .findByRegionAndVenueNameAndHallName(request.region(), request.venueName(),
                                                 request.hallName())
                                 .ifPresent(existing -> {
+                                        log.warn("좌석배치도 중복 등록 시도: region={}, venueName={}, hallName={}",
+                                                        request.region(), request.venueName(), request.hallName());
                                         throw new RuntimeException(
                                                         String.format("이미 등록된 좌석배치도입니다: %s, %s, %s",
                                                                         request.region().name(), request.venueName(),

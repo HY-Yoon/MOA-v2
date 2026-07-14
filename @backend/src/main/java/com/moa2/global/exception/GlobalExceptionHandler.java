@@ -8,16 +8,20 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,6 +38,9 @@ public class GlobalExceptionHandler {
         if (e.getMessage() != null && e.getMessage().contains("찾을 수 없습니다")) {
             status = HttpStatus.NOT_FOUND;
         }
+
+        log.warn("RuntimeException 처리: status={}, type={}, message={}",
+                status.value(), e.getClass().getSimpleName(), e.getMessage());
         
         return ResponseEntity.status(status)
             .body(ApiResponse.error(e.getMessage()));
@@ -54,6 +61,8 @@ public class GlobalExceptionHandler {
             .map(entry -> entry.getKey() + ": " + entry.getValue())
             .reduce((a, b) -> a + ", " + b)
             .orElse("입력값 검증에 실패했습니다");
+
+        log.warn("MethodArgumentNotValidException 처리: {}", detailMessage);
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.error("입력값 검증에 실패했습니다: " + detailMessage));
@@ -66,8 +75,38 @@ public class GlobalExceptionHandler {
         if (e.getMessage() != null && e.getMessage().contains("찾을 수 없습니다")) {
             status = HttpStatus.NOT_FOUND;
         }
+        log.warn("IllegalArgumentException 처리: status={}, message={}", status.value(), e.getMessage());
         return ResponseEntity.status(status)
             .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e) {
+        log.warn("MethodArgumentTypeMismatchException 처리: param={}, value={}, requiredType={}, message={}",
+                e.getName(), e.getValue(), e.getRequiredType(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("요청 파라미터 타입이 올바르지 않습니다: " + e.getName()));
+    }
+
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleBindException(BindException e) {
+        String detailMessage = e.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("요청 파라미터 바인딩에 실패했습니다.");
+        log.warn("BindException 처리: {}", detailMessage);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("요청 파라미터 바인딩에 실패했습니다: " + detailMessage));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e) {
+        log.warn("MissingServletRequestParameterException 처리: paramName={}, paramType={}",
+                e.getParameterName(), e.getParameterType());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("필수 요청 파라미터가 누락되었습니다: " + e.getParameterName()));
     }
 
     /**
@@ -86,7 +125,7 @@ public class GlobalExceptionHandler {
             
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(
-                    "잘못된 지역 값입니다."
+                    "잘못된 지역 값입니다. 허용값: " + acceptedValues
                 ));
         }
         
@@ -166,7 +205,7 @@ public class GlobalExceptionHandler {
                 LogMaskingUtil.mask(error.getDescription()));
         
         HttpStatus status = getOAuth2HttpStatus(errorCode);
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(Objects.requireNonNull(status))
             .body(ApiResponse.error(errorMessage));
     }
 

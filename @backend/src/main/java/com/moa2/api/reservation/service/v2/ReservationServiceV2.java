@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.RedisCallback;
 
@@ -55,19 +57,46 @@ public class ReservationServiceV2 {
             Long userId,
             Long scheduleId,
             List<Long> scheduleSeatIds) {
-        log.info("V2 좌석 선 점 시작 - userId: {}, scheduleId: {}, scheduleSeatIds: {}", userId, scheduleId, scheduleSeatIds);
+        log.info("V2 좌석 선점 시작 - userId: {}, scheduleId: {}, scheduleSeatIds: {}", userId, scheduleId, scheduleSeatIds);
 
         // 1. 좌석 ID 정렬 (데드락 방지)
         List<Long> sortedSeatIds = new ArrayList<>(scheduleSeatIds);
         sortedSeatIds.sort(Long::compareTo);
 
+        // 2. Redis 상태 일괄 사전 확인 (pipeline - 왕복 1회, 빠른 실패)
+        List<String> statusKeys = sortedSeatIds.stream()
+                .map(id -> SEAT_STATUS_PREFIX + id)
+                .toList();
+
+        List<Object> preCheckResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (String key : statusKeys) {
+                connection.stringCommands().get(key.getBytes());
+            }
+            return null;
+        });
+
+        List<String> preConflicts = new ArrayList<>();
+        for (int i = 0; i < sortedSeatIds.size(); i++) {
+            if (preCheckResults.get(i) != null) {
+                preConflicts.add(String.valueOf(sortedSeatIds.get(i)));
+            }
+        }
+        if (!preConflicts.isEmpty()) {
+            throw new SeatConflictException(preConflicts);
+        }
+
+        // 3. DB 일괄 조회 (IN 쿼리 - 왕복 1회)
+        List<ScheduleSeat> allSeats = scheduleSeatRepository.findAllByIdsWithGradeAndSchedule(sortedSeatIds);
+        Map<Long, ScheduleSeat> seatMap = allSeats.stream()
+                .collect(Collectors.toMap(ScheduleSeat::getId, s -> s));
+
+        // 4. 좌석별 락 획득 + 최종 검증 + Redis 선점
         List<Long> validatedSeatIds = new ArrayList<>();
         List<RLock> acquiredLocks = new ArrayList<>();
         List<String> conflictSeatNumbers = new ArrayList<>();
         int totalAmount = 0;
 
         try {
-            // 2. 각 좌석에 대해 Redis 분산 락 획득 및 검증
             for (Long seatId : sortedSeatIds) {
                 RLock lock = redissonClient.getLock(SEAT_LOCK_PREFIX + seatId);
 
@@ -83,30 +112,27 @@ public class ReservationServiceV2 {
 
                     acquiredLocks.add(lock);
 
-                    // Redis 캐시 확인 (빠른 중복 체크 - DB 접근 없이)
+                    // 락 획득 후 재확인 (경합 방지)
                     String statusKey = SEAT_STATUS_PREFIX + seatId;
                     String cachedStatus = redisTemplate.opsForValue().get(statusKey);
-
                     if (cachedStatus != null) {
-                        // 이미 누군가 선점했거나 판매된 좌석
                         conflictSeatNumbers.add(String.valueOf(seatId));
                         continue;
                     }
 
-                    // 좌석 엔티티 조회 (유효성 검증용)
-                    ScheduleSeat scheduleSeat = scheduleSeatRepository.findById(seatId)
-                            .orElseThrow(() -> new IllegalArgumentException("좌석을 찾을 수 없습니다: " + seatId));
-
+                    ScheduleSeat scheduleSeat = seatMap.get(seatId);
+                    if (scheduleSeat == null) {
+                        throw new IllegalArgumentException("좌석을 찾을 수 없습니다: " + seatId);
+                    }
                     if (scheduleSeat.getStatus() != SeatStatus.AVAILABLE) {
                         conflictSeatNumbers.add(String.valueOf(seatId));
                         continue;
                     }
-
                     if (!scheduleSeat.getSchedule().getId().equals(scheduleId)) {
                         throw new IllegalArgumentException("해당 스케줄의 좌석이 아닙니다: " + seatId);
                     }
 
-                    // Redis에 선점 저장: seat:status:{seatId} = userId (TTL)
+                    // Redis 선점 저장 (TTL)
                     redisTemplate.opsForValue().set(
                             statusKey,
                             String.valueOf(userId),
@@ -122,25 +148,20 @@ public class ReservationServiceV2 {
                 }
             }
 
-            // 충돌된 좌석이 있으면 SeatConflictException 발생
             if (!conflictSeatNumbers.isEmpty()) {
-                // 이미 선점한 좌석들의 Redis 키 롤백
                 for (Long seatId : validatedSeatIds) {
                     redisTemplate.delete(SEAT_STATUS_PREFIX + seatId);
                 }
                 throw new SeatConflictException(conflictSeatNumbers);
             }
 
-            // 선점 결과 반환 (DB Write 없음!)
             long remainingSeconds = (long) lockTtlMinutes * 60;
-
             log.info("V2 좌석 선점 완료 - userId: {}, seats: {}, totalAmount: {}", userId, validatedSeatIds, totalAmount);
 
             return ReservationDtoV2.ReserveSeatResponse.of(
                     validatedSeatIds.size(), remainingSeconds, totalAmount);
 
         } finally {
-            // 락 해제 (항상 실행)
             for (RLock lock : acquiredLocks) {
                 try {
                     if (lock.isHeldByCurrentThread()) {

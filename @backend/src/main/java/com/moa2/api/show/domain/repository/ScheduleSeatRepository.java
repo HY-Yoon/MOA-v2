@@ -30,6 +30,14 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
                      "WHERE ss.schedule.id = :scheduleId")
        List<ScheduleSeat> findSeatMapByScheduleId(@Param("scheduleId") Long scheduleId);
 
+       @Modifying
+       @Query("DELETE FROM ScheduleSeat ss WHERE ss.schedule.id = :scheduleId")
+       int deleteByScheduleId(@Param("scheduleId") Long scheduleId);
+
+       @Modifying
+       @Query("DELETE FROM ScheduleSeat ss WHERE ss.schedule.id IN :scheduleIds")
+       int deleteByScheduleIdIn(@Param("scheduleIds") List<Long> scheduleIds);
+
 
 
        /**
@@ -70,6 +78,15 @@ public interface ScheduleSeatRepository extends JpaRepository<ScheduleSeat, Long
         * 특정 회차의 전체 좌석 수 조회
         */
        Long countByScheduleId(Long scheduleId);
+
+       /**
+        * 특정 좌석 ID 목록을 등급/스케줄 포함 일괄 조회 (선점 시 N+1 방지)
+        */
+       @Query("SELECT ss FROM ScheduleSeat ss " +
+                     "JOIN FETCH ss.grade g " +
+                     "JOIN FETCH ss.schedule sch " +
+                     "WHERE ss.id IN :ids")
+       List<ScheduleSeat> findAllByIdsWithGradeAndSchedule(@Param("ids") List<Long> ids);
 
        /**
         * 회차별 좌석 등급 통계 (구역ID, 구역명, 가격, 잔여석, 전체석)

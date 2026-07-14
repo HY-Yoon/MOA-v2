@@ -13,6 +13,7 @@ import com.moa2.api.show.domain.repository.ScheduleSeatRepository;
 import com.moa2.api.user.domain.entity.User;
 import com.moa2.api.user.domain.repository.UserRepository;
 import com.moa2.global.dto.PageResponse;
+import com.moa2.global.model.SocialProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ import com.moa2.api.reservation.domain.specification.ReservationSpecification;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import com.moa2.api.reservation.dto.ReservationSearchCondition;
@@ -50,10 +52,9 @@ public class ReservationService {
          * 내 예매 내역 목록 조회
          */
         @Transactional(readOnly = true)
-        public PageResponse<ReservationDto.ListResponse> getMyReservations(String email,
+        public PageResponse<ReservationDto.ListResponse> getMyReservations(String email, String provider,
                         ReservationSearchCondition condition, Pageable pageable) {
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
+                User user = findUserByEmailAndProvider(email, provider);
 
                 Specification<Reservation> spec = Specification.where(ReservationSpecification.equalUser(user));
 
@@ -83,9 +84,8 @@ public class ReservationService {
          * 예매 상세 조회
          */
         @Transactional(readOnly = true)
-        public ReservationDto.DetailResponse getReservationDetail(String email, Long reservationId) {
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
+        public ReservationDto.DetailResponse getReservationDetail(String email, String provider, Long reservationId) {
+                User user = findUserByEmailAndProvider(email, provider);
 
                 // 본인의 예매만 조회 가능 (N+1 방지: Fetch Join)
                 Reservation reservation = reservationRepository.findWithDetailsByIdAndUser(reservationId, user)
@@ -103,9 +103,8 @@ public class ReservationService {
          * 예매 취소
          */
         @Transactional
-        public ReservationDto.CancelResponse cancelReservation(String email, Long reservationId) {
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
+        public ReservationDto.CancelResponse cancelReservation(String email, String provider, Long reservationId) {
+                User user = findUserByEmailAndProvider(email, provider);
 
                 // 본인의 예매만 취소 가능 (단건 조회라 일반 메서드 사용해도 무방하지만 일관성 위해 withDetails 권장)
                 Reservation reservation = reservationRepository.findByIdAndUser(reservationId, user)
@@ -165,5 +164,22 @@ public class ReservationService {
                                 .reservationNumber(reservation.getReservationNumber())
                                 .message("예매가 취소되었습니다.")
                                 .build();
+        }
+
+        private User findUserByEmailAndProvider(String email, String provider) {
+                if (email == null || email.isBlank() || provider == null || provider.isBlank()) {
+                        throw new IllegalArgumentException("인증 정보가 올바르지 않습니다. 다시 로그인해주세요.");
+                }
+
+                SocialProvider socialProvider;
+                try {
+                        socialProvider = SocialProvider.valueOf(provider.toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException("유효하지 않은 provider 입니다. 다시 로그인해주세요.");
+                }
+
+                return userRepository.findByEmailAndSocialProvider(email, socialProvider)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "사용자를 찾을 수 없습니다: " + email + " (" + socialProvider + ")"));
         }
 }

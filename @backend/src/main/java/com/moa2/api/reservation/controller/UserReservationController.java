@@ -9,7 +9,6 @@ import com.moa2.global.dto.PageResponse;
 import com.moa2.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -35,11 +34,24 @@ public class UserReservationController implements UserReservationControllerDocs 
   public ResponseEntity<ApiResponse<PageResponse<ReservationDto.ListResponse>>> getMyReservations(
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @ModelAttribute ReservationSearchCondition condition) {
+    String userEmail = userPrincipal != null ? userPrincipal.getEmail() : null;
+    String userProvider = userPrincipal != null ? userPrincipal.getProvider() : null;
+    log.info(
+        "[UserReservationController#getMyReservations] userEmail={}, provider={}, status={}, paymentStatus={}, dateType={}, startDate={}, endDate={}, page={}, size={}",
+        userEmail != null ? userEmail : "anonymous",
+        userProvider != null ? userProvider : "unknown",
+        condition.status(),
+        condition.paymentStatus(),
+        condition.dateType(),
+        condition.startDate(),
+        condition.endDate(),
+        condition.page(),
+        condition.size());
 
     // 최신순 정렬
     Pageable pageable = PageRequest.of(condition.page(), condition.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
 
-    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userPrincipal.getEmail(),
+    PageResponse<ReservationDto.ListResponse> response = reservationService.getMyReservations(userEmail, userProvider,
         condition, pageable);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
@@ -50,7 +62,9 @@ public class UserReservationController implements UserReservationControllerDocs 
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @PathVariable Long reservationId) {
 
-    ReservationDto.DetailResponse response = reservationService.getReservationDetail(userPrincipal.getEmail(),
+    ReservationDto.DetailResponse response = reservationService.getReservationDetail(
+        userPrincipal.getEmail(),
+        userPrincipal.getProvider(),
         reservationId);
     return ResponseEntity.ok(ApiResponse.success(response));
   }
@@ -61,7 +75,9 @@ public class UserReservationController implements UserReservationControllerDocs 
       @AuthenticationPrincipal UserPrincipal userPrincipal,
       @PathVariable Long reservationId) {
 
-    ReservationDto.CancelResponse response = reservationService.cancelReservation(userPrincipal.getEmail(),
+    ReservationDto.CancelResponse response = reservationService.cancelReservation(
+        userPrincipal.getEmail(),
+        userPrincipal.getProvider(),
         reservationId);
     return ResponseEntity.ok(ApiResponse.success(response, response.message()));
   }
