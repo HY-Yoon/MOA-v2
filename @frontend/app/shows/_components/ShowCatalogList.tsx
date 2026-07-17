@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/atoms';
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/atoms';
 import { ShowListItemCard } from '@/components/molecules';
 import { GENRE_OPTIONS, REGION_OPTIONS } from '@/constants/common';
 import { fetchShowCatalogList } from '@/lib/api/show';
@@ -17,7 +9,7 @@ import { Loader2, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const PAGE_SIZE = 20;
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 const DEFAULT_SORT: SortLabel = '인기순';
 
 const SORT_OPTIONS = [
@@ -85,8 +77,7 @@ const getMockShowCatalogPage = async (
     .filter((show) => (params.region ? show.location.region === params.region : true))
     .filter((show) => {
       if (!keyword) return true;
-      const searchable =
-        `${show.title} ${show.location.venue} ${show.location.hallName}`.toLowerCase();
+      const searchable = `${show.title} ${show.location.venue} ${show.location.hallName}`.toLowerCase();
       return searchable.includes(keyword);
     })
     .filter((show) => {
@@ -166,29 +157,28 @@ export default function ShowCatalogList() {
     [keyword, selectedRegion, selectedGenre, startDate, endDate, sortConfig],
   );
 
-  const { data, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
-    useInfiniteQuery({
-      queryKey: ['show', 'catalog', 'infinite', baseParams],
-      initialPageParam: 0,
-      queryFn: async ({ pageParam }) => {
-        const requestParams = {
-          ...baseParams,
-          page: pageParam,
-          size: PAGE_SIZE,
-        };
-        const apiResponse = await fetchShowCatalogList(requestParams).catch(() => undefined);
-        if (USE_MOCK_DATA) {
-          return getMockShowCatalogPage(requestParams, mockShows);
-        }
-        return apiResponse;
-      },
-      getNextPageParam: (lastPage) => {
-        if (!lastPage || lastPage.last) {
-          return undefined;
-        }
-        return lastPage.page + 1;
-      },
-    });
+  const { data, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } = useInfiniteQuery({
+    queryKey: ['show', 'catalog', 'infinite', baseParams],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const requestParams = {
+        ...baseParams,
+        page: pageParam,
+        size: PAGE_SIZE,
+      };
+      const apiResponse = await fetchShowCatalogList(requestParams).catch(() => undefined);
+      if (USE_MOCK_DATA) {
+        return getMockShowCatalogPage(requestParams, mockShows);
+      }
+      return apiResponse;
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.last) {
+        return undefined;
+      }
+      return lastPage.page + 1;
+    },
+  });
 
   const shows = useMemo(() => data?.pages.flatMap((page) => page?.content ?? []) ?? [], [data]);
   const isInitialLoading = isFetching && shows.length === 0;
@@ -232,17 +222,14 @@ export default function ShowCatalogList() {
           <button
             type="button"
             onClick={onSubmitSearch}
-            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+            className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
           >
             <Search className="h-4 w-4" />
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={selectedRegion}
-            onValueChange={(value) => setSelectedRegion(value as ShowCatalog.Region | 'ALL')}
-          >
+          <Select value={selectedRegion} onValueChange={(value) => setSelectedRegion(value as ShowCatalog.Region | 'ALL')}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="지역" />
             </SelectTrigger>
@@ -256,10 +243,7 @@ export default function ShowCatalogList() {
             </SelectContent>
           </Select>
 
-          <Select
-            value={selectedGenre}
-            onValueChange={(value) => setSelectedGenre(value as ShowCatalog.Genre | 'ALL')}
-          >
+          <Select value={selectedGenre} onValueChange={(value) => setSelectedGenre(value as ShowCatalog.Genre | 'ALL')}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="장르" />
             </SelectTrigger>
@@ -289,10 +273,7 @@ export default function ShowCatalogList() {
             className="w-[160px]"
           />
 
-          <Select
-            value={selectedSort}
-            onValueChange={(value) => setSelectedSort(value as SortLabel)}
-          >
+          <Select value={selectedSort} onValueChange={(value) => setSelectedSort(value as SortLabel)}>
             <SelectTrigger className="ml-auto w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -349,18 +330,12 @@ export default function ShowCatalogList() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
             {shows.map((show) => (
-              <ShowListItemCard
-                key={show.id}
-                show={show}
-                href={USE_MOCK_DATA ? undefined : `/shows/${show.id}`}
-              />
+              <ShowListItemCard key={show.id} show={show} href={`/shows/${show.id}`} />
             ))}
           </div>
 
           <div ref={sentinelRef} className="flex h-12 items-center justify-center">
-            {isFetchingNextPage ? (
-              <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-            ) : null}
+            {isFetchingNextPage ? <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" /> : null}
             {!hasNextPage && shows.length > 0 ? (
               <p className="text-muted-foreground text-sm">마지막 공연입니다.</p>
             ) : null}
