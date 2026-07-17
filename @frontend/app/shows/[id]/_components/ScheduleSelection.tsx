@@ -92,7 +92,10 @@ export default function ScheduleSelection({ schedules = [] }: Props) {
 
     if (detail.seatGrades?.length) {
       return detail.seatGrades
-        .map((g: ShowCatalog.SeatGrades) => `${g.sectionName}석 ${g.remainingSeats ?? 0}`)
+        .map((g: ShowCatalog.SeatGrades) => {
+          const sectionLabel = g.sectionName?.endsWith('석') ? g.sectionName : `${g.sectionName}석`;
+          return `${sectionLabel} ${g.remainingSeats ?? 0}`;
+        })
         .join(' / ');
     }
     return `잔여석 ${detail.remainingSeats ?? 0}`;
